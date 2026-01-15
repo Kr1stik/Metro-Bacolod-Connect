@@ -1,0 +1,217 @@
+/* --- RESET --- */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* --- MAIN CONTAINER --- */
+.hero-container {
+  display: flex;
+  height: 100vh; /* Full screen height */
+  width: 100vw;
+  overflow: hidden;
+  background-color: #f4f6f8; /* Light gray background */
+}
+
+/* --- LEFT SIDE (Info) --- */
+.hero-left {
+  flex: 1; /* Takes up 50% of width */
+  background-color: #0F172A; /* Dark Navy Blue */
+  color: white;
+  display: flex;
+  flex-direction: column;
+  padding: 60px;
+  justify-content: center; /* Centers content vertically */
+  position: relative;
+}
+
+.logo-section {
+  position: absolute;
+  top: 40px;
+  left: 40px;
+}
+
+.hero-logo {
+  width: 80px; /* Adjust size based on your logo */
+  height: auto;
+}
+
+.text-content {
+  margin-top: 60px;
+  max-width: 600px;
+}
+
+.hero-title {
+  font-size: 3rem;
+  font-weight: 700;
+  margin-bottom: 20px;
+  line-height: 1.2;
+}
+
+.hero-description {
+  font-size: 1.1rem;
+  line-height: 1.6;
+  opacity: 0.9;
+  font-weight: 300;
+}
+
+/* --- RIGHT SIDE (Form) --- */
+.hero-right {
+  flex: 1; /* Takes up 50% of width */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: white;
+}
+
+.login-box {
+  width: 100%;
+  max-width: 400px;
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.login-box h2 {
+  font-size: 2rem;
+  color: #333;
+  margin-bottom: 5px;
+}
+
+.login-subtext {
+  color: #666;
+  margin-bottom: 20px;
+  font-size: 0.9rem;
+}
+
+/* --- INPUTS & BUTTONS --- */
+.input-group input {
+  width: 100%;
+  padding: 12px 15px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border 0.3s;
+}
+
+.input-group input:focus {
+  border-color: #0F172A;
+  outline: none;
+}
+
+.primary-btn {
+  background-color: #0F172A; /* Matches left side */
+  color: white;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.primary-btn:hover {
+  opacity: 0.9;
+}
+
+.google-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background-color: white;
+  border: 1px solid #ddd;
+  padding: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  color: #333;
+  transition: background 0.2s;
+}
+
+.google-btn:hover {
+  background-color: #f9f9f9;
+}
+
+.divider {
+  text-align: center;
+  margin: 10px 0;
+  color: #aaa;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+}
+
+.divider::before, .divider::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid #ddd;
+}
+
+.divider span {
+  padding: 0 10px;
+}
+
+.message-text {
+  color: red;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.register-link {
+  text-align: center;
+  margin-top: 15px;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.register-link a {
+  color: #0F172A;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* --- RESPONSIVE DESIGN (Mobile) --- */
+@media (max-width: 900px) {
+  .hero-container {
+    flex-direction: column; /* Stack top to bottom */
+    height: auto;
+  }
+}
+  
+  .hero-left {
+    padding: 40px 20px;
+    align-items: center;
+    text-align: center;
+    min-height: 40vh;
+  }
+  
+  .logo-section {
+    position: static; /* Unstick logo on mobile */
+    margin-bottom: 20px;
+  }
+  
+  .hero-right {
+    padding: 40px 20px;
+  }
+/* Update this section in your App.css */
+.hero-right {
+  flex: 1; 
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: white;
+  
+  /* ADD THESE LINES to allow scrolling if form is too tall */
+  height: 100vh;
+  overflow-y: auto; 
+}
+
+/* Optional: Add some margin to the box so it doesn't touch edges when scrolling */
+.login-box {
+  margin: 40px 0; 
+}
