@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { createUserWithEmailAndPassword, signInWithPopup } from "firebase/auth";
-import { auth, googleProvider } from "../firebase-config";
-import { FcGoogle } from "react-icons/fc";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { auth } from "../firebase-config";
 import logo from "../assets/MBC Logo.png";
+import api from "../services/api";
 import "../App.css";
 
 export default function Register() {
@@ -19,54 +19,38 @@ export default function Register() {
   const navigate = useNavigate();
 
   const handleRegister = async () => {
+    // 1. Validation checks
     if (password !== confirmPassword) {
       setMessage("Passwords do not match.");
       return;
     }
     if (!firstName || !lastName || !address) {
-      setMessage("Please fill in all personal details.");
+      setMessage("Please fill in all details.");
       return;
     }
 
     try {
-      // 1. Create User in Firebase Auth (Handles Email/Pass validation)
+      // 2. Create Authentication (Email + Password) in Firebase
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
+      console.log("Auth Created. UID:", user.uid);
 
-      console.log("User Created in Firebase:", user.uid);
-
-      // 2. Prepare Data for your Backend
-      // (This is where you will eventually send this data to NestJS to save in the DB)
-      const userData = {
+      // 3. SEND DATA TO BACKEND (The missing link!)
+      // We send the UID (from step 2) along with the form data
+      await api.post('/users/create', {
         uid: user.uid,
         email: user.email,
-        firstName,
-        lastName,
-        address,
-      };
-      console.log("Ready to send to Backend:", userData);
+        firstName: firstName,
+        lastName: lastName,
+        address: address
+      });
 
       setMessage("Registration successful!");
-      // navigate("/dashboard"); 
+      navigate("/dashboard"); 
 
     } catch (error: any) {
-      if (error.code === 'auth/email-already-in-use') {
-        setMessage("Email is already registered.");
-      } else if (error.code === 'auth/weak-password') {
-        setMessage("Password should be at least 6 characters.");
-      } else {
-        setMessage("Registration failed. " + error.message);
-      }
-    }
-  };
-
-  const handleGoogleRegister = async () => {
-    try {
-      await signInWithPopup(auth, googleProvider);
-      setMessage("Registered with Google successfully!");
-      // navigate("/dashboard");
-    } catch (error: any) {
-      setMessage("Google registration failed.");
+      console.error("Error:", error);
+      setMessage("Registration failed: " + error.message);
     }
   };
 
@@ -89,7 +73,7 @@ export default function Register() {
 
       {/* RIGHT SIDE (Registration Form) */}
       <div className="hero-right">
-        <div className="login-box"> {/* Reusing login-box class for consistent style */}
+        <div className="login-box">
           <h2>Create Account</h2>
           <p className="login-subtext">Fill in your details to get started.</p>
           
@@ -120,17 +104,6 @@ export default function Register() {
           <button className="primary-btn" onClick={handleRegister}>
             Register
           </button>
-
-          <div className="divider">
-            <span>OR</span>
-          </div>
-
-          <button className="google-btn" onClick={handleGoogleRegister}>
-            <FcGoogle size={22} />
-            <span>Sign up with Google</span>
-          </button>
-
-          {message && <p className="message-text">{message}</p>}
 
           <p className="register-link">
             Already have an account? <Link to="/">Log in</Link>

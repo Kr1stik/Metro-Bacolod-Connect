@@ -3,6 +3,8 @@ import api from './services/api';
 import { Routes, Route } from 'react-router-dom';
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import CompleteProfile from "./pages/CompleteProfile";
+import Dashboard from "./pages/Dashboard";
 
 function App() {
   const [message, setMessage] = useState<string>('Connecting...');
@@ -28,6 +30,8 @@ function App() {
     <Routes>
       <Route path="/" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/complete-profile" element={<CompleteProfile />} />
+      <Route path="/dashboard" element={<Dashboard />} />
     </Routes>
   </>
   );

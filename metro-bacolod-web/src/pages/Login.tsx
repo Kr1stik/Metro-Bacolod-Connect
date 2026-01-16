@@ -3,7 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { signInWithEmailAndPassword, signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "../firebase-config";
 import { FcGoogle } from "react-icons/fc"; 
-import logo from "../assets/MBC Logo.png"; // Ensure this path matches your file structure
+import logo from "../assets/MBC Logo.png"; 
+import { getAdditionalUserInfo } from "firebase/auth";
 import "../App.css";
 
 export default function Login() {
@@ -13,20 +14,32 @@ export default function Login() {
   const navigate = useNavigate();
 
   const handleGoogleLogin = async () => {
-    try {
-      await signInWithPopup(auth, googleProvider);
-      setMessage("Login successful!");
-      // navigate("/dashboard"); 
-    } catch (error: any) {
-      setMessage("Google Login failed. " + error.message);
+  try {
+    const result = await signInWithPopup(auth, googleProvider);
+    
+    // Check if this is their first time logging in
+    const details = getAdditionalUserInfo(result);
+    
+    if (details?.isNewUser) {
+      // CASE 1: New User -> Send to "Complete Profile" page to get Address
+      console.log("New Google User! Redirecting to completion page...");
+      navigate("/complete-profile");
+    } else {
+      // CASE 2: Old User -> Send directly to Dashboard (Address is already in DB)
+      console.log("Welcome back!");
+      navigate("/dashboard");
     }
-  };
+    
+  } catch (error: any) {
+    setMessage("Google Login failed: " + error.message);
+  }
+};
 
   const handleEmailLogin = async () => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
       setMessage("Login successful!");
-      // navigate("/dashboard");
+      navigate("/dashboard");
     } catch (error: any) {
       setMessage("Invalid email or password.");
     }
@@ -34,8 +47,7 @@ export default function Login() {
 
   return (
     <div className="hero-container">
-      
-      {/* LEFT SIDE: Logo, Title, Description */}
+    
       <div className="hero-left">
         <div className="logo-section">
           <img src={logo} alt="Metro Bacolod Connect" className="hero-logo" />
@@ -51,7 +63,6 @@ export default function Login() {
         </div>
       </div>
 
-      {/* RIGHT SIDE: Login Form */}
       <div className="hero-right">
         <div className="login-box">
           <h2>Welcome Back</h2>
