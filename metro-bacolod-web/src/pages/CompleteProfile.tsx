@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth } from "../firebase-config";
-import { signOut } from "firebase/auth"; // Import signOut in case they want to cancel completely
+import { signOut } from "firebase/auth"; 
 import api from "../services/api";
 import logo from "../assets/MBC Logo.png";
 import "../App.css";
@@ -47,8 +47,6 @@ export default function CompleteProfile() {
       });
 
       setMessage("Profile saved! Redirecting...");
-      
-      // DELAY: Wait 1 second so user sees the success message, then go to Dashboard
       setTimeout(() => {
         navigate("/dashboard");
       }, 1000);
@@ -59,14 +57,10 @@ export default function CompleteProfile() {
     }
   };
 
-  // NEW: Handle the "Skip" action
   const handleSkip = () => {
-    // User wants to fill this later. Just send them to Dashboard.
-    console.log("User skipped profile completion.");
     navigate("/dashboard");
   };
 
-  // Optional: Handle "Cancel/Logout" if they didn't mean to sign in
   const handleCancel = async () => {
     await signOut(auth);
     navigate("/");
@@ -74,18 +68,19 @@ export default function CompleteProfile() {
 
   return (
     <div className="centered-page">
-      <div className="login-box centered-box">
+      <div className="centered-box">
         
-        <div style={{ textAlign: "center", marginBottom: "20px" }}>
-          <img src={logo} alt="MBC Logo" style={{ width: "60px", marginBottom: "10px" }} />
-          <h2>Complete Your Profile</h2>
-          <p className="login-subtext">
-            We need a few details to verify your account. You can also do this later.
+        <div style={{ textAlign: "center", marginBottom: "30px" }}>
+          {/* Using brand-logo class keeps it small */}
+          <img src={logo} alt="MBC Logo" className="brand-logo" style={{ margin: "0 auto 15px auto" }} />
+          <h2>Complete Profile</h2>
+          <p style={{ color: "#94A3B8", marginTop: "10px" }}>
+            We need a few details to verify your account.
           </p>
         </div>
         
         <div className="input-group">
-          <label style={{ fontSize: "0.9rem", fontWeight: "600", marginBottom: "5px", display: "block" }}>
+          <label style={{ fontSize: "0.9rem", color: "#fff", marginBottom: "8px", display: "block" }}>
             Home Address
           </label>
           <input 
@@ -96,8 +91,8 @@ export default function CompleteProfile() {
           />
         </div>
 
-        <div className="input-group">
-          <label style={{ fontSize: "0.9rem", fontWeight: "600", marginBottom: "5px", display: "block" }}>
+        <div className="input-group" style={{ marginTop: "20px" }}>
+          <label style={{ fontSize: "0.9rem", color: "#fff", marginBottom: "8px", display: "block" }}>
             Phone Number
           </label>
           <input 
@@ -108,43 +103,30 @@ export default function CompleteProfile() {
           />
         </div>
 
-        {/* Action Buttons */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "20px" }}>
-          
-          {/* Main Save Button */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "15px", marginTop: "30px" }}>
           <button className="primary-btn" onClick={handleSaveProfile}>
             Save & Continue
           </button>
 
-          {/* Skip Button (The "Back" option) */}
           <button 
             onClick={handleSkip}
-            style={{
-              background: "transparent",
-              border: "1px solid #ccc",
-              padding: "12px",
-              borderRadius: "8px",
-              cursor: "pointer",
-              color: "#666",
-              fontWeight: "600"
-            }}
+            className="action-btn"
+            style={{ border: "1px solid #334155", color: "#94A3B8" }} 
           >
             Skip for now
           </button>
-
         </div>
 
-        {/* Cancel Link */}
-        <p style={{ textAlign: "center", marginTop: "20px", fontSize: "0.9rem" }}>
+        <p style={{ textAlign: "center", marginTop: "25px", fontSize: "0.9rem" }}>
           <span 
             onClick={handleCancel} 
-            style={{ color: "#888", cursor: "pointer", textDecoration: "underline" }}
+            style={{ color: "#ef4444", cursor: "pointer", fontWeight: "600" }}
           >
             Cancel and Logout
           </span>
         </p>
 
-        {message && <p className="message-text" style={{ marginTop: "15px" }}>{message}</p>}
+        {message && <p className="message-text" style={{ marginTop: "15px", textAlign: "center", color: "#38BDF8" }}>{message}</p>}
       </div>
     </div>
   );

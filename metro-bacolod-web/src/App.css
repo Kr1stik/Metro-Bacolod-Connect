@@ -1,257 +1,569 @@
-/* 1. IMPORT GOOGLE FONTS (Poppins + Raleway) */
+/* =========================================
+   1. FONTS & GLOBAL RESET
+   ========================================= */
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Raleway:wght@300;400;500;600;700&display=swap');
 
-/* 2. GLOBAL RESET & VARIABLES */
 :root {
   --font-main: 'Poppins', sans-serif;
   --font-secondary: 'Raleway', sans-serif;
+  
+  /* DARK THEME PALETTE */
+  --bg-dark: #0F172A;       /* Deep Navy (Main Background) */
+  --bg-card: #1E293B;       /* Slate (Card Background) */
+  --text-primary: #FFFFFF;  /* White Text */
+  --text-secondary: #94A3B8;/* Muted Blue-Gray Text */
+  --accent-blue: #38BDF8;   /* Bright Blue (Buttons/Links) */
+  --border-color: #334155;  /* Subtle Border */
 }
 
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  /* Set Poppins as the default font for everything */
-  font-family: var(--font-main); 
+  font-family: var(--font-main);
 }
 
-/* 3. SPECIFIC FONT RULES */
-
-/* Headings often look good with the secondary font (Raleway) */
-h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-secondary);
-  font-weight: 700;
-}
-
-/* You can also create a utility class if you want to force Raleway specifically */
-.raleway-text {
-  font-family: var(--font-secondary);
-}
-
-/* --- MAIN CONTAINER --- */
-.hero-container {
-  display: flex;
-  height: 100vh; /* Full screen height */
+body {
+  background-color: var(--bg-dark);
+  color: var(--text-primary);
+  min-height: 100vh;
   width: 100vw;
-  overflow: hidden;
-  background-color: #f4f6f8; /* Light gray background */
+  overflow-x: hidden;
 }
 
-/* --- LEFT SIDE (Info) --- */
-.hero-left {
-  flex: 1; /* Takes up 50% of width */
-  background-color: #0F172A; /* Dark Navy Blue */
-  color: white;
-  display: flex;
-  flex-direction: column;
-  padding: 60px;
-  justify-content: center; /* Centers content vertically */
-  position: relative;
-}
-
-.logo-section {
-  position: absolute;
-  top: 40px;
-  left: 40px;
-}
-
-.hero-logo {
-  width: 80px; /* Adjust size based on your logo */
-  height: auto;
-}
-
-.text-content {
-  margin-top: 60px;
-  max-width: 600px;
-}
-
-.hero-title {
-  font-size: 3rem;
+/* Headings use Raleway */
+h1, h2, h3, h4, h5, h6, .brand-name {
+  font-family: var(--font-secondary);
   font-weight: 700;
-  margin-bottom: 20px;
-  line-height: 1.2;
 }
 
-.hero-description {
-  font-size: 1.1rem;
-  line-height: 1.6;
-  opacity: 0.9;
-  font-weight: 300;
-}
+/* =========================================
+   2. REUSABLE COMPONENTS (Buttons, Inputs, Cards)
+   ========================================= */
 
-/* --- RIGHT SIDE (Form) --- */
-.hero-right {
-  flex: 1;
-  display: flex;
-  align-items: flex-start;      /* Start at the top */
-  justify-content: center;
-  background-color: white;
-  overflow-y: auto;             /* Allow vertical scroll if needed */
-  height: 100vh;                /* Ensure full viewport height */
-}
-
-.login-box {
-  width: 100%;
-  max-width: 400px;
+/* Dark Cards */
+.glass-login-card, 
+.login-box, 
+.centered-box, 
+.post-card {
+  background-color: var(--bg-card) !important;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
   padding: 40px;
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-  margin-top: 60px;             /* Add space above the form */
-  margin-bottom: 30px;          /* Ensure space for the bottom link */
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  color: var(--text-primary);
 }
 
-.login-box h2 {
-  font-size: 2rem;
-  color: #333;
-  margin-bottom: 5px;
-}
-
-.login-subtext {
-  color: #666;
-  margin-bottom: 20px;
-  font-size: 0.9rem;
-}
-
-/* --- INPUTS & BUTTONS --- */
-.input-group input {
+/* Inputs */
+input, .create-input, .search-bar {
   width: 100%;
   padding: 12px 15px;
-  border: 1px solid #ddd;
+  background-color: var(--bg-dark) !important;
+  border: 1px solid var(--border-color) !important;
   border-radius: 8px;
+  color: white !important;
   font-size: 1rem;
-  transition: border 0.3s;
-}
-
-.input-group input:focus {
-  border-color: #0F172A;
   outline: none;
+  transition: border-color 0.3s;
 }
 
+input:focus, .create-input:focus {
+  border-color: var(--accent-blue) !important;
+}
+
+/* Primary Button */
 .primary-btn {
-  background-color: #0F172A; /* Matches left side */
-  color: white;
+  width: 100%;
+  background-color: var(--accent-blue);
+  color: var(--bg-dark);
   padding: 12px;
   border: none;
   border-radius: 8px;
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   transition: opacity 0.2s;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 10px;
 }
 
 .primary-btn:hover {
   opacity: 0.9;
 }
 
+/* Google Button */
 .google-btn {
+  width: 100%;
+  background-color: white;
+  color: #333;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  background-color: white;
-  border: 1px solid #ddd;
-  padding: 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 500;
-  color: #333;
-  transition: background 0.2s;
+  margin-top: 10px;
 }
 
 .google-btn:hover {
-  background-color: #f9f9f9;
+  background-color: #f0f0f0;
+}
+
+a {
+  color: var(--accent-blue);
+  text-decoration: none;
+}
+
+/* =========================================
+   3. LANDING PAGE (Login / Register)
+   ========================================= */
+
+.landing-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- FIXED HEADER ALIGNMENT --- */
+.landing-header {
+  width: 100%;
+  height: 80px; 
+  padding: 0 60px;
+  display: flex;
+  align-items: center;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 10;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  height: 100%;
+}
+
+.brand-logo {
+  width: 45px;
+  height: 45px;
+  object-fit: contain;
+  display: block;
+}
+
+.brand-name {
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  line-height: 1;
+  padding-top: 2px;
+}
+
+/* --- ADJUST LANDING CONTENT POSITION (FIXED) --- */
+
+.landing-content {
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  /* Reduce left padding from 80px to 40px */
+  padding: 120px 0 0 40px;
+  /* Optionally add gap for extra space between sections */
+  gap: 40px;
+}
+
+/* LEFT SIDE (Text) */
+.description-section {
+  flex: 1; 
+}
+
+.main-heading {
+  font-size: 3.5rem;
+  line-height: 1.2;
+  margin-bottom: 25px;
+}
+
+.sub-heading {
+  font-size: 1.1rem;
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+
+/* RIGHT SIDE (Form) - FORCED RIGHT */
+.form-section {
+  margin-left: auto;
+  padding-right: 50px;
+  flex: 0 0 auto;
+  width: auto;
+  display: flex;
+  justify-content: flex-end;
+  /* Optionally set a min-width */
+  min-width: 400px;
+}
+
+.glass-login-card {
+  width: 100%;
+  max-width: 400px;
 }
 
 .divider {
-  text-align: center;
-  margin: 10px 0;
-  color: #aaa;
-  font-size: 0.85rem;
   display: flex;
   align-items: center;
+  margin: 15px 0;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
 }
 
 .divider::before, .divider::after {
   content: "";
   flex: 1;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .divider span {
   padding: 0 10px;
 }
 
-.message-text {
-  color: red;
-  font-size: 0.9rem;
-  text-align: center;
-}
-
 .register-link {
   text-align: center;
   margin-top: 15px;
   font-size: 0.9rem;
-  color: #666;
+  color: var(--text-secondary);
 }
 
-.register-link a {
-  color: #0F172A;
+/* =========================================
+   4. DASHBOARD STYLES (Dark Mode)
+   ========================================= */
+
+.dashboard-layout {
+  padding-top: 70px; /* Space for fixed navbar */
+  min-height: 100vh;
+  background-color: var(--bg-dark);
+}
+
+.dashboard-body {
+  display: flex;
+  justify-content: center; /* Centers the whole group */
+  gap: 30px; /* Space between columns */
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* Navbar */
+.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 70px;
+  background-color: var(--bg-card);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 30px;
+  z-index: 1000;
+}
+
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.nav-logout-btn {
+  background-color: var(--border-color);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
   font-weight: 600;
-  text-decoration: none;
+  cursor: pointer;
 }
 
-/* --- RESPONSIVE DESIGN (Mobile) --- */
+.nav-logout-btn:hover {
+  background-color: #475569;
+}
+
+/* Feed */
+.feed-container {
+  max-width: 600px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-bottom: 40px;
+}
+
+/* Post Cards */
+.post-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.post-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 15px;
+}
+
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.author-name {
+  font-size: 1rem;
+  color: white;
+}
+
+.timestamp {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.post-text {
+  padding: 0 15px 15px;
+  color: #E2E8F0;
+  line-height: 1.5;
+}
+
+.post-image-container {
+  width: 100%;
+}
+
+.post-image {
+  width: 100%;
+  display: block;
+  max-height: 500px;
+  object-fit: cover;
+}
+
+.property-details {
+  display: flex;
+  gap: 20px;
+  padding: 15px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.action-bar {
+  display: flex;
+  padding: 5px;
+}
+
+.action-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  padding: 12px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 0.2s;
+}
+
+.action-btn:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+}
+
+.active-like {
+  color: #ef4444 !important;
+}
+
+/* =========================================
+   5. RESPONSIVE (Mobile) - FIXED
+   ========================================= */
+
 @media (max-width: 900px) {
-  .hero-container {
-    flex-direction: column; /* Stack top to bottom */
-    height: auto;
-  }
-  .hero-left {
-    padding: 40px 20px;
-    align-items: center;
+  /* Reset Landing Page Stack for Mobile */
+  .landing-content {
+    flex-direction: column;
+    padding: 40px 20px; /* Standard mobile padding */
     text-align: center;
-    min-height: 40vh;
+    gap: 30px;
+    margin-top: 60px; /* Clear header */
   }
-  .logo-section {
-    position: static; /* Unstick logo on mobile */
+
+  .form-section {
+    margin-left: 0; /* Remove right magnet */
+    width: 100%;
+    justify-content: center;
+    padding-right: 0; /* Remove Desktop padding */
+  }
+  
+  .description-section {
     margin-bottom: 20px;
   }
-  .hero-right {
-    padding: 40px 20px;
-    min-height: auto;
-    align-items: center;
+  
+  .sub-heading {
+    margin: 0 auto;
   }
-  .login-box {
-    margin: 20px 0;
+
+  /* Navbar Adjustments */
+  .landing-header {
+    padding: 20px;
+    justify-content: center;
+  }
+  
+  .search-bar {
+    display: none;
   }
 }
 
-/* --- CENTERED PAGE LAYOUT (For Complete Profile) --- */
+/* Centered Page Helper (for Complete Profile) */
 .centered-page {
   display: flex;
   justify-content: center;
   align-items: center;
   min-height: 100vh;
   width: 100vw;
-  background-color: #f4f6f8; /* Light gray background matching the login page */
+  padding: 20px;
 }
 
-/* Modifying the login box slightly when it is centered */
 .centered-box {
-  background: white;
   width: 100%;
-  max-width: 500px; /* Slightly wider than login for better form spacing */
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); /* Soft shadow for depth */
-  padding: 50px;
+  max-width: 500px;
 }
 
-/* Responsive fix for mobile */
-@media (max-width: 600px) {
-  .centered-box {
-    margin: 20px;
-    padding: 30px;
-    box-shadow: none; /* Flatten on mobile */
+/* --- SIDEBARS --- */
+.sidebar-left, .sidebar-right {
+  width: 280px; /* Fixed width for sidebars */
+  height: calc(100vh - 90px); /* Full height minus navbar */
+  position: sticky; /* Stays fixed while scrolling */
+  top: 90px;
+}
+
+/* Left Menu Styling */
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  border-radius: 10px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.menu-item:hover, .menu-item.active {
+  background-color: var(--bg-card);
+  color: var(--accent-blue);
+}
+
+/* Right Suggestions Styling */
+.suggestion-box {
+  background-color: var(--bg-card);
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+}
+
+.suggestion-box h4 {
+  margin-bottom: 15px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.suggestion-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+  font-weight: 500;
+}
+
+.sug-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background-color: #555;
+}
+.bg-blue { background-color: #38BDF8; }
+.bg-green { background-color: #10B981; }
+
+/* --- CENTER FEED --- */
+.feed-container {
+  flex: 1; /* Takes up remaining space */
+  max-width: 600px; /* Limits width to look like FB */
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.create-post-card {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.create-input {
+  border-radius: 30px !important;
+  background-color: var(--bg-dark) !important;
+  border: 1px solid var(--border-color) !important;
+  padding: 12px 20px !important;
+}
+
+/* Navbar Search tweaks */
+.search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon {
+  position: absolute;
+  left: 15px;
+  color: var(--text-secondary);
+  z-index: 1;
+}
+
+.search-bar {
+  padding-left: 40px !important; /* Space for icon */
+  border-radius: 30px !important;
+  background-color: var(--bg-dark) !important;
+}
+
+.nav-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  object-fit: cover;
+}
+
+.price-badge {
+  margin-left: auto;
+  color: #fff;
+  font-weight: 700;
+  background-color: rgba(255,255,255,0.1);
+  padding: 4px 10px;
+  border-radius: 10px;
+}
+
+/* --- RESPONSIVE --- */
+@media (max-width: 1000px) {
+  .sidebar-left, .sidebar-right {
+    display: none; /* Hide sidebars on smaller screens */
+  }
+  .dashboard-body {
+    padding: 10px;
   }
 }
