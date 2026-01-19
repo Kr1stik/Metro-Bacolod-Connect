@@ -7,6 +7,6 @@ export class UsersController {
 
   @Post('create')
   create(@Body() body: any) {
-    return this.usersService.createUserProfile(body);
+    return this.usersService.createUser(body);
   }
 }
