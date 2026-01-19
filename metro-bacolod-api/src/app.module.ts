@@ -3,17 +3,18 @@ import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
+import { FirebaseModule } from './firebase/firebase.module'; // IMPORT THIS
 
 @Module({
   imports: [
-    // This loads the .env file so process.env works
+    // 1. Load .env first
     ConfigModule.forRoot({
-      isGlobal: true, // Makes .env available everywhere
+      isGlobal: true,
     }),
-    UsersModule,
-    
-    // Your other modules will go here later
-    // AuthModule, 
+    // 2. Initialize Firebase
+    FirebaseModule, 
+    // 3. Load your Users feature
+    UsersModule, 
   ],
   controllers: [AppController],
   providers: [AppService],

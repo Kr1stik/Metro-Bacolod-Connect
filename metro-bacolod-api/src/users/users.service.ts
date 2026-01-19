@@ -1,26 +1,19 @@
 import { Injectable } from '@nestjs/common';
-import * as admin from 'firebase-admin';
+import * as admin from 'firebase-admin'; // Just import admin
 
 @Injectable()
 export class UsersService {
-  async createUserProfile(userData: any) {
-    const db = admin.firestore();
-    
+  async createUser(userData: any) {
     try {
-      // We use the User's UID as the document name. 
-      // This makes it easy to find them later (e.g. db.collection('users').doc(uid))
-      await db.collection('user_info').doc(userData.uid).set({
-        firstName: userData.firstName,
-        lastName: userData.lastName,
-        email: userData.email,
-        address: userData.address,
-        role: 'user', // Default role
-        createdAt: new Date().toISOString()
-      });
+      // DIRECTLY use admin.firestore()
+      // We don't need to call initializeApp() here because FirebaseModule did it already!
+      const db = admin.firestore();
       
-      return { message: 'User data saved successfully' };
+      await db.collection('users').doc(userData.uid).set(userData);
+      return { message: 'User created successfully' };
     } catch (error) {
-      throw new Error('Error saving to Firestore: ' + error.message);
+      console.error('Error creating user:', error);
+      throw error; // This helps you see the error in Render logs
     }
   }
 }
