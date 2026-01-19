@@ -7,7 +7,7 @@ import CompleteProfile from "./pages/CompleteProfile";
 import Dashboard from "./pages/Dashboard";
 
 function App() {
-  const [message, setMessage] = useState<string>('Connecting...');
+  const [ , setMessage] = useState<string>('Connecting...');
 
   useEffect(() => {
     // This function runs when the page loads
