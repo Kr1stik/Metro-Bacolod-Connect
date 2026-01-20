@@ -1,0 +1,22 @@
+export const BACOLOD_LOCATIONS = [
+  "Alijis",
+  "Banago",
+  "Bata",
+  "Cabug",
+  "Estefania",
+  "Felisa",
+  "Granada",
+  "Handumanan",
+  "Mandalagan",
+  "Mansilingan",
+  "Montevista",
+  "Pahanocoy",
+  "Punta Taytay",
+  "Singcang-Airport",
+  "Sum-ag",
+  "Taculing",
+  "Tangub",
+  "Villamonte",
+  "Vista Alegre",
+  "Others / Foreign" // For users outside Bacolod
+];

@@ -7,6 +7,7 @@ import logo from "../assets/MBC Logo.png";
 import "../App.css";
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { BACOLOD_LOCATIONS } from "../constants/locations";
 
 export default function Register() {
   const [email, setEmail] = useState("");
@@ -114,12 +115,26 @@ export default function Register() {
             </div>
 
             <div className="input-group" style={{ marginTop: "10px" }}>
-              <input 
-                type="text" 
-                placeholder="Home Address" 
+              <select 
                 value={address} 
-                onChange={e => setAddress(e.target.value)} 
-              />
+                onChange={e => setAddress(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "10px",
+                  borderRadius: "8px",
+                  border: "none",
+                  background: "rgba(255, 255, 255, 0.1)", // Matches your glass theme
+                  color: "white",
+                  outline: "none"
+                }}
+              >
+                <option value="" disabled style={{ color: "black" }}>Select Location</option>
+                {BACOLOD_LOCATIONS.map((loc) => (
+                  <option key={loc} value={loc} style={{ color: "black" }}>
+                    {loc}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="input-group" style={{ marginTop: "10px" }}>
