@@ -41,20 +41,11 @@ export default function Register() {
       });
 
       setMessage("Registration successful!");
-      navigate("/dashboard");
+      navigate("/");
 
     } catch (error: any) {
       console.error("Error:", error);
       setMessage("Registration failed: " + error.message);
-    }
-  };
-
-  const handleGoogleRegister = async () => {
-    try {
-      await signInWithPopup(auth, googleProvider);
-      navigate("/complete-profile");
-    } catch (error: any) {
-      setMessage("Google Registration failed.");
     }
   };
 
@@ -144,15 +135,6 @@ export default function Register() {
 
             <button className="primary-btn" onClick={handleRegister}>
               Sign Up
-            </button>
-
-            <div className="divider">
-              <span>OR</span>
-            </div>
-
-            <button className="google-btn" onClick={handleGoogleRegister}>
-              <FcGoogle size={22} />
-              <span>Sign up with Google</span>
             </button>
 
             {message && <p className="message-text" style={{ marginTop: "10px", color: "#ef4444" }}>{message}</p>}
