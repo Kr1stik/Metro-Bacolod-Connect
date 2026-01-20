@@ -6,28 +6,38 @@ import { FcGoogle } from "react-icons/fc";
 import logo from "../assets/MBC Logo.png"; 
 import "../App.css";
 
+// We still need ToastContainer for errors, but not for success (that moves to Dashboard)
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [message, setMessage] = useState("");
   const navigate = useNavigate();
 
   const handleGoogleLogin = async () => {
     try {
       await signInWithPopup(auth, googleProvider);
-      // UPDATED: Send to Complete Profile first to ensure we get their details
-      navigate("/complete-profile"); 
+      
+      // Pass a "state" object to the next page
+      navigate("/complete-profile", { state: { message: "👋 Welcome! Please complete your profile." } }); 
+      
     } catch (error: any) {
-      setMessage("Google Login failed. " + error.message);
+      console.error("Google Login Error:", error);
+      toast.error("❌ Google Login failed: " + error.message, { position: "top-left" });
     }
   };
 
   const handleEmailLogin = async () => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      navigate("/dashboard");
+      
+      // Pass "welcome: true" to the dashboard
+      navigate("/dashboard", { state: { welcome: true } });
+
     } catch (error: any) {
-      setMessage("Invalid email or password.");
+      console.error("Login Error:", error);
+      toast.error("❌ Invalid email or password.", { position: "top-left" });
     }
   };
 
@@ -44,7 +54,6 @@ export default function Login() {
       {/* MAIN CONTENT */}
       <div className="landing-content">
         
-        {/* LEFT SIDE */}
         <div className="description-section">
           <h1 className="main-heading">Secure Real Estate <br/> in Metro Bacolod</h1>
           <p className="sub-heading">
@@ -54,7 +63,6 @@ export default function Login() {
           </p>
         </div>
 
-        {/* RIGHT SIDE (Form) */}
         <div className="form-section">
           <div className="glass-login-card">
             <h2>Welcome Back</h2>
@@ -91,15 +99,14 @@ export default function Login() {
               <span>Sign in with Google</span>
             </button>
 
-            {message && <p className="message-text" style={{ marginTop: "10px", color: "#ef4444" }}>{message}</p>}
-
             <p className="register-link">
               Don't have an account? <Link to="/register">Create one</Link>
             </p>
           </div>
         </div>
-
       </div>
+
+      <ToastContainer position="top-left" theme="dark" />
     </div>
   );
 }

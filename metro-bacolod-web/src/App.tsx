@@ -5,6 +5,8 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import CompleteProfile from "./pages/CompleteProfile";
 import Dashboard from "./pages/Dashboard";
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 function App() {
   const [ , setMessage] = useState<string>('Connecting...');
@@ -27,6 +29,19 @@ function App() {
 
   return (
     <>
+    {/* This container handles the popups for the whole app */}
+      <ToastContainer 
+        position="top-left" 
+        autoClose={3000} 
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="dark" // Matches your dark theme
+      />
     <Routes>
       <Route path="/" element={<Login />} />
       <Route path="/register" element={<Register />} />

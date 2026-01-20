@@ -1,15 +1,21 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { auth } from "../firebase-config";
 import { signOut } from "firebase/auth";
 import { 
   FaHeart, FaRegHeart, FaShare, FaMapMarkerAlt, FaBed, FaBath, 
-  FaHome, FaUserFriends, FaStore, FaBookmark, FaSearch
+  FaHome, FaUserFriends, FaStore, FaBookmark, FaSearch,
+  FaUser, FaCog, FaSignOutAlt, FaCaretDown 
 } from "react-icons/fa"; 
 import logo from "../assets/MBC Logo.png";
 import "../App.css";
 
-// MOCK DATA
+// 1. Import SweetAlert2 for the confirmation dialog
+import Swal from 'sweetalert2';
+
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+
 const MOCK_POSTS = [
   {
     id: 1,
@@ -42,7 +48,21 @@ const MOCK_POSTS = [
 export default function Dashboard() {
   const [user, setUser] = useState<any>(null);
   const [likedPosts, setLikedPosts] = useState<number[]>([]);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.state && location.state.welcome) {
+      toast.success(`👋 Welcome back, ${auth.currentUser?.displayName || 'User'}!`, {
+        position: "top-right",
+        autoClose: 3000,
+        theme: "dark",
+      });
+      window.history.replaceState({}, document.title);
+    }
+  }, [location]);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((currentUser) => {
@@ -52,10 +72,32 @@ export default function Dashboard() {
     return () => unsubscribe();
   }, [navigate]);
 
-  const handleLogout = async () => {
-    await signOut(auth);
-    navigate("/");
+  // --- UPDATED LOGOUT FUNCTION ---
+  const handleLogout = () => {
+    // Close the dropdown first so it doesn't look weird
+    setIsDropdownOpen(false);
+
+    Swal.fire({
+      title: 'Log Out?',
+      text: "Are you sure you want to leave?",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444', // Red for "Yes"
+      cancelButtonColor: '#3b82f6', // Blue for "No"
+      confirmButtonText: 'Yes, log out',
+      cancelButtonText: 'Cancel',
+      background: '#1e293b', // Dark background
+      color: '#fff',         // White text
+      reverseButtons: true   // Puts "Cancel" on the left, "Yes" on the right
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        await signOut(auth);
+        navigate("/");
+        // Note: The user is now redirected, so no need for a success toast here
+      }
+    });
   };
+  // ------------------------------
 
   const toggleLike = (postId: number) => {
     if (likedPosts.includes(postId)) {
@@ -77,14 +119,14 @@ export default function Dashboard() {
         console.log('Error sharing:', error);
       }
     } else {
-      alert("Link copied to clipboard!");
+      toast.info("📋 Link copied to clipboard!", { position: "bottom-right", theme: "dark" });
     }
   };
 
   return (
     <div className="dashboard-layout">
       
-      {/* --- NAVBAR --- */}
+      {/* NAVBAR */}
       <nav className="navbar">
         <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
           <img src={logo} alt="MBC" className="brand-logo" />
@@ -94,46 +136,66 @@ export default function Dashboard() {
           </div>
         </div>
         
-        <div className="nav-right">
-          <span style={{ fontWeight: "600", fontSize: "0.9rem" }}>
-             {user?.displayName?.split(' ')[0]}
-          </span>
-          <img 
-            src={user?.photoURL || "https://ui-avatars.com/api/?name=User"} 
-            alt="Profile" 
-            className="nav-avatar"
-            onClick={handleLogout}
-          />
+        {/* RIGHT SIDE WITH DROPDOWN */}
+        <div className="nav-right" style={{ position: "relative" }}>
+          
+          <div 
+            className="user-menu-trigger" 
+            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" }}
+          >
+            <span style={{ fontWeight: "600", fontSize: "0.9rem" }}>
+              {user?.displayName?.split(' ')[0]}
+            </span>
+            <img 
+              src={user?.photoURL || "https://ui-avatars.com/api/?name=User"} 
+              alt="Profile" 
+              className="nav-avatar"
+            />
+            <FaCaretDown size={12} color="#aaa" />
+          </div>
+
+          {isDropdownOpen && (
+            <div className="dropdown-menu-container">
+              <div className="dropdown-item" onClick={() => navigate('/profile')}>
+                <FaUser className="dropdown-icon" /> Profile
+              </div>
+              <div className="dropdown-item" onClick={() => navigate('/settings')}>
+                <FaCog className="dropdown-icon" /> Settings
+              </div>
+              <div className="dropdown-divider"></div>
+              
+              {/* This item triggers the new popup */}
+              <div className="dropdown-item logout-item" onClick={handleLogout}>
+                <FaSignOutAlt className="dropdown-icon" /> Logout
+              </div>
+            </div>
+          )}
+
         </div>
       </nav>
 
-      {/* --- MAIN LAYOUT (3 Columns) --- */}
+      {/* BODY */}
       <div className="dashboard-body">
         
-        {/* LEFT SIDEBAR (Menu) */}
+        {/* LEFT SIDEBAR */}
         <aside className="sidebar-left">
           <div className="menu-item active">
-            <FaHome size={22} />
-            <span>Home</span>
+            <FaHome size={22} /> <span>Home</span>
           </div>
           <div className="menu-item">
-            <FaUserFriends size={22} />
-            <span>Agents</span>
+            <FaUserFriends size={22} /> <span>Agents</span>
           </div>
           <div className="menu-item">
-            <FaStore size={22} />
-            <span>Marketplace</span>
+            <FaStore size={22} /> <span>Marketplace</span>
           </div>
           <div className="menu-item">
-            <FaBookmark size={22} />
-            <span>Saved</span>
+            <FaBookmark size={22} /> <span>Saved</span>
           </div>
         </aside>
 
-        {/* CENTER FEED (Newsfeed) */}
+        {/* FEED */}
         <main className="feed-container">
-          
-          {/* Create Post Input */}
           <div className="post-card create-post-card">
             <img 
               src={user?.photoURL || "https://ui-avatars.com/api/?name=User"} 
@@ -147,7 +209,6 @@ export default function Dashboard() {
             />
           </div>
 
-          {/* POST LOOP */}
           {MOCK_POSTS.map((post) => (
             <div key={post.id} className="post-card">
               <div className="post-header">
@@ -157,13 +218,10 @@ export default function Dashboard() {
                   <span className="timestamp">{post.time}</span>
                 </div>
               </div>
-
               <p className="post-text">{post.content}</p>
-              
               <div className="post-image-container">
                 <img src={post.image} alt="Property" className="post-image" />
               </div>
-
               {post.beds > 0 && (
                 <div className="property-details">
                   <span><FaMapMarkerAlt /> {post.location}</span>
@@ -172,7 +230,6 @@ export default function Dashboard() {
                   <span className="price-badge">{post.price}</span>
                 </div>
               )}
-
               <div className="action-bar">
                 <button 
                   className={`action-btn ${likedPosts.includes(post.id) ? 'active-like' : ''}`}
@@ -182,15 +239,14 @@ export default function Dashboard() {
                   <span>Like</span>
                 </button>
                 <button className="action-btn" onClick={() => handleShare(post)}>
-                  <FaShare />
-                  <span>Share</span>
+                  <FaShare /> <span>Share</span>
                 </button>
               </div>
             </div>
           ))}
         </main>
 
-        {/* RIGHT SIDEBAR (Suggestions) */}
+        {/* RIGHT SIDEBAR */}
         <aside className="sidebar-right">
           <div className="suggestion-box">
             <h4>Verified Agents</h4>
@@ -206,6 +262,7 @@ export default function Dashboard() {
         </aside>
 
       </div>
+      <ToastContainer position="top-right" theme="dark" />
     </div>
   );
 }

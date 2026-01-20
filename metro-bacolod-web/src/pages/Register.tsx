@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { createUserWithEmailAndPassword, signInWithPopup } from "firebase/auth";
-import { auth, googleProvider } from "../firebase-config";
+import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth"; // 1. Import updateProfile
+import { auth } from "../firebase-config";
 import api from "../services/api";
-import { FcGoogle } from "react-icons/fc";
 import logo from "../assets/MBC Logo.png";
 import "../App.css";
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 export default function Register() {
   const [email, setEmail] = useState("");
@@ -14,23 +15,33 @@ export default function Register() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [address, setAddress] = useState("");
-  const [message, setMessage] = useState("");
+  
   const navigate = useNavigate();
 
   const handleRegister = async () => {
     if (password !== confirmPassword) {
-      setMessage("Passwords do not match.");
+      toast.error("⚠️ Passwords do not match.", { position: "top-left" });
       return;
     }
     if (!firstName || !lastName || !address) {
-      setMessage("Please fill in all details.");
+      toast.error("⚠️ Please fill in all details.", { position: "top-left" });
       return;
     }
 
     try {
+      // 1. Create the Account
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
+      // 2. FORCE UPDATE FIREBASE PROFILE (The Fix)
+      // This ensures 'auth.currentUser.displayName' is not null in the Dashboard
+      await updateProfile(user, {
+        displayName: `${firstName} ${lastName}`,
+        // Generate a random background color avatar with their initials
+        photoURL: `https://ui-avatars.com/api/?name=${firstName}+${lastName}&background=random&color=fff`
+      });
+
+      // 3. Save to Backend
       await api.post('/users/create', {
         uid: user.uid,
         email: user.email,
@@ -40,19 +51,28 @@ export default function Register() {
         role: 'user'
       });
 
-      setMessage("Registration successful!");
-      navigate("/");
+      toast.success("🎉 Registration Successful! Redirecting...", {
+        position: "top-left",
+        autoClose: 2000,
+        theme: "dark",
+      });
+
+      setTimeout(() => {
+        navigate("/"); 
+      }, 2000);
 
     } catch (error: any) {
       console.error("Error:", error);
-      setMessage("Registration failed: " + error.message);
+      if (error.code === 'auth/email-already-in-use') {
+        toast.error("❌ Email is already registered. Please log in.", { position: "top-left" });
+      } else {
+        toast.error("❌ Registration failed: " + error.message, { position: "top-left" });
+      }
     }
   };
 
   return (
     <div className="landing-container">
-      
-      {/* 1. HEADER (Matches Login Page) */}
       <header className="landing-header">
         <div className="brand">
           <img src={logo} alt="MBC Logo" className="brand-logo" />
@@ -60,10 +80,7 @@ export default function Register() {
         </div>
       </header>
 
-      {/* 2. MAIN CONTENT */}
       <div className="landing-content">
-        
-        {/* LEFT SIDE: Text */}
         <div className="description-section">
           <h1 className="main-heading">Join the Network</h1>
           <p className="sub-heading">
@@ -72,7 +89,6 @@ export default function Register() {
           </p>
         </div>
 
-        {/* RIGHT SIDE: Register Form */}
         <div className="form-section">
           <div className="glass-login-card">
             <h2>Create Account</h2>
@@ -137,15 +153,13 @@ export default function Register() {
               Sign Up
             </button>
 
-            {message && <p className="message-text" style={{ marginTop: "10px", color: "#ef4444" }}>{message}</p>}
-
             <p className="register-link">
               Already have an account? <Link to="/">Sign in</Link>
             </p>
           </div>
         </div>
-
       </div>
+      <ToastContainer position="top-left" theme="dark" />
     </div>
   );
 }
