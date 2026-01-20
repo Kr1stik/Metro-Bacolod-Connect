@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, UploadedFiles, UseInterceptors, Put, Param
 import { FilesInterceptor } from '@nestjs/platform-express'; // Note: FilesInterceptor (Plural)
 import { PostsService } from './posts.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { HttpException, HttpStatus } from '@nestjs/common';
 
 @Controller('posts')
 export class PostsController {
@@ -17,22 +18,49 @@ export class PostsController {
 
   // UPDATED: Handle Multiple Files (Max 10)
   @Post('create')
-  @UseInterceptors(FilesInterceptor('images', 10)) // Field name is 'images'
+  @UseInterceptors(FilesInterceptor('images', 10))
   async create(@UploadedFiles() files: Array<Express.Multer.File>, @Body() body: any) {
-    const imageUrls: string[] = [];
+    try {
+      const imageUrls: string[] = [];
 
-    // 1. Upload all files to Cloudinary in parallel
-    if (files && files.length > 0) {
-      const uploadPromises = files.map(file => this.cloudinaryService.uploadImage(file));
-      const results = await Promise.all(uploadPromises);
-      results.forEach(result => imageUrls.push(result.secure_url));
+      // DEBUG LOGGING
+      console.log('1. Received Create Request');
+      console.log('2. Body:', body);
+      console.log('3. Files found:', files?.length || 0);
+
+      if (files && files.length > 0) {
+        // Upload each file
+        const uploadPromises = files.map(file => {
+          if (!file.buffer) {
+            throw new Error('File buffer is missing. Multer configuration error.');
+          }
+          return this.cloudinaryService.uploadImage(file);
+        });
+
+        const results = await Promise.all(uploadPromises);
+        results.forEach(result => imageUrls.push(result.secure_url));
+      }
+
+      // Save to DB
+      console.log('4. Saving to Database...');
+      const newPost = await this.postsService.create({
+        ...body,
+        images: imageUrls,
+      });
+      
+      console.log('5. Success!');
+      return newPost;
+
+    } catch (error) {
+      // THIS LOGS THE REAL ERROR TO YOUR SERVER CONSOLE
+      console.error('❌ FATAL ERROR IN CREATE POST:', error);
+      
+      // Return the actual error message to the frontend so you can see it
+      throw new HttpException({
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        error: 'Upload Failed: ' + error.message,
+      }, HttpStatus.INTERNAL_SERVER_ERROR);
     }
-
-    // 2. Save to DB (Store array of URLs)
-    return this.postsService.create({
-      ...body,
-      images: imageUrls, // Now an array
-    });
   }
 
   // ... (Keep toggleLike, delete, update, restore, toggleSave exactly as they were) ...
