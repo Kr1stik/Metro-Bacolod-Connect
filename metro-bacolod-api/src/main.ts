@@ -17,8 +17,8 @@ async function bootstrap() {
 
   // 2. Enable CORS (from previous step)
   app.enableCors({
-    origin: 'http://localhost:5173',
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    origin: true, // <--- THIS IS THE MAGIC KEY. It allows any domain.
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
 
