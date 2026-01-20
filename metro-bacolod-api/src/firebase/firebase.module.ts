@@ -7,21 +7,26 @@ import * as admin from 'firebase-admin';
     {
       provide: 'FIREBASE_CONNECTION',
       useFactory: () => {
-        // --- THE FIX: CHECK IF APP EXISTS ---
-        // If Firebase is already running, just return the running instance.
-        // This prevents "App named [DEFAULT] already exists" errors.
+        // 1. If already connected, reuse it
         if (admin.apps.length > 0) {
           return admin.app();
         }
 
-        // --- OTHERWISE, START IT UP ---
         const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT;
 
         if (!serviceAccountString) {
           throw new Error('FATAL: FIREBASE_SERVICE_ACCOUNT is missing.');
         }
 
+        // 2. Parse the JSON
         const serviceAccount = JSON.parse(serviceAccountString);
+
+        // --- THE FIX IS HERE ---
+        // Render sometimes turns "\n" into literal "\\n". We must fix it.
+        if (serviceAccount.private_key) {
+          serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+        }
+        // -----------------------
 
         return admin.initializeApp({
           credential: admin.credential.cert(serviceAccount),
