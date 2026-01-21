@@ -1,8 +1,7 @@
 import { Controller, Get, Post, Body, UploadedFiles, UseInterceptors, Put, Param, Delete, Query } from '@nestjs/common';
-import { FilesInterceptor } from '@nestjs/platform-express'; // Note: FilesInterceptor (Plural)
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { PostsService } from './posts.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
-import { HttpException, HttpStatus } from '@nestjs/common';
 
 @Controller('posts')
 export class PostsController {
@@ -16,54 +15,26 @@ export class PostsController {
     return this.postsService.findAll(userLocation);
   }
 
-  // UPDATED: Handle Multiple Files (Max 10)
+  // UPDATED: Clean version (No logs, standard error handling)
   @Post('create')
-  @UseInterceptors(FilesInterceptor('images', 10))
+  @UseInterceptors(FilesInterceptor('images', 10)) 
   async create(@UploadedFiles() files: Array<Express.Multer.File>, @Body() body: any) {
-    try {
-      const imageUrls: string[] = [];
+    const imageUrls: string[] = [];
 
-      // DEBUG LOGGING
-      console.log('1. Received Create Request');
-      console.log('2. Body:', body);
-      console.log('3. Files found:', files?.length || 0);
-
-      if (files && files.length > 0) {
-        // Upload each file
-        const uploadPromises = files.map(file => {
-          if (!file.buffer) {
-            throw new Error('File buffer is missing. Multer configuration error.');
-          }
-          return this.cloudinaryService.uploadImage(file);
-        });
-
-        const results = await Promise.all(uploadPromises);
-        results.forEach(result => imageUrls.push(result.secure_url));
-      }
-
-      // Save to DB
-      console.log('4. Saving to Database...');
-      const newPost = await this.postsService.create({
-        ...body,
-        images: imageUrls,
-      });
-      
-      console.log('5. Success!');
-      return newPost;
-
-    } catch (error) {
-      // THIS LOGS THE REAL ERROR TO YOUR SERVER CONSOLE
-      console.error('❌ FATAL ERROR IN CREATE POST:', error);
-      
-      // Return the actual error message to the frontend so you can see it
-      throw new HttpException({
-        status: HttpStatus.INTERNAL_SERVER_ERROR,
-        error: 'Upload Failed: ' + error.message,
-      }, HttpStatus.INTERNAL_SERVER_ERROR);
+    // 1. Upload all files to Cloudinary in parallel
+    if (files && files.length > 0) {
+      const uploadPromises = files.map(file => this.cloudinaryService.uploadImage(file));
+      const results = await Promise.all(uploadPromises);
+      results.forEach(result => imageUrls.push(result.secure_url));
     }
+
+    // 2. Save to DB
+    return this.postsService.create({
+      ...body,
+      images: imageUrls,
+    });
   }
 
-  // ... (Keep toggleLike, delete, update, restore, toggleSave exactly as they were) ...
   @Put(':id/like')
   toggleLike(@Param('id') id: string, @Body('userId') userId: string) {
     return this.postsService.toggleLike(id, userId);
