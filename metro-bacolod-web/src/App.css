@@ -1,258 +1,60 @@
 /* =========================================
-   1. FONTS & GLOBAL RESET
+   1. GLOBAL RESETS & FONTS
    ========================================= */
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Raleway:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;500;600;700&display=swap');
 
 :root {
-  --font-main: 'Poppins', sans-serif;
+  /* 2. UPDATE MAIN FONT TO 'Google Sans' */
+  --font-main: 'Google Sans', sans-serif; 
   --font-secondary: 'Raleway', sans-serif;
-  
-  /* DARK THEME PALETTE */
-  --bg-dark: #0F172A;       /* Deep Navy (Main Background) */
-  --bg-card: #1E293B;       /* Slate (Card Background) */
-  --text-primary: #FFFFFF;  /* White Text */
-  --text-secondary: #94A3B8;/* Muted Blue-Gray Text */
-  --accent-blue: #38BDF8;   /* Bright Blue (Buttons/Links) */
-  --border-color: #334155;  /* Subtle Border */
+
+  /* DASHBOARD VARIABLES (Dark Theme) - Keeping these is correct! */
+  --bg-dark: #0f172a;       
+  --bg-card: #1e293b;       
+  --border-color: #334155;  
+  --text-primary: #ffffff;  
+  --text-secondary: #94a3b8; 
+  --accent-blue: #38BDF8;   
+  --danger: #ef4444;
 }
 
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  font-family: var(--font-main);
+  font-family: var(--font-main); /* This now applies Google Sans everywhere */
 }
 
 body {
-  background-color: var(--bg-dark);
+  font-family: var(--font-main);
+  background-color: var(--bg-dark); /* Default body background */
   color: var(--text-primary);
-  min-height: 100vh;
-  width: 100vw;
   overflow-x: hidden;
 }
 
-/* Headings use Raleway */
-h1, h2, h3, h4, h5, h6, .brand-name {
-  font-family: var(--font-secondary);
-  font-weight: 700;
-}
+a { text-decoration: none; color: inherit; }
+ul { list-style: none; }
 
 /* =========================================
-   2. REUSABLE COMPONENTS (Buttons, Inputs, Cards)
+   2. DASHBOARD SPECIFIC STYLES
    ========================================= */
 
-/* Dark Cards */
-.glass-login-card, 
-.login-box, 
-.centered-box, 
-.post-card {
-  background-color: var(--bg-card) !important;
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 40px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-  color: var(--text-primary);
-}
-
-/* Inputs */
-input, .create-input, .search-bar {
-  width: 100%;
-  padding: 12px 15px;
-  background-color: var(--bg-dark) !important;
-  border: 1px solid var(--border-color) !important;
-  border-radius: 8px;
-  color: white !important;
-  font-size: 1rem;
-  outline: none;
-  transition: border-color 0.3s;
-}
-
-input:focus, .create-input:focus {
-  border-color: var(--accent-blue) !important;
-}
-
-/* Primary Button */
-.primary-btn {
-  width: 100%;
-  background-color: var(--accent-blue);
-  color: var(--bg-dark);
-  padding: 12px;
-  border: none;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: opacity 0.2s;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin-top: 10px;
-}
-
-.primary-btn:hover {
-  opacity: 0.9;
-}
-
-/* Google Button */
-.google-btn {
-  width: 100%;
-  background-color: white;
-  color: #333;
-  border: none;
-  padding: 12px;
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.google-btn:hover {
-  background-color: #f0f0f0;
-}
-
-a {
-  color: var(--accent-blue);
-  text-decoration: none;
-}
-
-/* =========================================
-   3. LANDING PAGE (Login / Register)
-   ========================================= */
-
-.landing-container {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-/* --- FIXED HEADER ALIGNMENT --- */
-.landing-header {
-  width: 100%;
-  height: 80px; 
-  padding: 0 60px;
-  display: flex;
-  align-items: center;
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 10;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  height: 100%;
-}
-
-.brand-logo {
-  width: 45px;
-  height: 45px;
-  object-fit: contain;
-  display: block;
-}
-
-.brand-name {
-  font-size: 1.2rem;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  line-height: 1;
-  padding-top: 2px;
-}
-
-/* --- ADJUST LANDING CONTENT POSITION (FIXED) --- */
-
-.landing-content {
-  width: 100%;
-  max-width: 100%;
-  display: flex;
-  align-items: center;
-  /* Reduce left padding from 80px to 40px */
-  padding: 120px 0 0 40px;
-  /* Optionally add gap for extra space between sections */
-  gap: 40px;
-}
-
-/* LEFT SIDE (Text) */
-.description-section {
-  flex: 1; 
-}
-
-.main-heading {
-  font-size: 3.5rem;
-  line-height: 1.2;
-  margin-bottom: 25px;
-}
-
-.sub-heading {
-  font-size: 1.1rem;
-  line-height: 1.7;
-  color: var(--text-secondary);
-}
-
-/* RIGHT SIDE (Form) - FORCED RIGHT */
-.form-section {
-  margin-left: auto;
-  padding-right: 50px;
-  flex: 0 0 auto;
-  width: auto;
-  display: flex;
-  justify-content: flex-end;
-  /* Optionally set a min-width */
-  min-width: 400px;
-}
-
-.glass-login-card {
-  width: 100%;
-  max-width: 400px;
-}
-
-.divider {
-  display: flex;
-  align-items: center;
-  margin: 15px 0;
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-}
-
-.divider::before, .divider::after {
-  content: "";
-  flex: 1;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.divider span {
-  padding: 0 10px;
-}
-
-.register-link {
-  text-align: center;
-  margin-top: 15px;
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-}
-
-/* =========================================
-   4. DASHBOARD STYLES (Dark Mode)
-   ========================================= */
-
+/* Only apply these styles inside .dashboard-layout */
 .dashboard-layout {
-  padding-top: 70px; /* Space for fixed navbar */
+  padding-top: 80px; /* Push content below fixed navbar */
   min-height: 100vh;
   background-color: var(--bg-dark);
+  color: white;
 }
 
 .dashboard-body {
   display: flex;
-  justify-content: center; /* Centers the whole group */
-  gap: 30px; /* Space between columns */
+  justify-content: center;
+  gap: 30px;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 0 20px 40px 20px;
 }
 
 /* Navbar */
@@ -268,187 +70,23 @@ a {
   justify-content: space-between;
   align-items: center;
   padding: 0 30px;
-  z-index: 1000;
+  z-index: 100;
 }
 
-.nav-right {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-
-.nav-logout-btn {
-  background-color: var(--border-color);
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.nav-logout-btn:hover {
-  background-color: #475569;
-}
-
-/* Feed */
-.feed-container {
-  max-width: 600px;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  padding-bottom: 40px;
-}
-
-/* Post Cards */
-.post-card {
-  padding: 0;
-  overflow: hidden;
-}
-
-.post-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 15px;
-}
-
-.user-avatar {
+.brand-logo {
   width: 40px;
   height: 40px;
-  border-radius: 50%;
-  object-fit: cover;
+  object-fit: contain;
 }
 
-.author-name {
-  font-size: 1rem;
-  color: white;
-}
-
-.timestamp {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-}
-
-.post-text {
-  padding: 0 15px 15px;
-  color: #E2E8F0;
-  line-height: 1.5;
-}
-
-.post-image-container {
-  width: 100%;
-}
-
-.post-image {
-  width: 100%;
-  display: block;
-  max-height: 500px;
-  object-fit: cover;
-}
-
-.property-details {
-  display: flex;
-  gap: 20px;
-  padding: 15px;
-  color: var(--text-secondary);
-  border-bottom: 1px solid var(--border-color);
-}
-
-.action-bar {
-  display: flex;
-  padding: 5px;
-}
-
-.action-btn {
-  flex: 1;
-  background: transparent;
-  border: none;
-  padding: 12px;
-  color: var(--text-secondary);
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  transition: background 0.2s;
-}
-
-.action-btn:hover {
-  background-color: rgba(255, 255, 255, 0.05);
-  border-radius: 6px;
-}
-
-.active-like {
-  color: #ef4444 !important;
-}
-
-/* =========================================
-   5. RESPONSIVE (Mobile) - FIXED
-   ========================================= */
-
-@media (max-width: 900px) {
-  /* Reset Landing Page Stack for Mobile */
-  .landing-content {
-    flex-direction: column;
-    padding: 40px 20px; /* Standard mobile padding */
-    text-align: center;
-    gap: 30px;
-    margin-top: 60px; /* Clear header */
-  }
-
-  .form-section {
-    margin-left: 0; /* Remove right magnet */
-    width: 100%;
-    justify-content: center;
-    padding-right: 0; /* Remove Desktop padding */
-  }
-  
-  .description-section {
-    margin-bottom: 20px;
-  }
-  
-  .sub-heading {
-    margin: 0 auto;
-  }
-
-  /* Navbar Adjustments */
-  .landing-header {
-    padding: 20px;
-    justify-content: center;
-  }
-  
-  .search-bar {
-    display: none;
-  }
-}
-
-/* Centered Page Helper (for Complete Profile) */
-.centered-page {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  width: 100vw;
-  padding: 20px;
-}
-
-.centered-box {
-  width: 100%;
-  max-width: 500px;
-}
-
-/* --- SIDEBARS --- */
+/* Sidebars */
 .sidebar-left, .sidebar-right {
-  width: 280px; /* Fixed width for sidebars */
-  height: calc(100vh - 90px); /* Full height minus navbar */
-  position: sticky; /* Stays fixed while scrolling */
+  width: 260px;
+  position: sticky;
   top: 90px;
+  height: fit-content;
 }
 
-/* Left Menu Styling */
 .menu-item {
   display: flex;
   align-items: center;
@@ -466,163 +104,199 @@ a {
   color: var(--accent-blue);
 }
 
-/* Right Suggestions Styling */
-.suggestion-box {
-  background-color: var(--bg-card);
-  padding: 20px;
-  border-radius: 12px;
-  border: 1px solid var(--border-color);
-}
-
-.suggestion-box h4 {
-  margin-bottom: 15px;
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-.suggestion-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 15px;
-  font-weight: 500;
-}
-
-.sug-avatar {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background-color: #555;
-}
-.bg-blue { background-color: #38BDF8; }
-.bg-green { background-color: #10B981; }
-
-/* --- CENTER FEED --- */
+/* Feed */
 .feed-container {
-  flex: 1; /* Takes up remaining space */
-  max-width: 600px; /* Limits width to look like FB */
+  flex: 1;
+  max-width: 600px;
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
 
-.create-post-card {
-  display: flex;
-  align-items: center;
-  gap: 15px;
+/* Cards */
+.post-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  overflow: hidden;
 }
 
-.create-input {
-  border-radius: 30px !important;
+.create-post-card {
+  padding: 20px;
+}
+
+/* Inputs inside Dashboard */
+.create-input, .search-bar {
   background-color: var(--bg-dark) !important;
   border: 1px solid var(--border-color) !important;
-  padding: 12px 20px !important;
+  color: white !important;
+  padding: 10px 15px;
+  border-radius: 20px;
+  outline: none;
 }
 
-/* Navbar Search tweaks */
-.search-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.search-icon {
-  position: absolute;
-  left: 15px;
-  color: var(--text-secondary);
-  z-index: 1;
-}
-
-.search-bar {
-  padding-left: 40px !important; /* Space for icon */
-  border-radius: 30px !important;
-  background-color: var(--bg-dark) !important;
-}
-
-.nav-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  cursor: pointer;
-  object-fit: cover;
-}
-
-.price-badge {
-  margin-left: auto;
-  color: #fff;
+/* Buttons */
+.primary-btn {
+  background-color: var(--accent-blue);
+  color: var(--bg-dark);
+  border: none;
+  padding: 8px 16px;
+  border-radius: 20px;
   font-weight: 700;
-  background-color: rgba(255,255,255,0.1);
-  padding: 4px 10px;
-  border-radius: 10px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
-/* --- RESPONSIVE --- */
-@media (max-width: 1000px) {
-  .sidebar-left, .sidebar-right {
-    display: none; /* Hide sidebars on smaller screens */
-  }
-  .dashboard-body {
-    padding: 10px;
-  }
-}
-
-/* Add these to the bottom of App.css */
-
+/* Dropdown */
 .dropdown-menu-container {
   position: absolute;
-  top: 120%; /* Pushes it just below the avatar */
+  top: 50px;
   right: 0;
   width: 180px;
-  background: rgba(30, 41, 59, 0.95); /* Dark blue-ish background */
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-  padding: 8px;
-  z-index: 1000;
-  animation: fadeIn 0.2s ease-out;
+  padding: 10px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
 }
 
 .dropdown-item {
+  padding: 10px;
+  border-radius: 8px;
+  cursor: pointer;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
-  font-size: 0.9rem;
-  color: #e2e8f0;
-  cursor: pointer;
-  border-radius: 8px;
-  transition: all 0.2s;
+  color: var(--text-secondary);
 }
 
 .dropdown-item:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  background-color: rgba(255,255,255,0.05);
+  color: white;
 }
 
-.dropdown-icon {
-  font-size: 1rem;
-  opacity: 0.7;
+/* =========================================
+   3. LANDING PAGE OVERRIDES (Light Theme)
+   ========================================= */
+
+/* Modal Overrides */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
 }
 
-.logout-item {
-  color: #ef4444; /* Red color for logout */
+.modal-card {
+  background: white;
+  padding: 40px;
+  border-radius: 24px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.1);
+  width: 90%;
+  max-width: 400px;
+  text-align: center;
+  border: 1px solid #f0f0f0;
+  color: black;
 }
 
-.logout-item:hover {
-  background: rgba(239, 68, 68, 0.2);
-  color: #ff6b6b;
+/* Force Modal Inputs to be Light */
+.modal-card input {
+  background-color: #f9fafb !important;
+  border: 1px solid #e5e7eb !important;
+  color: #111827 !important;
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 10px;
+  border-radius: 8px;
 }
 
-.dropdown-divider {
-  height: 1px;
-  background: rgba(255, 255, 255, 0.1);
-  margin: 6px 0;
+.modal-card input:focus {
+  background-color: #ffffff !important;
+  border-color: #000000 !important;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
+/* =========================================
+   4. RESPONSIVE
+   ========================================= */
+@media (max-width: 1000px) {
+  .sidebar-left, .sidebar-right { display: none; }
+  .dashboard-body { padding: 10px; }
+  .feed-container { max-width: 100%; }
+}
+
+/* --- FIX: CIRCULAR AVATARS --- */
+.nav-right img, 
+.nav-right div[style*="background"], /* Targets the "LL" box if it's a div */
+.user-avatar, 
+.sug-avatar {
+  border-radius: 50% !important; /* Forces Circle */
+  object-fit: cover;
+  aspect-ratio: 1 / 1; /* Ensures it stays a perfect circle */
+}
+
+/* --- FIX: POST OPTIONS (Three Dots & Dropdown) --- */
+
+/* The 'Three Dots' Button */
+.post-header button {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.2rem;
+  padding: 8px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-left: auto; /* Pushes it to the far right */
+}
+
+.post-header button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+/* The Dropdown Menu for Edit/Delete */
+.post-options-dropdown {
+  position: absolute;
+  right: 20px; /* Adjust based on your padding */
+  top: 50px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+  z-index: 10;
+  overflow: hidden;
+  width: 120px;
+}
+
+.post-options-dropdown button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 15px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  text-align: left;
+  border-radius: 0; /* Reset radius for list items */
+  margin: 0;
+}
+
+.post-options-dropdown button:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: white;
+}
+
+/* Specific Colors */
+.post-options-dropdown button.delete-btn:hover {
+  background-color: rgba(239, 68, 68, 0.2);
+  color: #ef4444; /* Red for Delete */
 }

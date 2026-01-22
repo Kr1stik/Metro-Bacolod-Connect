@@ -5,6 +5,7 @@ import { signOut } from "firebase/auth";
 import api from "../services/api";
 import logo from "../assets/MBC Logo.png";
 import "../App.css";
+import { BACOLOD_LOCATIONS } from "../constants/locations"; 
 
 export default function CompleteProfile() {
   const [address, setAddress] = useState("");
@@ -12,7 +13,6 @@ export default function CompleteProfile() {
   const [message, setMessage] = useState("");
   const navigate = useNavigate();
 
-  // Protect the route
   useEffect(() => {
     const checkAuth = setTimeout(() => {
       if (!auth.currentUser) {
@@ -57,23 +57,34 @@ export default function CompleteProfile() {
     }
   };
 
-  const handleSkip = () => {
-    navigate("/dashboard");
-  };
-
-  const handleCancel = async () => {
-    await signOut(auth);
-    navigate("/");
-  };
+  const handleSkip = () => navigate("/dashboard");
+  const handleCancel = async () => { await signOut(auth); navigate("/"); };
 
   return (
-    <div className="centered-page">
-      <div className="centered-box">
+    // FORCE CENTER PARENT
+    <div style={{
+      width: '100vw',
+      height: '100vh',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      background: '#0f172a' // Dark Background
+    }}>
+      
+      {/* CENTERED BOX */}
+      <div style={{
+        width: '100%',
+        maxWidth: '500px',
+        background: '#1e293b', // Card Color
+        padding: '40px',
+        borderRadius: '16px',
+        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+        border: '1px solid #334155'
+      }}>
         
         <div style={{ textAlign: "center", marginBottom: "30px" }}>
-          {/* Using brand-logo class keeps it small */}
-          <img src={logo} alt="MBC Logo" className="brand-logo" style={{ margin: "0 auto 15px auto" }} />
-          <h2>Complete Profile</h2>
+          <img src={logo} alt="MBC Logo" style={{ width: '60px', margin: "0 auto 15px auto", display: 'block' }} />
+          <h2 style={{ color: 'white', fontSize: '1.5rem', fontWeight: 'bold' }}>Complete Profile</h2>
           <p style={{ color: "#94A3B8", marginTop: "10px" }}>
             We need a few details to verify your account.
           </p>
@@ -81,14 +92,21 @@ export default function CompleteProfile() {
         
         <div className="input-group">
           <label style={{ fontSize: "0.9rem", color: "#fff", marginBottom: "8px", display: "block" }}>
-            Home Address
+            Home Address / Location
           </label>
-          <input 
-            type="text" 
-            placeholder="e.g. Blk 10 Lot 5, Camella Homes" 
+          <select 
             value={address} 
-            onChange={e => setAddress(e.target.value)} 
-          />
+            onChange={e => setAddress(e.target.value)}
+            className="create-input" 
+            style={{ width: '100%', padding: '12px', background: '#0f172a', color: 'white', border: '1px solid #334155', borderRadius: '8px' }}
+          >
+            <option value="" disabled style={{ color: 'gray' }}>Select your location</option>
+            {BACOLOD_LOCATIONS.map((loc) => (
+              <option key={loc} value={loc} style={{ color: 'black' }}>
+                {loc}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="input-group" style={{ marginTop: "20px" }}>
@@ -99,19 +117,22 @@ export default function CompleteProfile() {
             type="tel" 
             placeholder="e.g. 0917 123 4567" 
             value={phone} 
-            onChange={e => setPhone(e.target.value)} 
+            onChange={e => setPhone(e.target.value)}
+            style={{ width: '100%', padding: '12px', background: '#0f172a', color: 'white', border: '1px solid #334155', borderRadius: '8px', outline: 'none' }} 
           />
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "15px", marginTop: "30px" }}>
-          <button className="primary-btn" onClick={handleSaveProfile}>
+          <button 
+            onClick={handleSaveProfile}
+            style={{ width: '100%', padding: '12px', background: '#38BDF8', color: '#0f172a', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}
+          >
             Save & Continue
           </button>
 
           <button 
             onClick={handleSkip}
-            className="action-btn"
-            style={{ border: "1px solid #334155", color: "#94A3B8" }} 
+            style={{ width: '100%', padding: '12px', background: 'transparent', color: '#94A3B8', border: '1px solid #334155', borderRadius: '8px', cursor: 'pointer' }} 
           >
             Skip for now
           </button>
@@ -126,7 +147,7 @@ export default function CompleteProfile() {
           </span>
         </p>
 
-        {message && <p className="message-text" style={{ marginTop: "15px", textAlign: "center", color: "#38BDF8" }}>{message}</p>}
+        {message && <p style={{ marginTop: "15px", textAlign: "center", color: "#38BDF8" }}>{message}</p>}
       </div>
     </div>
   );

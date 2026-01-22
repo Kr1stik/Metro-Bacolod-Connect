@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import api from './services/api';
 import { Routes, Route } from 'react-router-dom';
-import Login from "./pages/Login";
 import Register from "./pages/Register";
 import CompleteProfile from "./pages/CompleteProfile";
 import Dashboard from "./pages/Dashboard";
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import LandingPage from './pages/LandingPage';
+import Archive from "./pages/Archive";
 
 function App() {
   const [ , setMessage] = useState<string>('Connecting...');
@@ -43,10 +44,11 @@ function App() {
         theme="dark" // Matches your dark theme
       />
     <Routes>
-      <Route path="/" element={<Login />} />
+      <Route path="/" element={<LandingPage />} />
       <Route path="/register" element={<Register />} />
       <Route path="/complete-profile" element={<CompleteProfile />} />
       <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/archive" element={<Archive />} />
     </Routes>
   </>
   );

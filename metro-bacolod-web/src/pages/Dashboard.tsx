@@ -7,7 +7,7 @@ import {
   FaHeart, FaRegHeart, FaShare, FaMapMarkerAlt, FaBookmark, FaSearch,
   FaUser, FaCog, FaSignOutAlt, FaCaretDown, 
   FaImage, FaPaperPlane, FaSpinner,
-  FaEllipsisH, FaTrash, FaEdit, FaHome, FaUserFriends, FaStore, FaChevronLeft, FaChevronRight
+  FaHome, FaChevronLeft, FaChevronRight, FaTrash
 } from "react-icons/fa"; 
 import logo from "../assets/MBC Logo.png";
 import "../App.css";
@@ -15,18 +15,19 @@ import Swal from 'sweetalert2';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { BACOLOD_LOCATIONS } from "../constants/locations";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "../firebase-config";
 
 export default function Dashboard() {
   const [user, setUser] = useState<any>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [activeMenuPostId, setActiveMenuPostId] = useState<string | null>(null);
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   
-  // Post Creation State
   const [posts, setPosts] = useState<any[]>([]); 
   const [newCaption, setNewCaption] = useState("");
   const [postLocation, setPostLocation] = useState("");
   
-  // CHANGED: Now storing an ARRAY of files
   const [imageFiles, setImageFiles] = useState<File[]>([]); 
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -62,7 +63,14 @@ export default function Dashboard() {
     }
   }, [location]);
 
-  // --- NEW: HANDLE FILE SELECTION ---
+  const toggleDropdown = (postId: string) => {
+    if (activeDropdown === postId) {
+      setActiveDropdown(null);
+    } else {
+      setActiveDropdown(postId);
+    }
+  };
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const selectedFiles = Array.from(e.target.files);
@@ -72,7 +80,6 @@ export default function Dashboard() {
         toast.warning("Maximum 10 images allowed!", { theme: "dark" });
         return;
       }
-      
       setImageFiles([...imageFiles, ...selectedFiles]);
     }
   };
@@ -83,9 +90,7 @@ export default function Dashboard() {
     setImageFiles(newFiles);
   };
 
-  // --- CREATE POST (UPDATED) ---
   const handleCreatePost = async () => {
-    // Validation: Min 1 Image
     if (imageFiles.length === 0) {
       toast.warning("Please upload at least 1 image.", { theme: "dark" });
       return;
@@ -104,12 +109,13 @@ export default function Dashboard() {
     try {
       const formData = new FormData();
       formData.append('userId', user.uid);
-      formData.append('agentName', user.displayName || "Metro Agent");
-      formData.append('agentAvatar', user.photoURL || "");
+      // FIX: Changed 'agentName' to 'userName' to match rendering logic
+      formData.append('userName', user.displayName || "Metro Agent");
+      // FIX: Changed 'agentAvatar' to 'userAvatar' to match rendering logic
+      formData.append('userAvatar', user.photoURL || "");
       formData.append('content', newCaption);
       formData.append('location', postLocation);
       
-      // Append all images with the same key 'images'
       imageFiles.forEach((file) => {
         formData.append('images', file);
       });
@@ -120,7 +126,7 @@ export default function Dashboard() {
       
       setNewCaption("");
       setPostLocation("");
-      setImageFiles([]); // Clear array
+      setImageFiles([]); 
       
       fetchPosts(); 
     } catch (error) {
@@ -131,34 +137,47 @@ export default function Dashboard() {
     }
   };
 
-  // ... (handleDelete, handleEdit, toggleSave, handleLogout, toggleLike, handleShare remain same) ...
   const handleDelete = async (postId: string) => {
-    setActiveMenuPostId(null); 
+    setActiveDropdown(null); // Close the menu
+    
     const result = await Swal.fire({
-      title: 'Move to Trash?', text: "You can undo this immediately.", icon: 'warning',
-      showCancelButton: true, confirmButtonColor: '#d33', cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Yes, remove', background: '#1e293b', color: '#fff'
+      title: 'Move to Trash?', 
+      text: "Items in trash will be deleted after 30 days.", 
+      icon: 'warning',
+      showCancelButton: true, 
+      confirmButtonColor: '#d33', 
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Yes, move to trash', 
+      background: '#1e293b', 
+      color: '#fff'
     });
+
     if (result.isConfirmed) {
+      // 1. Optimistic Update: Remove it from the screen INSTANTLY (Smoothest feel)
       const originalPosts = [...posts];
       setPosts(posts.filter(p => p.id !== postId));
+
       try {
-        await api.delete(`/posts/${postId}`, { data: { userId: user.uid } });
-        const UndoToast = ({ closeToast }: any) => (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span>Post deleted</span>
-            <button onClick={async () => {
-                try { await api.put(`/posts/${postId}/restore`, { userId: user.uid }); setPosts(originalPosts); toast.success("Restored!", { theme: "dark" }); closeToast(); } catch (err) { toast.error("Failed to restore", { theme: "dark" }); }
-              }} style={{ background: 'transparent', border: '1px solid white', color: 'white', borderRadius: '4px', padding: '2px 8px', marginLeft: '10px', cursor: 'pointer', fontSize: '0.8rem' }}>UNDO</button>
-          </div>
-        );
-        toast(<UndoToast />, { position: "bottom-center", autoClose: 5000, theme: "dark", hideProgressBar: false });
-      } catch (error) { setPosts(originalPosts); toast.error("Could not delete", { theme: "dark" }); }
+        // 2. Update Firebase directly
+        const postRef = doc(db, "posts", postId);
+        
+        await updateDoc(postRef, {
+             deletedAt: new Date().toISOString(),
+             isArchived: true 
+        });
+
+        toast.success("Post moved to Trash", { theme: "dark" });
+      } catch (error) {
+        console.error("Delete error:", error);
+        // 3. If it fails, put the post back
+        setPosts(originalPosts); 
+        toast.error("Failed to move to trash", { theme: "dark" });
+      }
     }
   };
 
   const handleEdit = async (post: any) => {
-    setActiveMenuPostId(null);
+    setActiveDropdown(null); 
     const { value: newContent } = await Swal.fire({
       input: 'textarea', inputLabel: 'Edit Caption', inputValue: post.content,
       showCancelButton: true, background: '#1e293b', color: '#fff'
@@ -186,8 +205,7 @@ export default function Dashboard() {
   };
 
   const toggleLike = (postId: string | number) => {
-     // Trigger reload to update UI properly with backend logic or implement optimistic update
-     fetchPosts(); // Simple reload for now
+     fetchPosts(); 
      api.put(`/posts/${postId}/like`, { userId: user.uid });
   };
   
@@ -195,7 +213,6 @@ export default function Dashboard() {
       if (navigator.share) { try { await navigator.share({ title: 'Metro Bacolod Connect', text: post.content, url: window.location.href }); } catch (error) { console.log('Error sharing:', error); } } else { toast.info("Link copied!", { position: "bottom-right", theme: "dark" }); }
   };
 
-  // --- HELPER: IMAGE SLIDER COMPONENT ---
   const ImageSlider = ({ images }: { images: string[] }) => {
     const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -230,7 +247,7 @@ export default function Dashboard() {
         <div className="nav-right" style={{ position: "relative" }}>
           <div className="user-menu-trigger" onClick={() => setIsDropdownOpen(!isDropdownOpen)} style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" }}>
             <span style={{ fontWeight: "600", fontSize: "0.9rem" }}>{user?.displayName?.split(' ')[0]}</span>
-            <img src={user?.photoURL || "https://ui-avatars.com/api/?name=User"} alt="Profile" className="nav-avatar" />
+            <img src={user?.photoURL || "https://ui-avatars.com/api/?name=User"} alt="Profile" className="nav-avatar" style={{ borderRadius: '50%', width: '40px', height: '40px', objectFit: 'cover' }} />
             <FaCaretDown size={12} color="#aaa" />
           </div>
           {isDropdownOpen && (
@@ -247,15 +264,21 @@ export default function Dashboard() {
       <div className="dashboard-body">
         <aside className="sidebar-left">
           <div className="menu-item active"><FaHome size={22} /> <span>Listings</span></div>
-          <div className="menu-item"><FaUserFriends size={22} /> <span>Agents</span></div>
-          <div className="menu-item"><FaStore size={22} /> <span>Marketplace</span></div>
-          <div className="menu-item"><FaBookmark size={22} /> <span>Saved</span></div>
+          
+          {/* NEW TRASH LINK */}
+          <div 
+            className="menu-item" 
+            style={{ marginTop: '20px', borderTop: '1px solid #334155', paddingTop: '20px' }}
+            onClick={() => navigate('/archive')}
+          >
+            <FaTrash size={22} color="#ef4444" /> <span style={{ color: '#ef4444' }}>Trash</span>
+          </div>
         </aside>
 
         <main className="feed-container">
           <div className="post-card create-post-card" style={{ padding: '20px' }}>
             <div style={{ display: 'flex', gap: '15px' }}>
-              <img src={user?.photoURL || "https://ui-avatars.com/api/?name=User"} alt="User" className="user-avatar" style={{ width: '50px', height: '50px' }} />
+              <img src={user?.photoURL || "https://ui-avatars.com/api/?name=User"} alt="User" className="user-avatar" style={{ width: '50px', height: '50px', borderRadius: '50%' }} />
               <div style={{ flex: 1 }}>
                 <textarea 
                   className="create-input" 
@@ -264,7 +287,6 @@ export default function Dashboard() {
                   style={{ resize: 'none', background: 'transparent', border: 'none', color: 'white', width: '100%', outline: 'none', fontSize: '1.1rem', marginBottom: '10px' }}
                 />
                 
-                {/* PREVIEW GRID */}
                 {imageFiles.length > 0 && (
                    <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', marginBottom: '15px', paddingBottom: '5px' }}>
                      {imageFiles.map((file, index) => (
@@ -283,7 +305,6 @@ export default function Dashboard() {
                     <button onClick={() => fileInputRef.current?.click()} style={{ background: 'transparent', border: 'none', color: '#38BDF8', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.9rem', padding: '5px 10px', borderRadius: '20px' }}>
                       <FaImage size={16} /> <span>Photos ({imageFiles.length}/10)</span>
                     </button>
-                    {/* ADDED 'multiple' ATTRIBUTE */}
                     <input type="file" ref={fileInputRef} hidden accept="image/*" multiple onChange={handleFileSelect} />
 
                     <div style={{ position: 'relative' }}>
@@ -307,47 +328,72 @@ export default function Dashboard() {
           ) : (
             posts.map((post: any) => (
               <div key={post.id} className="post-card" style={{ position: 'relative', marginTop: '20px' }}>
-                <div className="post-header" style={{ justifyContent: 'space-between', marginBottom: '15px' }}>
-                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                    <img src={post.agentAvatar} alt="Avatar" className="user-avatar" />
-                    <div>
-                      <h4 className="author-name" style={{margin: 0, color: 'white'}}>{post.agentName}</h4>
-                      <span className="timestamp" style={{fontSize: '0.8rem', color: '#888'}}>{new Date(post.createdAt).toLocaleDateString()}</span>
-                    </div>
+                
+                {/* FIX: ADDED DISPLAY: FLEX TO FIX LAYOUT & FALLBACKS FOR NULL DATA */}
+                <div className="post-header" style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '12px', padding: '15px' }}>
+                  {/* FIX: Fallback for missing avatar */}
+                  <img 
+                    src={post.userAvatar || post.agentAvatar || "https://ui-avatars.com/api/?name=User"} 
+                    className="user-avatar" 
+                    alt="User" 
+                    style={{ borderRadius: '50%', width: '40px', height: '40px', objectFit: 'cover' }} 
+                  />
+                  
+                  <div>
+                    {/* FIX: Fallback for missing name */}
+                    <h4 className="author-name" style={{margin: 0, color: 'white'}}>{post.userName || post.agentName || "Unknown User"}</h4>
+                    <span className="timestamp" style={{fontSize: '0.8rem', color: '#94a3b8'}}>{post.timeAgo}</span>
                   </div>
-                  {post.userId === user?.uid && (
-                    <div style={{ position: 'relative' }}>
-                      <FaEllipsisH className="menu-icon" style={{ cursor: 'pointer', color: '#aaa' }} onClick={() => setActiveMenuPostId(activeMenuPostId === post.id ? null : post.id)} />
-                      {activeMenuPostId === post.id && (
-                        <div className="dropdown-menu-container" style={{ top: '30px', right: '0', width: '140px' }}>
-                          <div className="dropdown-item" onClick={() => handleEdit(post)}><FaEdit /> Edit</div>
-                          <div className="dropdown-item logout-item" onClick={() => handleDelete(post.id)}><FaTrash /> Delete</div>
+
+                  {user?.uid === post.userId && (
+                    <div style={{ marginLeft: 'auto', position: 'relative' }}>
+                      <button 
+                        onClick={() => toggleDropdown(post.id)}
+                        style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '1.5rem', cursor: 'pointer', padding: '0 10px' }}
+                      >
+                        &#x22EE;
+                      </button>
+
+                      {activeDropdown === post.id && (
+                        <div className="post-options-dropdown" style={{
+                          position: 'absolute', right: 0, top: '30px', backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', zIndex: 50, width: '100px', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
+                        }}>
+                          <button 
+                            onClick={() => handleEdit(post)}
+                            style={{ width: '100%', textAlign: 'left', padding: '10px', background: 'transparent', color: 'white', border: 'none', cursor: 'pointer', fontSize: '0.9rem' }}
+                          >
+                            Edit
+                          </button>
+                          <button 
+                            onClick={() => handleDelete(post.id)}
+                            style={{ width: '100%', textAlign: 'left', padding: '10px', background: 'transparent', color: '#ef4444', border: 'none', cursor: 'pointer', fontSize: '0.9rem' }}
+                          >
+                            Delete
+                          </button>
                         </div>
                       )}
                     </div>
                   )}
                 </div>
 
-                <p className="post-text" style={{ lineHeight: '1.5', marginBottom: '15px' }}>{post.content}</p>
+                <p className="post-text" style={{ lineHeight: '1.5', marginBottom: '15px', padding: '0 15px' }}>{post.content}</p>
 
-                {/* --- DISPLAY IMAGES (Supports Legacy Single String or New Array) --- */}
                 {Array.isArray(post.images) && post.images.length > 0 ? (
                   <ImageSlider images={post.images} />
                 ) : post.image ? (
-                  // Legacy support for old posts with single 'image' string
                   <div className="post-image-container" style={{ borderRadius: '12px', overflow: 'hidden', marginBottom: '15px' }}>
                     <img src={post.image} alt="Property" className="post-image" style={{ width: '100%', display: 'block' }} />
                   </div>
                 ) : null}
 
                 {(post.location || post.price) && (
-                  <div className="property-details" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '15px' }}>
+                  <div className="property-details" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '15px', padding: '0 15px' }}>
                     {post.location && <span style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(16, 185, 129, 0.1)', color: '#10B981', padding: '4px 10px', borderRadius: '15px', fontSize: '0.85rem' }}><FaMapMarkerAlt /> {post.location}</span>}
                     {post.price && <span className="price-badge" style={{ background: 'rgba(56, 189, 248, 0.1)', color: '#38BDF8', padding: '4px 10px', borderRadius: '15px', fontSize: '0.85rem', fontWeight: 'bold' }}>{post.price}</span>}
                   </div>
                 )}
                 <div style={{ height: '1px', background: 'rgba(255,255,255,0.05)', marginBottom: '10px' }}></div>
-                <div className="action-bar" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div className="action-bar" style={{ display: 'flex', justifyContent: 'space-between', padding: '0 15px 15px' }}>
                   <button className={`action-btn ${post.likedBy?.includes(user?.uid) ? 'active-like' : ''}`} onClick={() => toggleLike(post.id)} style={{ background: 'transparent', border: 'none', color: post.likedBy?.includes(user?.uid) ? '#ec4899' : '#aaa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
                     {post.likedBy?.includes(user?.uid) ? <FaHeart /> : <FaRegHeart />} <span>{post.likes > 0 ? post.likes : 'Like'}</span>
                   </button>
@@ -362,8 +408,8 @@ export default function Dashboard() {
         <aside className="sidebar-right">
           <div className="suggestion-box">
             <h4>Verified Agents</h4>
-            <div className="suggestion-item"><div className="sug-avatar bg-blue"></div><span>Negros Realty</span></div>
-            <div className="suggestion-item"><div className="sug-avatar bg-green"></div><span>Bacolod Homes</span></div>
+            <div className="suggestion-item"><div className="sug-avatar bg-blue" style={{borderRadius: '50%'}}></div><span>Negros Realty</span></div>
+            <div className="suggestion-item"><div className="sug-avatar bg-green" style={{borderRadius: '50%'}}></div><span>Bacolod Homes</span></div>
           </div>
         </aside>
       </div>
