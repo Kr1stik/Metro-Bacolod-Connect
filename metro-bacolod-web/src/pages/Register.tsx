@@ -1,180 +1,339 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth"; // 1. Import updateProfile
-import { auth } from "../firebase-config";
-import api from "../services/api";
-import logo from "../assets/MBC Logo.png";
-import "../App.css";
+import { useNavigate } from "react-router-dom";
+import { createUserWithEmailAndPassword, updateProfile, sendEmailVerification, signOut } from "firebase/auth";
+import { auth, db } from "../firebase-config";
+import { doc, setDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import logo from "../assets/MBC Logo.png"; 
 import { BACOLOD_LOCATIONS } from "../constants/locations";
+import { FaEye, FaEyeSlash, FaCheckCircle, FaTimesCircle } from "react-icons/fa"; 
 
 export default function Register() {
+  const navigate = useNavigate();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // --- FORM STATE ---
+  const [isAgent, setIsAgent] = useState(false);
+  
+  // Personal
+  const [firstName, setFirstName] = useState("");
+  const [middleInitial, setMiddleInitial] = useState(""); 
+  const [lastName, setLastName] = useState("");
+  const [dob, setDob] = useState("");
+  const [gender, setGender] = useState("");
+  const [maritalStatus, setMaritalStatus] = useState("");
+  
+  // Contact
+  const [mobile, setMobile] = useState("");
   const [email, setEmail] = useState("");
+  
+  // Address
+  const [street, setStreet] = useState("");
+  const [city, setCity] = useState(""); 
+  const [province, setProvince] = useState("Negros Occidental");
+  const zipCode = "6100";
+
+  // Security
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [address, setAddress] = useState("");
-  
-  const navigate = useNavigate();
+  const [showPassword, setShowPassword] = useState(false); 
 
-  const handleRegister = async () => {
-    if (password !== confirmPassword) {
-      toast.error("⚠️ Passwords do not match.", { position: "top-left" });
-      return;
+  // --- HELPERS ---
+  const generateUniqueId = async (role: string) => {
+    const usersRef = collection(db, "users");
+    const q = query(usersRef, where("role", "==", role));
+    const snapshot = await getDocs(q);
+    const count = snapshot.size + 1;
+    const prefix = role === "Agent" ? "AGENT" : "CLIENT";
+    return `${prefix}${count.toString().padStart(3, '0')}`;
+  };
+
+  const handleMiddleInitial = (e: any) => {
+    let val = e.target.value.toUpperCase();
+    if (val.length === 1 && /^[A-Z]$/.test(val)) {
+        val = val + "."; 
     }
-    if (!firstName || !lastName || !address) {
-      toast.error("⚠️ Please fill in all details.", { position: "top-left" });
-      return;
-    }
-
-    try {
-      // 1. Create the Account
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-
-      // 2. FORCE UPDATE FIREBASE PROFILE (The Fix)
-      // This ensures 'auth.currentUser.displayName' is not null in the Dashboard
-      await updateProfile(user, {
-        displayName: `${firstName} ${lastName}`,
-        // Generate a random background color avatar with their initials
-        photoURL: `https://ui-avatars.com/api/?name=${firstName}+${lastName}&background=random&color=fff`
-      });
-
-      // 3. Save to Backend
-      await api.post('/users/create', {
-        uid: user.uid,
-        email: user.email,
-        firstName: firstName,
-        lastName: lastName,
-        address: address,
-        role: 'user'
-      });
-
-      toast.success("🎉 Registration Successful! Redirecting...", {
-        position: "top-left",
-        autoClose: 2000,
-        theme: "dark",
-      });
-
-      setTimeout(() => {
-        navigate("/"); 
-      }, 2000);
-
-    } catch (error: any) {
-      console.error("Error:", error);
-      if (error.code === 'auth/email-already-in-use') {
-        toast.error("❌ Email is already registered. Please log in.", { position: "top-left" });
-      } else {
-        toast.error("❌ Registration failed: " + error.message, { position: "top-left" });
-      }
+    if (val.length <= 2) {
+        setMiddleInitial(val);
     }
   };
 
+  const handleMobile = (e: any) => {
+    const val = e.target.value.replace(/\D/g, ''); 
+    if (val.length <= 10) {
+        setMobile(val);
+    }
+  };
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password !== confirmPassword) return toast.error("Passwords do not match!");
+    if (!city) return toast.error("Please select a City/Barangay.");
+    if (mobile.length !== 10) return toast.error("Mobile number must be 10 digits (excluding +63).");
+
+    setIsSubmitting(true);
+
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      const role = isAgent ? "Agent" : "Client";
+      const customId = await generateUniqueId(role);
+      const fullMobile = `+63${mobile}`; 
+
+      await updateProfile(user, {
+        displayName: `${firstName} ${lastName}`,
+        photoURL: `https://ui-avatars.com/api/?name=${firstName}+${lastName}&background=random`
+      });
+
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
+        email: user.email,
+        role: role,
+        customId: customId,
+        firstName, 
+        middleName: middleInitial, 
+        lastName,
+        dob, gender, maritalStatus, 
+        mobile: fullMobile,
+        address: city, 
+        fullAddress: { street, city, province, zipCode },
+        createdAt: new Date().toISOString()
+      });
+
+      await sendEmailVerification(user);
+      
+      await signOut(auth);
+      toast.success(`Account created! Please verify your email.`);
+      setTimeout(() => navigate("/verify-email"), 1500);
+
+    } catch (error: any) {
+        console.error(error);
+        toast.error(error.message);
+    } finally {
+        setIsSubmitting(false);
+    }
+  };
+
+  const isMatch = password && confirmPassword && password === confirmPassword;
+  const isMismatch = password && confirmPassword && password !== confirmPassword;
+
   return (
-    <div className="landing-container">
-      <header className="landing-header">
-        <div className="brand">
-          <img src={logo} alt="MBC Logo" className="brand-logo" />
-          <span className="brand-name">Metro Bacolod Connect</span>
+    <div style={{ 
+        position: 'fixed',
+        inset: 0,
+        width: '100%',
+        height: '100%',
+        overflowY: 'auto', 
+        backgroundColor: '#ffffff', 
+        fontFamily: "'Inter', sans-serif",
+        zIndex: 9999, 
+        color: '#111'
+    }}>
+      
+      {/* HEADER */}
+      <div style={{ 
+          width: '100%', 
+          padding: '15px 5%', // Reduced padding for mobile
+          borderBottom: '1px solid #e5e7eb', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          position: 'sticky',
+          top: 0,
+          background: 'white',
+          zIndex: 50
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <img src={logo} alt="Logo" style={{ width: '40px' }} />
+          <div><h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '700', color: '#111' }}>Create Account</h2></div>
         </div>
-      </header>
-
-      <div className="landing-content">
-        <div className="description-section">
-          <h1 className="main-heading">Join the Network</h1>
-          <p className="sub-heading">
-            Create your account today to access the safest Real Estate Marketplace in Metro Negros. 
-            Connect with verified professionals and secure your future investment.
-          </p>
-        </div>
-
-        <div className="form-section">
-          <div className="glass-login-card">
-            <h2>Create Account</h2>
-            <p className="form-subtitle">Fill in your details to get started.</p>
-            
-            <div style={{ display: "flex", gap: "10px" }}>
-              <div className="input-group">
-                <input 
-                  type="text" 
-                  placeholder="First Name" 
-                  value={firstName} 
-                  onChange={e => setFirstName(e.target.value)} 
-                />
-              </div>
-              <div className="input-group">
-                <input 
-                  type="text" 
-                  placeholder="Last Name" 
-                  value={lastName} 
-                  onChange={e => setLastName(e.target.value)} 
-                />
-              </div>
-            </div>
-
-            <div className="input-group" style={{ marginTop: "10px" }}>
-              <select 
-                value={address} 
-                onChange={e => setAddress(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "10px",
-                  borderRadius: "8px",
-                  border: "none",
-                  background: "rgba(255, 255, 255, 0.1)", // Matches your glass theme
-                  color: "white",
-                  outline: "none"
-                }}
-              >
-                <option value="" disabled style={{ color: "black" }}>Select Location</option>
-                {BACOLOD_LOCATIONS.map((loc) => (
-                  <option key={loc} value={loc} style={{ color: "black" }}>
-                    {loc}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="input-group" style={{ marginTop: "10px" }}>
-              <input 
-                type="email" 
-                placeholder="Email Address" 
-                value={email} 
-                onChange={e => setEmail(e.target.value)} 
-              />
-            </div>
-            
-            <div className="input-group" style={{ marginTop: "10px" }}>
-              <input 
-                type="password" 
-                placeholder="Password" 
-                value={password} 
-                onChange={e => setPassword(e.target.value)} 
-              />
-            </div>
-
-            <div className="input-group" style={{ marginTop: "10px" }}>
-              <input 
-                type="password" 
-                placeholder="Confirm Password" 
-                value={confirmPassword} 
-                onChange={e => setConfirmPassword(e.target.value)} 
-              />
-            </div>
-
-            <button className="primary-btn" onClick={handleRegister}>
-              Sign Up
-            </button>
-
-            <p className="register-link">
-              Already have an account? <Link to="/">Sign in</Link>
-            </p>
-          </div>
-        </div>
+        <button onClick={() => navigate('/')} style={{ background: 'transparent', border: '1px solid #e5e7eb', padding: '8px 15px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600', color: '#111' }}>
+            Cancel
+        </button>
       </div>
-      <ToastContainer position="top-left" theme="dark" />
+
+      {/* BODY - Added className="register-card" for mobile responsiveness */}
+      <div className="register-card" style={{ maxWidth: '1000px', margin: '0 auto', padding: '40px 20px' }}>
+        
+        <form onSubmit={handleRegister}>
+          
+          <div style={{ marginBottom: '30px', textAlign: 'center' }}>
+            <h1 style={{ fontSize: '1.8rem', fontWeight: '800', marginBottom: '10px', color: '#111' }}>Join Metro Bacolod Connect</h1>
+            <p style={{ color: '#6b7280', fontSize: '0.95rem' }}>Fill in your details to get verified access to listings and professionals.</p>
+          </div>
+
+          <div style={{ marginBottom: '40px', background: '#f9fafb', padding: '15px', borderRadius: '12px', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'flex-start', gap: '15px' }}>
+             <input type="checkbox" id="agentCheck" checked={isAgent} onChange={e => setIsAgent(e.target.checked)} style={{ width: '22px', height: '22px', accentColor: 'black', marginTop: '3px' }} />
+             <div>
+                <label htmlFor="agentCheck" style={{ fontWeight: '700', fontSize: '1rem', cursor: 'pointer', display: 'block', color: '#111' }}>I am a Licensed Real Estate Agent</label>
+                <span style={{ fontSize: '0.85rem', color: '#6b7280' }}>Check this box if you intend to post listings and sell properties.</span>
+             </div>
+          </div>
+
+          <section style={{ marginBottom: '40px' }}>
+            <h4 style={sectionHeaderStyle}>Personal Details</h4>
+            
+            {/* NAME GRID: Changed to Flex Wrap for Mobile */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', marginBottom: '20px' }}>
+                <div className="form-group" style={{ flex: '2 1 200px' }}>
+                    <label style={labelStyle}>First Name *</label>
+                    <input required type="text" style={inputStyle} value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="e.g. Juan" />
+                </div>
+                
+                <div className="form-group" style={{ flex: '1 1 80px' }}>
+                    <label style={labelStyle}>M.I.</label>
+                    <input 
+                        type="text" 
+                        style={{...inputStyle, textAlign: 'center'}} 
+                        value={middleInitial} 
+                        onChange={handleMiddleInitial} 
+                        placeholder="M."
+                        maxLength={2}
+                    />
+                </div>
+                
+                <div className="form-group" style={{ flex: '2 1 200px' }}>
+                    <label style={labelStyle}>Last Name *</label>
+                    <input required type="text" style={inputStyle} value={lastName} onChange={e => setLastName(e.target.value)} placeholder="e.g. Dela Cruz" />
+                </div>
+            </div>
+
+            <div style={grid3Style}>
+                <div className="form-group" style={{ position: 'relative' }}>
+                    <label style={labelStyle}>Date of Birth *</label>
+                    <input 
+                        required 
+                        type="date" 
+                        style={inputStyle} 
+                        value={dob} 
+                        onChange={e => setDob(e.target.value)} 
+                        className="custom-date-input"
+                    />
+                </div>
+                
+                <div className="form-group"><label style={labelStyle}>Gender *</label>
+                <select required style={inputStyle} value={gender} onChange={e => setGender(e.target.value)}>
+                    <option value="" disabled>Select Gender</option><option value="Male">Male</option><option value="Female">Female</option><option value="Prefer not to say">Prefer not to say</option>
+                </select></div>
+                
+                <div className="form-group"><label style={labelStyle}>Marital Status *</label>
+                <select required style={inputStyle} value={maritalStatus} onChange={e => setMaritalStatus(e.target.value)}>
+                    <option value="" disabled>Select Status</option><option value="Single">Single</option><option value="Married">Married</option><option value="Widowed">Widowed</option><option value="Separated">Separated</option>
+                </select></div>
+            </div>
+          </section>
+
+          <hr style={{ border: 'none', borderTop: '1px solid #f3f4f6', margin: '30px 0' }} />
+
+          <section style={{ marginBottom: '40px' }}>
+            <h4 style={sectionHeaderStyle}>Address & Contact</h4>
+            
+            <div style={{ marginBottom: '20px' }}>
+                <label style={labelStyle}>Mobile Number *</label>
+                <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #d1d5db', borderRadius: '8px', overflow: 'hidden', background: 'white' }}>
+                    <span style={{ background: '#f3f4f6', padding: '12px 15px', color: '#374151', fontWeight: '600', borderRight: '1px solid #d1d5db' }}>+63</span>
+                    <input 
+                        required 
+                        type="tel" 
+                        value={mobile} 
+                        onChange={handleMobile} 
+                        placeholder="917 123 4567" 
+                        style={{ 
+                            border: 'none', 
+                            outline: 'none', 
+                            padding: '12px', 
+                            width: '100%', 
+                            fontSize: '1rem',
+                            color: '#000000', 
+                            background: 'transparent' 
+                        }}
+                    />
+                </div>
+            </div>
+
+            <div style={{ marginBottom: '20px' }}><label style={labelStyle}>Street / Block / Lot *</label><input required type="text" style={inputStyle} value={street} onChange={e => setStreet(e.target.value)} placeholder="e.g. Lacson Street" /></div>
+            
+            <div style={grid3Style}>
+                <div className="form-group"><label style={labelStyle}>City / Barangay *</label>
+                <select required style={inputStyle} value={city} onChange={e => setCity(e.target.value)}>
+                    <option value="" disabled>Select Location</option>{BACOLOD_LOCATIONS.map(loc => <option key={loc} value={loc}>{loc}</option>)}
+                </select></div>
+                
+                <div className="form-group"><label style={labelStyle}>Province</label><input type="text" style={{...inputStyle, background: '#f9fafb', color: '#6b7280'}} value={province} readOnly /></div>
+                
+                <div className="form-group"><label style={labelStyle}>Postal Code</label>
+                    <input 
+                        type="text" 
+                        style={{...inputStyle, background: '#f9fafb', color: '#6b7280', cursor: 'not-allowed'}} 
+                        value="6100" 
+                        readOnly 
+                    />
+                </div>
+            </div>
+          </section>
+
+          <hr style={{ border: 'none', borderTop: '1px solid #f3f4f6', margin: '30px 0' }} />
+
+          <section style={{ marginBottom: '40px' }}>
+             <h4 style={sectionHeaderStyle}>Account Security</h4>
+             <div style={grid3Style}>
+                <div className="form-group"><label style={labelStyle}>Email Address *</label><input required type="email" style={inputStyle} value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" /></div>
+                
+                <div className="form-group" style={{ position: 'relative' }}>
+                    <label style={labelStyle}>Password *</label>
+                    <input 
+                        required 
+                        type={showPassword ? "text" : "password"} 
+                        style={inputStyle} 
+                        value={password} 
+                        onChange={e => setPassword(e.target.value)} 
+                        placeholder="••••••••" 
+                    />
+                    <div onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '12px', top: '38px', cursor: 'pointer', color: '#6b7280' }}>
+                        {showPassword ? <FaEyeSlash /> : <FaEye />}
+                    </div>
+                </div>
+
+                <div className="form-group" style={{ position: 'relative' }}>
+                    <label style={labelStyle}>Confirm Password *</label>
+                    <input 
+                        required 
+                        type={showPassword ? "text" : "password"} 
+                        style={{...inputStyle, borderColor: isMatch ? '#10B981' : isMismatch ? '#EF4444' : '#d1d5db'}} 
+                        value={confirmPassword} 
+                        onChange={e => setConfirmPassword(e.target.value)} 
+                        placeholder="••••••••" 
+                    />
+                    {isMatch && <FaCheckCircle style={{ position: 'absolute', right: '12px', top: '40px', color: '#10B981' }} />}
+                    {isMismatch && <FaTimesCircle style={{ position: 'absolute', right: '12px', top: '40px', color: '#EF4444' }} />}
+                </div>
+             </div>
+             {isMismatch && <p style={{ color: '#EF4444', fontSize: '0.85rem', marginTop: '-15px', textAlign: 'right' }}>Passwords do not match</p>}
+          </section>
+
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginTop: '50px', marginBottom: '50px' }}>
+             <button type="submit" disabled={isSubmitting} style={{ padding: '15px 60px', borderRadius: '50px', border: 'none', background: 'black', color: 'white', fontWeight: '700', fontSize: '1rem', cursor: 'pointer', opacity: isSubmitting ? 0.7 : 1, boxShadow: '0 4px 15px rgba(0,0,0,0.2)', width: '100%' }}>
+               {isSubmitting ? "Creating Account..." : "Complete Registration"}
+             </button>
+          </div>
+        </form>
+      </div>
+
+      <style>{`
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            cursor: pointer;
+            filter: invert(0); 
+        }
+      `}</style>
+      
+      <ToastContainer position="top-right" theme="light" />
     </div>
   );
 }
+
+const sectionHeaderStyle = { margin: '0 0 25px 0', color: '#111827', fontSize: '1.2rem', fontWeight: '700' };
+const labelStyle = { display: 'block', marginBottom: '8px', fontSize: '0.9rem', fontWeight: '600', color: '#374151' };
+const inputStyle = { width: '100%', padding: '12px 15px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '1rem', outline: 'none', transition: '0.2s', background: '#ffffff', color: '#000000' };
+const grid3Style = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '25px', marginBottom: '20px' };

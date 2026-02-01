@@ -1,13 +1,13 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { auth } from "../firebase-config";
+import { auth, db } from "../firebase-config";
 import { signOut } from "firebase/auth";
-import api from "../services/api"; 
+import { doc, getDoc, collection, query, orderBy, getDocs, addDoc, updateDoc } from "firebase/firestore"; 
 import { 
   FaHeart, FaRegHeart, FaShare, FaMapMarkerAlt, FaBookmark, FaSearch,
   FaUser, FaCog, FaSignOutAlt, FaCaretDown, 
-  FaImage, FaPaperPlane, FaSpinner,
-  FaHome, FaChevronLeft, FaChevronRight, FaTrash
+  FaImage, FaSpinner,
+  FaHome, FaTrash, FaFilter, FaEnvelope, FaPen, FaSave, FaTimes
 } from "react-icons/fa"; 
 import logo from "../assets/MBC Logo.png";
 import "../App.css";
@@ -15,75 +15,150 @@ import Swal from 'sweetalert2';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { BACOLOD_LOCATIONS } from "../constants/locations";
-import { doc, updateDoc } from "firebase/firestore";
-import { db } from "../firebase-config";
+
+// --- COMPONENT: IMAGE SLIDER ---
+const ImageSlider = ({ images }: { images: string[] }) => {
+    const [idx, setIdx] = useState(0);
+    if (!images || images.length === 0) return null;
+
+    if (images.length === 1) {
+        return <img src={images[0]} alt="Post" style={{ width: '100%', borderRadius: '8px', display: 'block', maxHeight: '500px', objectFit: 'cover' }} />;
+    }
+
+    return (
+        <div style={{position: 'relative', borderRadius: '8px', overflow: 'hidden', maxHeight: '500px'}}>
+            <img src={images[idx]} alt={`Slide ${idx}`} style={{width: '100%', height: 'auto', minHeight: '300px', objectFit: 'cover', display: 'block'}} />
+            <button onClick={(e) => {e.stopPropagation(); setIdx(idx === 0 ? images.length - 1 : idx - 1)}} 
+                style={{position:'absolute', top:'50%', left: 10, transform: 'translateY(-50%)', background:'rgba(0,0,0,0.6)', color:'white', border:'none', borderRadius:'50%', width:35, height:35, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>‹</button>
+            <button onClick={(e) => {e.stopPropagation(); setIdx(idx === images.length - 1 ? 0 : idx + 1)}} 
+                style={{position:'absolute', top:'50%', right: 10, transform: 'translateY(-50%)', background:'rgba(0,0,0,0.6)', color:'white', border:'none', borderRadius:'50%', width:35, height:35, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>›</button>
+            <div style={{position: 'absolute', bottom: 10, right: 10, background: 'rgba(0,0,0,0.6)', color: 'white', padding: '2px 8px', borderRadius: '10px', fontSize: '0.8rem'}}>{idx + 1} / {images.length}</div>
+        </div>
+    );
+};
 
 export default function Dashboard() {
   const [user, setUser] = useState<any>(null);
+  const [userData, setUserData] = useState<any>(null); 
+  
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [activeMenuPostId, setActiveMenuPostId] = useState<string | null>(null);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   
   const [posts, setPosts] = useState<any[]>([]); 
   const [newCaption, setNewCaption] = useState("");
   const [postLocation, setPostLocation] = useState("");
-  
+  const [filterLocation, setFilterLocation] = useState("");
+
   const [imageFiles, setImageFiles] = useState<File[]>([]); 
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const toastShown = useRef(false);
+
+  // --- EDIT MODE STATES ---
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [editCaption, setEditCaption] = useState("");
+  const [editImages, setEditImages] = useState<string[]>([]);
+  const [newEditFiles, setNewEditFiles] = useState<File[]>([]);
+  const editFileRef = useRef<HTMLInputElement>(null);
 
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
-    fetchPosts();
-    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
-      if (!currentUser) navigate("/");
-      else setUser(currentUser);
+    const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
+      if (!currentUser) {
+          navigate("/");
+      } else {
+        setUser(currentUser);
+        try {
+            const userDocRef = doc(db, "users", currentUser.uid);
+            const userSnap = await getDoc(userDocRef);
+            if (userSnap.exists()) {
+                const data = userSnap.data();
+                setUserData(data);
+                if (data.address) {
+                    setFilterLocation(data.address);
+                    fetchPosts(data.address); 
+                } else {
+                    fetchPosts(""); 
+                }
+            } else {
+                fetchPosts("");
+            }
+        } catch (err) {
+            console.error("Error fetching user data:", err);
+            fetchPosts("");
+        }
+      }
     });
     return () => unsubscribe();
   }, [navigate]);
 
-  const fetchPosts = async () => {
+  useEffect(() => {
+    if (location.state?.welcome && user && !toastShown.current) {
+      const displayName = userData?.firstName 
+        ? `${userData.firstName} ${userData.lastName}` 
+        : (user.displayName || 'User');
+
+      toast.success(`👋 Welcome back, ${displayName}!`, { theme: "dark" });
+      toastShown.current = true;
+      window.history.replaceState({}, document.title);
+    }
+  }, [location, user, userData]);
+
+  const formatTimeAgo = (dateString: string) => {
+    if (!dateString) return "Just now";
+    const now = new Date();
+    const date = new Date(dateString);
+    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (seconds < 60) return `${seconds}s ago`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days}d ago`;
+    return date.toLocaleDateString();
+  };
+
+  const fetchPosts = async (locationFilter: string = "") => {
     try {
-      const userLocation = user?.address || ""; 
-      const response = await api.get(`/posts?userLocation=${userLocation}`);
-      setPosts(response.data);
+      const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
+      const querySnapshot = await getDocs(q);
+      
+      const fetchedPosts = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          timeAgo: formatTimeAgo(data.createdAt) 
+        };
+      });
+
+      let activePosts = fetchedPosts.filter((post: any) => !post.isArchived);
+
+      if (locationFilter && locationFilter !== "All") {
+          activePosts = activePosts.filter((post: any) => post.location === locationFilter);
+      }
+
+      setPosts(activePosts);
     } catch (error) {
       console.error("Failed to load posts", error);
     }
   };
 
-  useEffect(() => {
-    if (location.state && location.state.welcome) {
-      toast.success(`👋 Welcome back, ${auth.currentUser?.displayName || 'User'}!`, {
-        position: "top-right", autoClose: 3000, theme: "dark",
-      });
-      window.history.replaceState({}, document.title);
-    }
-  }, [location]);
-
-  const toggleDropdown = (postId: string) => {
-    if (activeDropdown === postId) {
-      setActiveDropdown(null);
-    } else {
-      setActiveDropdown(postId);
-    }
+  const handleFilterChange = (e: any) => {
+      const newLocation = e.target.value;
+      setFilterLocation(newLocation);
+      fetchPosts(newLocation);
   };
 
+  const toggleDropdown = (postId: string) => activeDropdown === postId ? setActiveDropdown(null) : setActiveDropdown(postId);
+  
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const selectedFiles = Array.from(e.target.files);
-      const totalFiles = imageFiles.length + selectedFiles.length;
-
-      if (totalFiles > 10) {
-        toast.warning("Maximum 10 images allowed!", { theme: "dark" });
-        return;
-      }
-      setImageFiles([...imageFiles, ...selectedFiles]);
-    }
+    if (e.target.files) setImageFiles([...imageFiles, ...Array.from(e.target.files)]);
   };
-
   const removeImage = (index: number) => {
     const newFiles = [...imageFiles];
     newFiles.splice(index, 1);
@@ -91,154 +166,172 @@ export default function Dashboard() {
   };
 
   const handleCreatePost = async () => {
-    if (imageFiles.length === 0) {
-      toast.warning("Please upload at least 1 image.", { theme: "dark" });
-      return;
-    }
-    if (imageFiles.length > 10) {
-      toast.warning("Maximum 10 images allowed.", { theme: "dark" });
-      return;
-    }
-    if (!postLocation) {
-        toast.warning("Please select a location!", { theme: "dark" });
-        return;
-    }
-
+    if (imageFiles.length === 0) return toast.warning("Upload at least 1 image.");
+    if (!postLocation) return toast.warning("Select a location!");
     setIsUploading(true);
-
-    try {
-      const formData = new FormData();
-      formData.append('userId', user.uid);
-      // FIX: Changed 'agentName' to 'userName' to match rendering logic
-      formData.append('userName', user.displayName || "Metro Agent");
-      // FIX: Changed 'agentAvatar' to 'userAvatar' to match rendering logic
-      formData.append('userAvatar', user.photoURL || "");
-      formData.append('content', newCaption);
-      formData.append('location', postLocation);
-      
-      imageFiles.forEach((file) => {
-        formData.append('images', file);
-      });
-
-      await api.post('/posts/create', formData); 
-      
-      toast.success("Post published!", { theme: "dark" });
-      
-      setNewCaption("");
-      setPostLocation("");
-      setImageFiles([]); 
-      
-      fetchPosts(); 
-    } catch (error) {
-      console.error("Post Error:", error);
-      toast.error("Failed to post.", { theme: "dark" });
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handleDelete = async (postId: string) => {
-    setActiveDropdown(null); // Close the menu
     
-    const result = await Swal.fire({
-      title: 'Move to Trash?', 
-      text: "Items in trash will be deleted after 30 days.", 
-      icon: 'warning',
-      showCancelButton: true, 
-      confirmButtonColor: '#d33', 
-      cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Yes, move to trash', 
-      background: '#1e293b', 
-      color: '#fff'
-    });
+    try {
+      const uniqueId = userData?.customId || "USER";
+      const role = userData?.role || "Client";
+      const imageUrls: string[] = [];
+      
+      const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || "dg6kzqq5n"; 
+      const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || "jdj7tsar"; 
 
-    if (result.isConfirmed) {
-      // 1. Optimistic Update: Remove it from the screen INSTANTLY (Smoothest feel)
-      const originalPosts = [...posts];
-      setPosts(posts.filter(p => p.id !== postId));
+      for (const file of imageFiles) {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("upload_preset", UPLOAD_PRESET);
+        formData.append("cloud_name", CLOUD_NAME);
+        const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, { method: "POST", body: formData });
+        const data = await response.json();
+        if (data.secure_url) imageUrls.push(data.secure_url);
+        else throw new Error("Image upload failed");
+      }
 
+      await addDoc(collection(db, "posts"), {
+        userId: user.uid,
+        userName: userData?.firstName ? `${userData.firstName} ${userData.lastName}` : (user.displayName || "Metro User"),
+        userAvatar: user.photoURL,
+        userCustomId: uniqueId,
+        userRole: role,
+        content: newCaption,
+        location: postLocation,
+        images: imageUrls, 
+        image: imageUrls[0], 
+        createdAt: new Date().toISOString(),
+        likes: 0,
+        likedBy: [],
+        savedBy: [],
+        isArchived: false
+      });
+      
+      toast.success("Post published!");
+      setNewCaption(""); setPostLocation(""); setImageFiles([]);
+      fetchPosts(filterLocation); 
+    } catch (error: any) { 
+        console.error(error);
+        toast.error("Failed to post: " + error.message); 
+    } finally { 
+        setIsUploading(false); 
+    }
+  };
+
+  const startEdit = (post: any) => {
+      setEditingPostId(post.id);
+      setEditCaption(post.content);
+      setEditImages(post.images || [post.image]); 
+      setNewEditFiles([]);
+      setActiveDropdown(null);
+  };
+
+  const handleEditFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files) setNewEditFiles([...newEditFiles, ...Array.from(e.target.files)]);
+  };
+
+  const removeEditImage = (index: number) => {
+      setEditImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeNewEditFile = (index: number) => {
+      setNewEditFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const saveEdit = async () => {
+      if (!editingPostId) return;
+      if (editImages.length === 0 && newEditFiles.length === 0) return toast.warning("Post must have at least one image.");
+      
+      setIsUploading(true);
       try {
-        // 2. Update Firebase directly
-        const postRef = doc(db, "posts", postId);
-        
-        await updateDoc(postRef, {
-             deletedAt: new Date().toISOString(),
-             isArchived: true 
-        });
+          const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || "dg6kzqq5n"; 
+          const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || "jdj7tsar"; 
+          
+          const newUrls: string[] = [];
 
-        toast.success("Post moved to Trash", { theme: "dark" });
+          for (const file of newEditFiles) {
+            const formData = new FormData();
+            formData.append("file", file);
+            formData.append("upload_preset", UPLOAD_PRESET);
+            formData.append("cloud_name", CLOUD_NAME);
+            const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, { method: "POST", body: formData });
+            const data = await response.json();
+            if (data.secure_url) newUrls.push(data.secure_url);
+          }
+
+          const finalImages = [...editImages, ...newUrls];
+
+          const postRef = doc(db, "posts", editingPostId);
+          await updateDoc(postRef, {
+              content: editCaption,
+              images: finalImages,
+              image: finalImages[0] 
+          });
+
+          toast.success("Post updated!");
+          setEditingPostId(null);
+          fetchPosts(filterLocation);
+
       } catch (error) {
-        console.error("Delete error:", error);
-        // 3. If it fails, put the post back
-        setPosts(originalPosts); 
-        toast.error("Failed to move to trash", { theme: "dark" });
+          toast.error("Failed to update post");
+      } finally {
+          setIsUploading(false);
       }
-    }
-  };
-
-  const handleEdit = async (post: any) => {
-    setActiveDropdown(null); 
-    const { value: newContent } = await Swal.fire({
-      input: 'textarea', inputLabel: 'Edit Caption', inputValue: post.content,
-      showCancelButton: true, background: '#1e293b', color: '#fff'
-    });
-    if (newContent) {
-      try { await api.put(`/posts/${post.id}`, { userId: user.uid, content: newContent }); setPosts(posts.map(p => p.id === post.id ? { ...p, content: newContent } : p)); toast.success("Updated", { theme: "dark" }); } catch (error) { toast.error("Update failed", { theme: "dark" }); }
-    }
-  };
-
-  const toggleSave = async (postId: string) => {
-    const updatedPosts = posts.map(p => {
-      if (p.id === postId) {
-        const isSaved = p.savedBy?.includes(user.uid);
-        return { ...p, savedBy: isSaved ? p.savedBy.filter((id: string) => id !== user.uid) : [...(p.savedBy || []), user.uid] };
-      }
-      return p;
-    });
-    setPosts(updatedPosts);
-    try { await api.put(`/posts/${postId}/save`, { userId: user.uid }); } catch (error) { toast.error("Connection error", { theme: "dark" }); }
   };
 
   const handleLogout = () => {
-    setIsDropdownOpen(false);
-    Swal.fire({ title: 'Log Out?', text: "Are you sure?", icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#3b82f6', confirmButtonText: 'Yes, log out', background: '#1e293b', color: '#fff' }).then(async (result) => { if (result.isConfirmed) { await signOut(auth); navigate("/"); } });
-  };
-
-  const toggleLike = (postId: string | number) => {
-     fetchPosts(); 
-     api.put(`/posts/${postId}/like`, { userId: user.uid });
+    Swal.fire({ title: 'Log Out?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Yes' })
+    .then(async (res) => { if(res.isConfirmed) { await signOut(auth); navigate("/"); } });
   };
   
-  const handleShare = async (post: any) => {
-      if (navigator.share) { try { await navigator.share({ title: 'Metro Bacolod Connect', text: post.content, url: window.location.href }); } catch (error) { console.log('Error sharing:', error); } } else { toast.info("Link copied!", { position: "bottom-right", theme: "dark" }); }
+  const handleDelete = async (postId: string) => { 
+      setActiveDropdown(null);
+      const result = await Swal.fire({ title: 'Move to Trash?', text: "Items in trash will be deleted after 30 days.", icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', cancelButtonColor: '#3085d6', confirmButtonText: 'Yes, move to trash', background: '#1e293b', color: '#fff' });
+      if (result.isConfirmed) {
+          try {
+              const postRef = doc(db, "posts", postId);
+              await updateDoc(postRef, { deletedAt: new Date().toISOString(), isArchived: true });
+              setPosts(posts.filter(p => p.id !== postId));
+              toast.success("Post moved to Trash", { theme: "dark" });
+          } catch (error) { toast.error("Failed to move to trash", { theme: "dark" }); }
+      }
   };
 
-  const ImageSlider = ({ images }: { images: string[] }) => {
-    const [currentIndex, setCurrentIndex] = useState(0);
+  const handleShare = async (post: any) => {
+    const shareUrl = window.location.href; 
+    const shareText = `Check out this listing by ${post.userName}: ${post.content}`;
+    const listContainerStyle = 'display: flex; flex-direction: column; border: 1px solid #334155; border-radius: 8px; overflow: hidden; margin-top: 10px;';
+    const itemStyle = 'padding: 15px; cursor: pointer; border-bottom: 1px solid #334155; color: #e2e8f0; text-align: left; font-size: 0.9rem; font-weight: 500; transition: background 0.2s;';
+    const lastItemStyle = itemStyle.replace('border-bottom: 1px solid #334155;', ''); 
+    const hoverEvents = 'onmouseover="this.style.background=\'#334155\'" onmouseout="this.style.background=\'transparent\'"';
 
-    if (!images || images.length === 0) return null;
-    if (images.length === 1) return <img src={images[0]} alt="Post" className="post-image" style={{ width: '100%', display: 'block' }} />;
-
-    const nextSlide = () => setCurrentIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
-    const prevSlide = () => setCurrentIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
-
-    return (
-      <div className="post-image-container" style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', marginBottom: '15px' }}>
-        <img src={images[currentIndex]} alt={`Slide ${currentIndex}`} style={{ width: '100%', height: '400px', objectFit: 'cover', display: 'block' }} />
-        
-        <button onClick={prevSlide} style={{ position: 'absolute', top: '50%', left: '10px', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: '30px', height: '30px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><FaChevronLeft /></button>
-        <button onClick={nextSlide} style={{ position: 'absolute', top: '50%', right: '10px', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.5)', color: 'white', border: 'none', borderRadius: '50%', width: '30px', height: '30px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><FaChevronRight /></button>
-        
-        <div style={{ position: 'absolute', bottom: '10px', left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,0.5)', padding: '2px 8px', borderRadius: '10px', color: 'white', fontSize: '0.8rem' }}>
-          {currentIndex + 1} / {images.length}
+    await Swal.fire({
+      title: '<span style="color: white; font-size: 1.1rem; font-weight: 600;">Share Post</span>',
+      html: `
+        <div style="${listContainerStyle}">
+          <div id="share-fb" style="${itemStyle}" ${hoverEvents}>Share to Facebook</div>
+          <div id="share-x" style="${itemStyle}" ${hoverEvents}>Share to X (Twitter)</div>
+          <div id="share-copy" style="${lastItemStyle}" ${hoverEvents}>Copy Link</div>
+          ${('share' in navigator) ? `<div id="share-native" style="border-top: 1px solid #334155; padding: 15px; cursor: pointer; color: #94a3b8; text-align: center; font-size: 0.85rem;" ${hoverEvents}>More Options...</div>` : ''}
         </div>
-      </div>
-    );
+      `,
+      showConfirmButton: false, showCloseButton: true, background: '#1e293b', padding: '20px', width: '320px', 
+      didOpen: () => {
+        document.getElementById('share-fb')?.addEventListener('click', () => { window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, '_blank'); Swal.close(); });
+        document.getElementById('share-x')?.addEventListener('click', () => { window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`, '_blank'); Swal.close(); });
+        document.getElementById('share-copy')?.addEventListener('click', () => { navigator.clipboard.writeText(`${shareText} ${shareUrl}`); toast.success("Link copied", { theme: "dark", autoClose: 2000 }); Swal.close(); });
+        document.getElementById('share-native')?.addEventListener('click', async () => { try { if (navigator.share) { await navigator.share({ title: 'Metro Bacolod Connect', text: shareText, url: shareUrl }); } Swal.close(); } catch (err) { /* ignore */ } });
+      }
+    });
+  };
+
+  const handleInquire = () => {
+      Swal.fire({ title: 'Contact Agent', text: 'Messaging feature is coming soon!', icon: 'info', background: '#1e293b', color: '#fff' });
   };
 
   return (
     <div className="dashboard-layout">
-      {/* NAVBAR */}
+      <ToastContainer position="top-right" theme="dark" toastStyle={{ backgroundColor: "#1e293b", color: "white" }} />
+
       <nav className="navbar">
         <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
           <img src={logo} alt="MBC" className="brand-logo" />
@@ -246,7 +339,10 @@ export default function Dashboard() {
         </div>
         <div className="nav-right" style={{ position: "relative" }}>
           <div className="user-menu-trigger" onClick={() => setIsDropdownOpen(!isDropdownOpen)} style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" }}>
-            <span style={{ fontWeight: "600", fontSize: "0.9rem" }}>{user?.displayName?.split(' ')[0]}</span>
+            <div style={{textAlign: 'right'}}>
+                <div style={{ fontWeight: "700", fontSize: "0.9rem", color: 'white' }}>{userData?.firstName ? `${userData.firstName} ${userData.lastName}` : (user?.displayName || "Loading...")}</div>
+                <div style={{ fontSize: "0.75rem", color: '#aaa' }}>{userData?.role || "User"} • {userData?.customId}</div>
+            </div>
             <img src={user?.photoURL || "https://ui-avatars.com/api/?name=User"} alt="Profile" className="nav-avatar" style={{ borderRadius: '50%', width: '40px', height: '40px', objectFit: 'cover' }} />
             <FaCaretDown size={12} color="#aaa" />
           </div>
@@ -264,156 +360,140 @@ export default function Dashboard() {
       <div className="dashboard-body">
         <aside className="sidebar-left">
           <div className="menu-item active"><FaHome size={22} /> <span>Listings</span></div>
-          
-          {/* NEW TRASH LINK */}
-          <div 
-            className="menu-item" 
-            style={{ marginTop: '20px', borderTop: '1px solid #334155', paddingTop: '20px' }}
-            onClick={() => navigate('/archive')}
-          >
-            <FaTrash size={22} color="#ef4444" /> <span style={{ color: '#ef4444' }}>Trash</span>
-          </div>
+          {userData?.role === 'Agent' && (<div className="menu-item" onClick={() => navigate('/archive')}><FaTrash size={22} /> <span>Trash</span></div>)}
         </aside>
 
         <main className="feed-container">
-          <div className="post-card create-post-card" style={{ padding: '20px' }}>
-            <div style={{ display: 'flex', gap: '15px' }}>
-              <img src={user?.photoURL || "https://ui-avatars.com/api/?name=User"} alt="User" className="user-avatar" style={{ width: '50px', height: '50px', borderRadius: '50%' }} />
-              <div style={{ flex: 1 }}>
-                <textarea 
-                  className="create-input" 
-                  placeholder={`What are you listing today, ${user?.displayName?.split(' ')[0]}?`}
-                  value={newCaption} onChange={(e) => setNewCaption(e.target.value)} rows={2}
-                  style={{ resize: 'none', background: 'transparent', border: 'none', color: 'white', width: '100%', outline: 'none', fontSize: '1.1rem', marginBottom: '10px' }}
-                />
-                
-                {imageFiles.length > 0 && (
-                   <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', marginBottom: '15px', paddingBottom: '5px' }}>
-                     {imageFiles.map((file, index) => (
-                       <div key={index} style={{ position: 'relative', minWidth: '100px' }}>
-                         <img src={URL.createObjectURL(file)} alt="Preview" style={{ width: '100px', height: '100px', borderRadius: '8px', objectFit: 'cover' }} />
-                         <button onClick={() => removeImage(index)} style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.7)', color: 'white', border: 'none', borderRadius: '50%', width: 20, height: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem' }}>✕</button>
-                       </div>
-                     ))}
-                   </div>
-                )}
-
-                <div style={{ height: '1px', background: 'rgba(255,255,255,0.1)', marginBottom: '15px' }}></div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                    <button onClick={() => fileInputRef.current?.click()} style={{ background: 'transparent', border: 'none', color: '#38BDF8', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.9rem', padding: '5px 10px', borderRadius: '20px' }}>
-                      <FaImage size={16} /> <span>Photos ({imageFiles.length}/10)</span>
-                    </button>
-                    <input type="file" ref={fileInputRef} hidden accept="image/*" multiple onChange={handleFileSelect} />
-
-                    <div style={{ position: 'relative' }}>
-                        <FaMapMarkerAlt style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#10B981', pointerEvents: 'none', fontSize: '14px' }} />
-                        <select value={postLocation} onChange={(e) => setPostLocation(e.target.value)} style={{ padding: '6px 15px 6px 32px', background: 'rgba(255,255,255,0.08)', border: 'none', color: postLocation ? 'white' : '#aaa', borderRadius: '20px', cursor: 'pointer', fontSize: '0.85rem', outline: 'none' }}>
-                          <option value="" disabled>Add Location</option>
-                          {BACOLOD_LOCATIONS.map((loc) => (<option key={loc} value={loc} style={{ color: "black" }}>{loc}</option>))}
-                        </select>
-                    </div>
-                  </div>
-                  <button onClick={handleCreatePost} disabled={isUploading} className="primary-btn" style={{ width: 'auto', padding: '8px 24px', fontSize: '0.9rem', borderRadius: '20px', display: 'flex', gap: '8px', alignItems: 'center', opacity: isUploading ? 0.7 : 1 }}>
-                    {isUploading ? <FaSpinner className="spin" /> : <FaPaperPlane />} <span>Post</span>
-                  </button>
-                </div>
-              </div>
+            <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#1e293b', padding: '10px 20px', borderRadius: '12px', border: '1px solid #334155' }}>
+                <span style={{ color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <FaFilter /> Filtering by:
+                </span>
+                <select value={filterLocation} onChange={handleFilterChange} style={{ background: '#0f172a', color: 'white', border: '1px solid #334155', padding: '8px 15px', borderRadius: '8px', cursor: 'pointer', outline: 'none' }}>
+                    <option value="All">Show All Locations</option>
+                    {BACOLOD_LOCATIONS.map(loc => <option key={loc} value={loc}>{loc}</option>)}
+                </select>
             </div>
-          </div>
 
-          {posts.length === 0 ? (
-             <p style={{textAlign: 'center', color: '#aaa', marginTop: '40px', fontStyle: 'italic'}}>No listings yet.</p>
-          ) : (
-            posts.map((post: any) => (
-              <div key={post.id} className="post-card" style={{ position: 'relative', marginTop: '20px' }}>
-                
-                {/* FIX: ADDED DISPLAY: FLEX TO FIX LAYOUT & FALLBACKS FOR NULL DATA */}
-                <div className="post-header" style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '12px', padding: '15px' }}>
-                  {/* FIX: Fallback for missing avatar */}
-                  <img 
-                    src={post.userAvatar || post.agentAvatar || "https://ui-avatars.com/api/?name=User"} 
-                    className="user-avatar" 
-                    alt="User" 
-                    style={{ borderRadius: '50%', width: '40px', height: '40px', objectFit: 'cover' }} 
-                  />
-                  
-                  <div>
-                    {/* FIX: Fallback for missing name */}
-                    <h4 className="author-name" style={{margin: 0, color: 'white'}}>{post.userName || post.agentName || "Unknown User"}</h4>
-                    <span className="timestamp" style={{fontSize: '0.8rem', color: '#94a3b8'}}>{post.timeAgo}</span>
-                  </div>
-
-                  {user?.uid === post.userId && (
-                    <div style={{ marginLeft: 'auto', position: 'relative' }}>
-                      <button 
-                        onClick={() => toggleDropdown(post.id)}
-                        style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '1.5rem', cursor: 'pointer', padding: '0 10px' }}
-                      >
-                        &#x22EE;
-                      </button>
-
-                      {activeDropdown === post.id && (
-                        <div className="post-options-dropdown" style={{
-                          position: 'absolute', right: 0, top: '30px', backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', zIndex: 50, width: '100px', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
-                        }}>
-                          <button 
-                            onClick={() => handleEdit(post)}
-                            style={{ width: '100%', textAlign: 'left', padding: '10px', background: 'transparent', color: 'white', border: 'none', cursor: 'pointer', fontSize: '0.9rem' }}
-                          >
-                            Edit
-                          </button>
-                          <button 
-                            onClick={() => handleDelete(post.id)}
-                            style={{ width: '100%', textAlign: 'left', padding: '10px', background: 'transparent', color: '#ef4444', border: 'none', cursor: 'pointer', fontSize: '0.9rem' }}
-                          >
-                            Delete
-                          </button>
+            {userData?.role === 'Agent' && (
+                <div className="post-card create-post-card" style={{ padding: '20px' }}>
+                    <div style={{ display: 'flex', gap: '15px' }}>
+                        <img src={user?.photoURL} className="user-avatar" style={{width: '50px', height: '50px', borderRadius: '50%'}} />
+                        <div style={{flex: 1}}>
+                             <textarea className="create-input" placeholder={`What are you listing today, ${userData?.firstName || 'Agent'}?`} value={newCaption} onChange={(e) => setNewCaption(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCreatePost(); }}} />
+                             {imageFiles.length > 0 && (
+                                 <div style={{display: 'flex', gap: '10px', overflowX: 'auto', marginBottom: '10px'}}>
+                                     {imageFiles.map((file, i) => (
+                                         <div key={i} style={{position:'relative'}}>
+                                             <img src={URL.createObjectURL(file)} style={{width: 60, height: 60, borderRadius: 8, objectFit: 'cover'}} />
+                                             <button onClick={() => removeImage(i)} style={{position:'absolute', top:0, right:0, background:'red', color:'white', border:'none', borderRadius:'50%', width:15, height:15, fontSize:10, cursor:'pointer'}}>x</button>
+                                         </div>
+                                     ))}
+                                 </div>
+                             )}
+                             <div style={{display:'flex', justifyContent:'space-between', marginTop: '10px'}}>
+                                <div style={{display: 'flex', gap: '10px'}}>
+                                    <button onClick={() => fileInputRef.current?.click()} style={{background: 'transparent', border:'none', color: '#38BDF8', cursor: 'pointer', display: 'flex', gap: '5px', alignItems: 'center'}}><FaImage /> Photos</button>
+                                    <input type="file" ref={fileInputRef} hidden accept="image/*" multiple onChange={handleFileSelect} />
+                                    <select value={postLocation} onChange={(e) => setPostLocation(e.target.value)} style={{ background: 'rgba(255,255,255,0.1)', color: 'white', border: 'none', borderRadius: '20px', padding: '5px 10px' }}>
+                                        <option value="" disabled>Location</option>
+                                        {BACOLOD_LOCATIONS.map(loc => <option key={loc} value={loc} style={{color:'black'}}>{loc}</option>)}
+                                    </select>
+                                </div>
+                                <button onClick={handleCreatePost} className="primary-btn" disabled={isUploading}>{isUploading ? <FaSpinner className="spin"/> : "Post"}</button>
+                             </div>
                         </div>
-                      )}
                     </div>
-                  )}
                 </div>
+            )}
 
-                <p className="post-text" style={{ lineHeight: '1.5', marginBottom: '15px', padding: '0 15px' }}>{post.content}</p>
-
-                {Array.isArray(post.images) && post.images.length > 0 ? (
-                  <ImageSlider images={post.images} />
-                ) : post.image ? (
-                  <div className="post-image-container" style={{ borderRadius: '12px', overflow: 'hidden', marginBottom: '15px' }}>
-                    <img src={post.image} alt="Property" className="post-image" style={{ width: '100%', display: 'block' }} />
-                  </div>
-                ) : null}
-
-                {(post.location || post.price) && (
-                  <div className="property-details" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '15px', padding: '0 15px' }}>
-                    {post.location && <span style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(16, 185, 129, 0.1)', color: '#10B981', padding: '4px 10px', borderRadius: '15px', fontSize: '0.85rem' }}><FaMapMarkerAlt /> {post.location}</span>}
-                    {post.price && <span className="price-badge" style={{ background: 'rgba(56, 189, 248, 0.1)', color: '#38BDF8', padding: '4px 10px', borderRadius: '15px', fontSize: '0.85rem', fontWeight: 'bold' }}>{post.price}</span>}
-                  </div>
-                )}
-                <div style={{ height: '1px', background: 'rgba(255,255,255,0.05)', marginBottom: '10px' }}></div>
-                <div className="action-bar" style={{ display: 'flex', justifyContent: 'space-between', padding: '0 15px 15px' }}>
-                  <button className={`action-btn ${post.likedBy?.includes(user?.uid) ? 'active-like' : ''}`} onClick={() => toggleLike(post.id)} style={{ background: 'transparent', border: 'none', color: post.likedBy?.includes(user?.uid) ? '#ec4899' : '#aaa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    {post.likedBy?.includes(user?.uid) ? <FaHeart /> : <FaRegHeart />} <span>{post.likes > 0 ? post.likes : 'Like'}</span>
-                  </button>
-                  <button className="action-btn" onClick={() => handleShare(post)} style={{ background: 'transparent', border: 'none', color: '#aaa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}><FaShare /> <span>Share</span></button>
-                  <button className={`action-btn ${post.savedBy?.includes(user?.uid) ? 'active-save' : ''}`} onClick={() => toggleSave(post.id)} style={{ background: 'transparent', border: 'none', color: post.savedBy?.includes(user?.uid) ? '#38BDF8' : '#aaa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}><FaBookmark /> <span>{post.savedBy?.includes(user?.uid) ? 'Saved' : 'Save'}</span></button>
-                </div>
-              </div>
-            ))
-          )}
+            {posts.length === 0 ? (
+                <p style={{textAlign: 'center', color: '#aaa', marginTop: '40px'}}>No listings found in <span style={{color: '#38BDF8'}}>{filterLocation || "this area"}</span>.</p>
+            ) : (
+                posts.map((post: any) => (
+                    <div key={post.id} className="post-card" style={{marginTop: '20px', padding: '15px'}}>
+                        {editingPostId === post.id ? (
+                            <div>
+                                <h4 style={{color: 'white', marginBottom: '10px'}}>Edit Post</h4>
+                                <textarea className="create-input" value={editCaption} onChange={(e) => setEditCaption(e.target.value)} style={{ width: '100%', minHeight: '80px', background: '#0f172a', border: '1px solid #334155' }} />
+                                <div style={{display: 'flex', gap: '10px', flexWrap: 'wrap', margin: '15px 0'}}>
+                                    {editImages.map((img, i) => (<div key={i} style={{position:'relative'}}><img src={img} style={{width: 70, height: 70, borderRadius: 8, objectFit: 'cover'}} /><button onClick={() => removeEditImage(i)} style={{position:'absolute', top:-5, right:-5, background:'#ef4444', color:'white', border:'none', borderRadius:'50%', width:20, height:20, fontSize:12, cursor:'pointer'}}>x</button></div>))}
+                                    {newEditFiles.map((file, i) => (<div key={i} style={{position:'relative'}}><img src={URL.createObjectURL(file)} style={{width: 70, height: 70, borderRadius: 8, objectFit: 'cover', border: '1px solid #38BDF8'}} /><button onClick={() => removeNewEditFile(i)} style={{position:'absolute', top:-5, right:-5, background:'#ef4444', color:'white', border:'none', borderRadius:'50%', width:20, height:20, fontSize:12, cursor:'pointer'}}>x</button></div>))}
+                                </div>
+                                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                                    <button onClick={() => editFileRef.current?.click()} style={{color: '#38BDF8', background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', gap: '5px', alignItems: 'center'}}><FaImage /> Add Photos</button>
+                                    <input type="file" ref={editFileRef} hidden accept="image/*" multiple onChange={handleEditFileSelect} />
+                                    <div style={{display: 'flex', gap: '10px'}}><button onClick={() => setEditingPostId(null)} style={{background: 'transparent', color: '#94a3b8', border: 'none', cursor: 'pointer'}}>Cancel</button><button onClick={saveEdit} className="primary-btn" disabled={isUploading}>{isUploading ? "Saving..." : "Save"}</button></div>
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                <div style={{display: 'flex', gap: '15px', alignItems: 'center', marginBottom: '10px'}}>
+                                    <img src={post.userAvatar} style={{width: 40, height: 40, borderRadius: '50%'}} />
+                                    <div style={{flex: 1}}><h4 style={{color:'white', margin: 0}}>{post.userName}</h4><span style={{fontSize: '0.8rem', color: '#aaa'}}>{post.userRole} • {post.timeAgo}</span></div>
+                                    {user?.uid === post.userId && (<div style={{position: 'relative'}}><button onClick={() => toggleDropdown(post.id)} style={{background:'transparent', border:'none', color:'#aaa', fontSize:'1.2rem', cursor:'pointer'}}>⋮</button>{activeDropdown === post.id && (<div style={{position:'absolute', right:0, top:20, background:'#1e293b', border:'1px solid #334155', borderRadius:8, zIndex:10, width:160, boxShadow: '0 10px 15px -3px rgba(0,0,0,0.5)'}}><button onClick={() => startEdit(post)} style={{width:'100%', padding:'12px', background:'transparent', color:'white', border:'none', cursor:'pointer', textAlign:'left', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.9rem', borderBottom: '1px solid #334155'}}><FaPen size={12} /> Edit Post</button><button onClick={() => handleDelete(post.id)} style={{width:'100%', padding:'12px', background:'transparent', color:'#ef4444', border:'none', cursor:'pointer', textAlign:'left', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.9rem'}}><FaTrash size={12} /> Move to Trash</button></div>)}</div>)}
+                                </div>
+                                <p style={{color:'#ddd', marginBottom: '10px'}}>{post.content}</p>
+                                <div style={{marginBottom: '10px'}}>{post.images && post.images.length > 0 ? (<ImageSlider images={post.images} />) : post.image ? (<img src={post.image} alt="Post" style={{width: '100%', borderRadius: 8}} />) : null}</div>
+                                <div style={{marginTop: '10px', display:'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                                    {post.location ? (<span style={{background:'rgba(16, 185, 129, 0.1)', color:'#10B981', padding:'2px 8px', borderRadius:10, fontSize:'0.8rem', display:'flex', alignItems:'center', gap:4}}><FaMapMarkerAlt /> {post.location}</span>) : <div></div>}
+                                    <div style={{ display: 'flex', gap: '10px' }}>
+                                        <button onClick={() => handleShare(post)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.9rem' }}><FaShare /> Share</button>
+                                        {userData?.role !== 'Agent' && user?.uid !== post.userId && (<button onClick={handleInquire} style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '6px 16px', borderRadius: '6px', fontSize: '0.9rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}><FaEnvelope /> Inquire</button>)}
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                ))
+            )}
         </main>
         
         <aside className="sidebar-right">
-          <div className="suggestion-box">
-            <h4>Verified Agents</h4>
-            <div className="suggestion-item"><div className="sug-avatar bg-blue" style={{borderRadius: '50%'}}></div><span>Negros Realty</span></div>
-            <div className="suggestion-item"><div className="sug-avatar bg-green" style={{borderRadius: '50%'}}></div><span>Bacolod Homes</span></div>
-          </div>
+           <div className="suggestion-box">
+             <h4>Verified Agents</h4>
+             <div className="suggestion-item"><div className="sug-avatar bg-blue" style={{borderRadius: '50%'}}></div><span>Negros Realty</span></div>
+           </div>
         </aside>
+
+        {/* --- MOBILE BOTTOM NAVIGATION (Visible only on Mobile via CSS) --- */}
+        <div className="mobile-bottom-nav" style={{ 
+            display: 'none', /* Hidden by default (desktop), shown via CSS media query */
+            position: 'fixed', bottom: 0, left: 0, width: '100%', 
+            background: '#1e293b', borderTop: '1px solid #334155', 
+            justifyContent: 'space-around', alignItems: 'center', padding: '10px 0', zIndex: 100 
+        }}>
+            <div onClick={() => navigate('/dashboard')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: 'white', cursor: 'pointer' }}>
+                <FaHome size={24} />
+                <span style={{ fontSize: '0.7rem', marginTop: '4px' }}>Home</span>
+            </div>
+            
+            {/* Show Trash only for Agents */}
+            {userData?.role === 'Agent' && (
+                <div onClick={() => navigate('/archive')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#ef4444', cursor: 'pointer' }}>
+                    <FaTrash size={24} />
+                    <span style={{ fontSize: '0.7rem', marginTop: '4px' }}>Trash</span>
+                </div>
+            )}
+
+            <div onClick={() => navigate('/profile')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#94a3b8', cursor: 'pointer' }}>
+                <FaUser size={24} />
+                <span style={{ fontSize: '0.7rem', marginTop: '4px' }}>Profile</span>
+            </div>
+
+            <div onClick={handleLogout} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#94a3b8', cursor: 'pointer' }}>
+                <FaSignOutAlt size={24} />
+                <span style={{ fontSize: '0.7rem', marginTop: '4px' }}>Logout</span>
+            </div>
+        </div>
+
+        {/* CSS to show Bottom Nav on Mobile */}
+        <style>{`
+            @media (max-width: 768px) {
+                .mobile-bottom-nav { display: flex !important; }
+            }
+        `}</style>
+
       </div>
-      <ToastContainer position="top-right" theme="dark" />
     </div>
   );
 }

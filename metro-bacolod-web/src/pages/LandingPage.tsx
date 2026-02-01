@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { signInWithEmailAndPassword, signInWithPopup, createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { signInWithEmailAndPassword, signInWithPopup, signOut } from "firebase/auth";
 import { auth, googleProvider } from "../firebase-config";
-import api from "../services/api";
 import { FcGoogle } from "react-icons/fc";
 import { FaTimes } from "react-icons/fa";
 import logo from "../assets/MBC Logo.png"; 
@@ -13,54 +12,36 @@ import 'react-toastify/dist/ReactToastify.css';
 
 export default function LandingPage() {
   const [showLogin, setShowLogin] = useState(false);
-  const [showRegister, setShowRegister] = useState(false);
-  
-  // Login State
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  
-  // Register State
-  const [regFirstName, setRegFirstName] = useState("");
-  const [regLastName, setRegLastName] = useState("");
-  const [regAddress, setRegAddress] = useState("");
-  const [regEmail, setRegEmail] = useState("");
-  const [regPassword, setRegPassword] = useState("");
-
   const navigate = useNavigate();
 
-  // --- NEW: CLOSE & RESET FUNCTIONS ---
   const closeLogin = () => {
     setShowLogin(false);
     setEmail("");
     setPassword("");
   };
 
-  const closeRegister = () => {
-    setShowRegister(false);
-    setRegFirstName("");
-    setRegLastName("");
-    setRegAddress("");
-    setRegEmail("");
-    setRegPassword("");
-  };
+  const handleLogin = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault(); 
 
-  const switchToRegister = () => {
-    closeLogin(); // Clear login data
-    setShowRegister(true);
-  };
-
-  const switchToLogin = () => {
-    closeRegister(); // Clear register data
-    setShowLogin(true);
-  };
-
-  // --- HANDLERS ---
-  const handleLogin = async () => {
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      if (!user.emailVerified) {
+        await signOut(auth); 
+        toast.error("Login failed: Email not verified. Please check your inbox.");
+        return; 
+      }
+
       navigate("/dashboard", { state: { welcome: true } });
     } catch (error: any) {
-      toast.error("Invalid credentials");
+      if (error.code === 'auth/invalid-credential') {
+        toast.error("Incorrect email or password.");
+      } else {
+        toast.error("Login failed. Please try again.");
+      }
     }
   };
 
@@ -73,255 +54,129 @@ export default function LandingPage() {
     }
   };
 
-  const handleRegister = async () => {
-    try {
-      const userCredential = await createUserWithEmailAndPassword(auth, regEmail, regPassword);
-      const user = userCredential.user;
-      await updateProfile(user, {
-        displayName: `${regFirstName} ${regLastName}`,
-        photoURL: `https://ui-avatars.com/api/?name=${regFirstName}+${regLastName}&background=random`
-      });
-      // Save to backend
-       await api.post('/users/create', { uid: user.uid, email: user.email, firstName: regFirstName, lastName: regLastName, address: regAddress });
-      
-      toast.success("Account created!");
-      closeRegister();
-      setShowLogin(true);
-    } catch (error: any) {
-      toast.error(error.message);
-    }
-  };
-
   return (
-    <div style={{ 
-      position: 'relative', 
-      width: '100vw', 
-      minHeight: '100vh', 
-      overflowX: 'hidden', 
-      fontFamily: "'Inter', sans-serif", 
-      background: '#ffffff',
-      margin: 0,
-      padding: 0
-    }}>
+    <div style={{ position: 'relative', width: '100vw', minHeight: '100vh', overflowX: 'hidden', fontFamily: "'Inter', sans-serif", background: '#ffffff' }}>
       
       {/* NAVBAR */}
-      <nav style={{ 
-        position: 'absolute', 
-        top: 0, 
-        left: 0, 
-        width: '100%', 
-        padding: '35px 5%', 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        zIndex: 50,
-        boxSizing: 'border-box'
-      }}>
+      <nav className="landing-nav" style={{ position: 'absolute', top: 0, left: 0, width: '100%', padding: '35px 5%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 50 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '50px' }}>
             <img src={logo} alt="Logo" style={{ width: '60px', height: 'auto' }} />
-            
-            <div style={{ display: 'flex', gap: '30px' }}>
+            <div className="nav-links" style={{ display: 'flex', gap: '30px' }}>
                 {['Properties', 'Professionals', 'Services', 'Resources'].map((item) => (
-                    <a key={item} href="#" style={{ color: '#000', fontWeight: '600', fontSize: '0.9rem', opacity: 0.7, transition: '0.2s' }}>
-                        {item}
-                    </a>
+                    <a key={item} href="#" style={{ color: '#000', fontWeight: '600', fontSize: '0.9rem', opacity: 0.7, transition: '0.2s', textDecoration: 'none' }}>{item}</a>
                 ))}
             </div>
         </div>
-        
-        <button 
-          onClick={() => setShowLogin(true)}
-          style={{ 
-            background: 'black', 
-            color: 'white', 
-            padding: '12px 35px', 
-            fontSize: '0.9rem', 
-            fontWeight: '700', 
-            borderRadius: '50px',
-            border: 'none',
-            cursor: 'pointer',
-            boxShadow: '0 4px 14px 0 rgba(0,0,0,0.39)' 
-          }}
-        >
-          LOGIN
-        </button>
+        <div className="nav-buttons" style={{ display: 'flex', gap: '15px' }}>
+            <button onClick={() => setShowLogin(true)} style={{ background: 'transparent', border: '1px solid black', color: 'black', padding: '12px 35px', fontSize: '0.9rem', fontWeight: '700', borderRadius: '50px', cursor: 'pointer' }}>LOGIN</button>
+            <button onClick={() => navigate('/register')} style={{ background: 'black', color: 'white', padding: '12px 35px', fontSize: '0.9rem', fontWeight: '700', borderRadius: '50px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 14px 0 rgba(0,0,0,0.39)' }}>CREATE ACCOUNT</button>
+        </div>
       </nav>
 
-      {/* 3. HERO SECTION */}
-      <section style={{ 
-        minHeight: '100vh', 
-        width: '100%',
-        display: 'flex', 
-        flexDirection: 'column', 
-        justifyContent: 'center', 
-        alignItems: 'center',
-        textAlign: 'center',
-        padding: '0 20px',
-        boxSizing: 'border-box',
-        position: 'relative' 
-      }}>
-        
-        <Antigravity 
-          count={300}          
-          color="#000000"      
-          particleSize={0.6}   
-        />
-
-        <h1 style={{ 
-          fontSize: 'clamp(3.5rem, 6vw, 6rem)', 
-          fontWeight: '700', 
-          color: '#000',
-          lineHeight: '1.1', 
-          marginBottom: '30px',
-          letterSpacing: '-2px',
-          zIndex: 2
-        }}>
-           <TextType
-             text={["Metro Bacolod \n Connect."]}
-             typingSpeed={100}
-             deletingSpeed={50}
-             loop={false} 
-             showCursor={true}
-             cursorCharacter="|"
-           />
+      {/* HERO */}
+      <section className="landing-hero" style={{ minHeight: '100vh', width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', padding: '0 20px', position: 'relative' }}>
+        <Antigravity count={300} color="#000000" particleSize={0.6} />
+        {/* Adjusted clamp() lower bound to 2.5rem for mobile safety */}
+        <h1 style={{ fontSize: 'clamp(2.5rem, 6vw, 6rem)', fontWeight: '700', color: '#000', lineHeight: '1.1', marginBottom: '30px', letterSpacing: '-2px', zIndex: 2 }}>
+           <TextType text={["Metro Bacolod \n Connect."]} typingSpeed={100} deletingSpeed={50} loop={false} showCursor={true} cursorCharacter="|" />
         </h1>
-        
         <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', justifyContent: 'center', zIndex: 2 }}>
           {['Connect', 'Verify', 'Close'].map(tag => (
-            <span key={tag} style={{ 
-              background: '#e5e7eb', 
-              color: '#374151', 
-              padding: '8px 24px', 
-              borderRadius: '25px', 
-              fontSize: '0.85rem', 
-              fontWeight: '600' 
-            }}>
-              {tag}
-            </span>
+            <span key={tag} style={{ background: '#e5e7eb', color: '#374151', padding: '8px 24px', borderRadius: '25px', fontSize: '0.85rem', fontWeight: '600' }}>{tag}</span>
           ))}
         </div>
       </section>
 
-      {/* 4. CONTENT SECTION */}
-      <section style={{ 
-        background: '#f9fafb', 
-        padding: '100px 5%', 
-        display: 'flex',
-        justifyContent: 'center',
-        position: 'relative', 
-        zIndex: 5
-      }}>
-        <div style={{ 
-          maxWidth: '1400px', 
-          width: '100%', 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'space-between', 
-          gap: '80px',
-          flexWrap: 'wrap' 
-        }}>
-          
-          <div style={{ flex: '1 1 500px' }}> 
-            <h2 style={{ 
-              fontSize: '3rem', 
-              fontWeight: '800', 
-              marginBottom: '25px', 
-              lineHeight: '1.2',
-              color: '#111',
-              letterSpacing: '-1px'
-            }}>
-              Secure Real Estate <br /> in Metro Bacolod
-            </h2>
-            <p style={{ 
-              fontSize: '1.15rem', 
-              color: '#4b5563', 
-              lineHeight: '1.6', 
-              maxWidth: '500px',
-              fontWeight: '500'
-            }}>
-              Metro Bacolod Connect is a SaaS-enabled Real Estate Marketplace designed specifically for the Metro Negros region. 
-              A centralized "safe zone" connecting you exclusively with PRC-Verified Licensed Professionals.
-            </p>
+      {/* ABOUT SECTION */}
+      <section className="landing-about" style={{ padding: '100px 8%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '60px', flexWrap: 'wrap', background: 'white' }}>
+          <div className="about-text" style={{ flex: 1, minWidth: '350px' }}>
+             <h2 style={{ fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: '800', lineHeight: '1.1', marginBottom: '25px', color: '#111' }}>
+               Secure Real Estate <br /> in Metro Bacolod
+             </h2>
+             <p style={{ fontSize: '1.1rem', color: '#4b5563', lineHeight: '1.7', maxWidth: '500px' }}>
+               Metro Bacolod Connect is a SaaS-enabled Real Estate Marketplace designed specifically for the Metro Negros region. A centralized "safe zone" connecting you exclusively with PRC-Verified Licensed Professionals.
+             </p>
           </div>
-
-          <div style={{ flex: '1 1 500px', display: 'flex', justifyContent: 'flex-end' }}>
-            <img 
-              src="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&q=80&w=1000" 
-              alt="Metro Bacolod" 
-              style={{ 
-                width: '100%', 
-                height: 'auto', 
-                maxHeight: '500px',
-                objectFit: 'cover', 
-                borderRadius: '32px',
-                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
-              }} 
-            />
+          <div className="about-image" style={{ flex: 1, minWidth: '350px', display: 'flex', justifyContent: 'flex-end' }}>
+             <img src="https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=1000&auto=format&fit=crop" alt="Modern Building" style={{ width: '100%', maxWidth: '550px', borderRadius: '30px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }} />
           </div>
-
-        </div>
       </section>
 
-      {/* --- MODAL: LOGIN (Fixed: No Click Outside Close) --- */}
+      {/* LOGIN MODAL */}
       {showLogin && (
-        // REMOVED onClick from overlay so it ignores background clicks
         <div className="modal-overlay">
           <div className="modal-card" onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
               <h2 style={{ margin: 0 }}>Welcome Back</h2>
-              {/* Uses new closeLogin function to clear data */}
               <FaTimes style={{ cursor: 'pointer' }} onClick={closeLogin} />
             </div>
             
-            <input 
-              type="email" placeholder="Email" 
-              value={email} onChange={e => setEmail(e.target.value)}
-              style={{ width: '100%', padding: '12px', marginBottom: '10px', borderRadius: '8px', border: '1px solid #ddd' }}
-            />
-            <input 
-              type="password" placeholder="Password" 
-              value={password} onChange={e => setPassword(e.target.value)}
-              style={{ width: '100%', padding: '12px', marginBottom: '20px', borderRadius: '8px', border: '1px solid #ddd' }}
-            />
-            
-            <button className="primary-btn" style={{ width: '100%', marginBottom: '15px', background: 'black', color: 'white' }} onClick={handleLogin}>Sign In</button>
-            <button className="primary-btn" style={{ width: '100%', background: 'white', color: 'black', border: '1px solid #ddd', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }} onClick={handleGoogleLogin}>
-              <FcGoogle size={20} /> Sign in with Google
+            <form onSubmit={handleLogin}>
+                <input required type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '10px', borderRadius: '8px', border: '1px solid #ddd' }} />
+                <input required type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '20px', borderRadius: '8px', border: '1px solid #ddd' }} />
+                
+                <button type="submit" className="primary-btn" style={{ width: '100%', marginBottom: '15px', background: 'black', color: 'white' }}>
+                    Sign In
+                </button>
+            </form>
+
+            <button type="button" className="primary-btn" style={{ width: '100%', background: 'white', color: 'black', border: '1px solid #ddd', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }} onClick={handleGoogleLogin}>
+                <FcGoogle size={20} /> Sign in with Google
             </button>
-
+            
             <p style={{ marginTop: '20px', fontSize: '0.9rem' }}>
-              No account? <span style={{ color: '#2563eb', cursor: 'pointer', fontWeight: '600' }} onClick={switchToRegister}>Register</span>
+                No account? 
+                <span style={{ color: '#2563eb', cursor: 'pointer', fontWeight: '600' }} onClick={() => { setShowLogin(false); navigate('/register'); }}>
+                  Create Account
+                </span>
             </p>
           </div>
         </div>
       )}
 
-      {/* --- MODAL: REGISTER (Fixed: No Click Outside Close) --- */}
-      {showRegister && (
-        <div className="modal-overlay">
-          <div className="modal-card" onClick={e => e.stopPropagation()}>
-             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <h2 style={{ margin: 0 }}>Create Account</h2>
-              {/* Uses new closeRegister function to clear data */}
-              <FaTimes style={{ cursor: 'pointer' }} onClick={closeRegister} />
-            </div>
+      {/* --- MOBILE RESPONSIVE CSS INJECTION --- */}
+      <style>{`
+        @media (max-width: 768px) {
+            /* 1. Navbar Adjustments */
+            .landing-nav {
+                padding: 20px !important;
+            }
+            .nav-links {
+                display: none !important; /* Hide text links on mobile */
+            }
+            .nav-buttons button {
+                padding: 10px 20px !important;
+                font-size: 0.8rem !important;
+            }
             
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <input type="text" placeholder="First Name" value={regFirstName} onChange={e => setRegFirstName(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '10px', borderRadius: '8px', border: '1px solid #ddd' }} />
-              <input type="text" placeholder="Last Name" value={regLastName} onChange={e => setRegLastName(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '10px', borderRadius: '8px', border: '1px solid #ddd' }} />
-            </div>
-            <input type="text" placeholder="Address" value={regAddress} onChange={e => setRegAddress(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '10px', borderRadius: '8px', border: '1px solid #ddd' }} />
-            <input type="email" placeholder="Email" value={regEmail} onChange={e => setRegEmail(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '10px', borderRadius: '8px', border: '1px solid #ddd' }} />
-            <input type="password" placeholder="Password" value={regPassword} onChange={e => setRegPassword(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '20px', borderRadius: '8px', border: '1px solid #ddd' }} />
+            /* 2. Hero Section Adjustments */
+            .landing-hero {
+                padding-top: 80px !important; /* Prevent overlap with fixed nav */
+            }
 
-            <button className="primary-btn" style={{ width: '100%', background: 'black', color: 'white' }} onClick={handleRegister}>Sign Up</button>
-            
-            <p style={{ marginTop: '20px', fontSize: '0.9rem' }}>
-              Have an account? <span style={{ color: '#2563eb', cursor: 'pointer', fontWeight: '600' }} onClick={switchToLogin}>Login</span>
-            </p>
-          </div>
-        </div>
-      )}
+            /* 3. About Section Stacking */
+            .landing-about {
+                flex-direction: column-reverse !important; /* Image top, text bottom */
+                padding: 60px 20px !important;
+                gap: 40px !important;
+            }
+            .about-text, .about-image {
+                width: 100% !important;
+                min-width: 0 !important;
+                text-align: center;
+                justify-content: center !important;
+            }
+            .about-text p {
+                margin: 0 auto; /* Center paragraph */
+            }
+
+            /* 4. Modal Adjustments */
+            .modal-card {
+                width: 90% !important;
+                padding: 25px !important;
+            }
+        }
+      `}</style>
 
       <ToastContainer position="top-center" theme="light" />
     </div>
