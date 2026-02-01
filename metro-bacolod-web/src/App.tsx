@@ -8,6 +8,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import LandingPage from './pages/LandingPage';
 import Archive from "./pages/Archive";
 import VerifyEmail from "./pages/VerifyEmail";
+import { Analytics } from "@vercel/analytics/react";
 
 function App() {
   const [ , setMessage] = useState<string>('Connecting...');
@@ -50,6 +51,7 @@ function App() {
       <Route path="/archive" element={<Archive />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
     </Routes>
+    <Analytics />
   </>
   );
 }
