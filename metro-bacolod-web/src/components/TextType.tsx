@@ -139,6 +139,9 @@ const TextType = ({
         } else if (textArray.length >= 1) {
           // CHECK IF DONE
           if (!loop && currentTextIndex === textArray.length - 1) {
+            if (onSentenceComplete) {
+              onSentenceComplete(textArray[currentTextIndex], currentTextIndex);
+            }
             setIsDone(true); // <--- HIDES CURSOR
             return;
           }
