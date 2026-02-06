@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { signInWithEmailAndPassword, signInWithPopup, signOut } from "firebase/auth";
 import { auth, googleProvider } from "../firebase-config";
@@ -10,12 +10,75 @@ import TextType from "../components/TextType";
 import ScrollFloat from "../components/ScrollFloat";
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { gsap } from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+
+gsap.registerPlugin(ScrollTrigger);
 
 export default function LandingPage() {
   const [showLogin, setShowLogin] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showTags, setShowTags] = useState(false);
   const navigate = useNavigate();
+
+  const timelineRef = useRef<HTMLDivElement>(null);
+  const dotRef = useRef<HTMLDivElement>(null);
+  const progressLineRef = useRef<HTMLDivElement>(null);
+  const tagsRef = useRef<HTMLDivElement>(null);
+
+  const handleTypingComplete = () => {
+    setShowTags(true);
+    if (tagsRef.current) {
+      gsap.fromTo(tagsRef.current.children,
+        { opacity: 0, y: 20, scale: 0.8 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.6, stagger: 0.1, ease: 'back.out(1.7)' }
+      );
+    }
+  };
+
+  useEffect(() => {
+    if (!timelineRef.current || !dotRef.current || !progressLineRef.current) return;
+
+    const tl = gsap.timeline({
+      scrollTrigger: {
+        trigger: timelineRef.current,
+        start: 'top center',
+        end: 'bottom center',
+        scrub: 0.3,
+      }
+    });
+
+    tl.to(dotRef.current, { top: '100%', ease: 'none' }, 0);
+    tl.to(progressLineRef.current, { height: '100%', ease: 'none' }, 0);
+
+    // Float-in animations for each card row
+    const rightRows = timelineRef.current.querySelectorAll('.timeline-row-right');
+    const leftRows = timelineRef.current.querySelectorAll('.timeline-row-left');
+
+    rightRows.forEach((row) => {
+      gsap.fromTo(row, 
+        { opacity: 0, x: 80 },
+        { opacity: 1, x: 0, duration: 0.8, ease: 'power3.out',
+          scrollTrigger: { trigger: row, start: 'top 85%', end: 'top 55%', scrub: 0.4 }
+        }
+      );
+    });
+
+    leftRows.forEach((row) => {
+      gsap.fromTo(row, 
+        { opacity: 0, x: -80 },
+        { opacity: 1, x: 0, duration: 0.8, ease: 'power3.out',
+          scrollTrigger: { trigger: row, start: 'top 85%', end: 'top 55%', scrub: 0.4 }
+        }
+      );
+    });
+
+    return () => {
+      tl.kill();
+      ScrollTrigger.getAll().forEach(st => st.kill());
+    };
+  }, []);
 
   const closeLogin = () => {
     setShowLogin(false);
@@ -64,13 +127,13 @@ export default function LandingPage() {
             <img src={logo} alt="Logo" style={{ width: '60px', height: 'auto' }} />
             <div className="nav-links" style={{ display: 'flex', gap: '30px' }}>
                 {['Properties', 'Professionals', 'Services', 'Resources'].map((item) => (
-                    <a key={item} href="#" style={{ color: '#000', fontWeight: '600', fontSize: '0.9rem', opacity: 0.7, transition: '0.2s', textDecoration: 'none' }}>{item}</a>
+                    <a key={item} href="#" className="nav-link-item" style={{ color: '#000', fontWeight: '600', fontSize: '0.9rem', opacity: 0.7, transition: '0.2s', textDecoration: 'none', position: 'relative' }}>{item}</a>
                 ))}
             </div>
         </div>
         <div className="nav-buttons" style={{ display: 'flex', gap: '15px' }}>
-            <button onClick={() => setShowLogin(true)} style={{ background: 'transparent', border: '1px solid black', color: 'black', padding: '12px 35px', fontSize: '0.9rem', fontWeight: '700', borderRadius: '50px', cursor: 'pointer' }}>LOGIN</button>
-            <button onClick={() => navigate('/register')} style={{ background: 'black', color: 'white', padding: '12px 35px', fontSize: '0.9rem', fontWeight: '700', borderRadius: '50px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 14px 0 rgba(0,0,0,0.39)' }}>CREATE ACCOUNT</button>
+            <button onClick={() => setShowLogin(true)} className="hero-btn hero-btn-outline" style={{ background: 'transparent', border: '1px solid black', color: 'black', padding: '12px 35px', fontSize: '0.9rem', fontWeight: '700', borderRadius: '50px', cursor: 'pointer', transition: 'all 0.3s ease' }}>LOGIN</button>
+            <button onClick={() => navigate('/register')} className="hero-btn hero-btn-filled" style={{ background: 'black', color: 'white', padding: '12px 35px', fontSize: '0.9rem', fontWeight: '700', borderRadius: '50px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 14px 0 rgba(0,0,0,0.39)', transition: 'all 0.3s ease' }}>CREATE ACCOUNT</button>
         </div>
       </nav>
 
@@ -79,13 +142,23 @@ export default function LandingPage() {
         <Antigravity count={300} color="#000000" particleSize={0.6} />
         {/* Adjusted clamp() lower bound to 2.5rem for mobile safety */}
         <h1 style={{ fontSize: 'clamp(2.5rem, 6vw, 6rem)', fontWeight: '700', color: '#000', lineHeight: '1.1', marginBottom: '30px', letterSpacing: '-2px', zIndex: 2 }}>
-           <TextType text={["Metro Bacolod \n Connect."]} typingSpeed={100} deletingSpeed={50} loop={false} showCursor={true} cursorCharacter="|" />
+           <TextType 
+             text={["Metro Bacolod \n Connect."]} 
+             typingSpeed={100} 
+             deletingSpeed={50} 
+             loop={false} 
+             showCursor={true} 
+             cursorCharacter="|" 
+             onSentenceComplete={handleTypingComplete}
+           />
         </h1>
-        <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', justifyContent: 'center', zIndex: 2 }}>
-          {['Connect', 'Verify', 'Close'].map(tag => (
-            <span key={tag} style={{ background: '#e5e7eb', color: '#374151', padding: '8px 24px', borderRadius: '25px', fontSize: '0.85rem', fontWeight: '600' }}>{tag}</span>
-          ))}
-        </div>
+        {showTags && (
+          <div ref={tagsRef} style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', justifyContent: 'center', zIndex: 2 }}>
+            {['Connect', 'Verify', 'Close'].map(tag => (
+              <span key={tag} style={{ background: '#e5e7eb', color: '#374151', padding: '8px 24px', borderRadius: '25px', fontSize: '0.85rem', fontWeight: '600', opacity: 0 }}>{tag}</span>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* EXPLORE SECTION */}
@@ -100,18 +173,51 @@ export default function LandingPage() {
         >
           EXPLORE
         </ScrollFloat>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '40px', maxWidth: '1200px', margin: '0 auto', marginTop: '60px' }}>
-          {[
-            { title: 'View Lands', description: 'Lorem ipsum is simply dummy text of the printing and typesetting industry. Lorem ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer t' },
-            { title: 'See Homes', description: 'Lorem ipsum is simply dummy text of the printing and typesetting industry. Lorem ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer t' },
-            { title: 'Contact Agents', description: 'Lorem ipsum is simply dummy text of the printing and typesetting industry. Lorem ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer t' }
-          ].map((item, index) => (
-            <div key={index} style={{ textAlign: 'center' }}>
-              <div style={{ width: '100%', height: '200px', background: '#8B7B78', borderRadius: '20px', marginBottom: '20px' }}></div>
-              <h3 style={{ fontSize: '1.5rem', fontWeight: '700', color: '#000', marginBottom: '10px' }}>{item.title}</h3>
-              <p style={{ fontSize: '0.95rem', color: '#666', lineHeight: '1.6' }}>{item.description}</p>
+
+        {/* Timeline container */}
+        <div ref={timelineRef} className="explore-timeline" style={{ position: 'relative', maxWidth: '1000px', margin: '60px auto 0', paddingBottom: '40px' }}>
+          
+          {/* Vertical line track */}
+          <div className="timeline-track" style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: '2px', background: '#d1d5db', transform: 'translateX(-50%)' }}>
+            {/* Progress fill */}
+            <div ref={progressLineRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '0%', background: '#6b7280', borderRadius: '1px' }} />
+            {/* Scrolling dot */}
+            <div ref={dotRef} style={{ position: 'absolute', top: '0%', left: '50%', transform: 'translate(-50%, -50%)', width: '14px', height: '14px', borderRadius: '50%', background: '#9ca3af', boxShadow: '0 0 6px rgba(0,0,0,0.15)', zIndex: 2 }} />
+          </div>
+
+          {/* Card 1 – View Lands (RIGHT) */}
+          <div className="timeline-row timeline-row-right" style={{ display: 'flex', justifyContent: 'flex-end', paddingLeft: '55%', marginBottom: '80px', position: 'relative' }}>
+            <div className="timeline-card" style={{ textAlign: 'center', maxWidth: '380px' }}>
+              <img src="https://images.pexels.com/photos/3013440/pexels-photo-3013440.jpeg?auto=compress&cs=tinysrgb&w=800" alt="Green grass field landscape" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '20px', marginBottom: '20px', border: '2px solid #3f3f3f', display: 'block' }} />
+              <span className="explore-btn" style={{ display: 'inline-block', padding: '6px 24px', border: '2px solid #333', borderRadius: '50px', fontSize: '1rem', fontWeight: '700', color: '#000', marginBottom: '12px', cursor: 'pointer', transition: 'all 0.3s ease' }}>View Lands</span>
+              <p style={{ fontSize: '0.9rem', color: '#666', lineHeight: '1.6', marginTop: '8px' }}>
+                Discover available lots in prime locations. Browse land options with complete details to help you choose the perfect place to build or invest.
+              </p>
             </div>
-          ))}
+          </div>
+
+          {/* Card 2 – See Homes (LEFT) */}
+          <div className="timeline-row timeline-row-left" style={{ display: 'flex', justifyContent: 'flex-start', paddingRight: '55%', marginBottom: '80px', position: 'relative' }}>
+            <div className="timeline-card" style={{ textAlign: 'center', maxWidth: '380px' }}>
+              <img src="https://images.pexels.com/photos/9203777/pexels-photo-9203777.jpeg?auto=compress&cs=tinysrgb&w=800" alt="Aerial shot of a neighborhood" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '20px', marginBottom: '20px', border: '2px solid #3f3f3f', display: 'block' }} />
+              <span className="explore-btn" style={{ display: 'inline-block', padding: '6px 24px', border: '2px solid #333', borderRadius: '50px', fontSize: '1rem', fontWeight: '700', color: '#000', marginBottom: '12px', cursor: 'pointer', transition: 'all 0.3s ease' }}>See Homes</span>
+              <p style={{ fontSize: '0.9rem', color: '#666', lineHeight: '1.6', marginTop: '8px' }}>
+                Explore ready-to-move and pre-selling homes. View layouts, photos, and features to find a home that fits your lifestyle and budget.
+              </p>
+            </div>
+          </div>
+
+          {/* Card 3 – Contact Agents (RIGHT) */}
+          <div className="timeline-row timeline-row-right" style={{ display: 'flex', justifyContent: 'flex-end', paddingLeft: '55%', position: 'relative' }}>
+            <div className="timeline-card" style={{ textAlign: 'center', maxWidth: '380px' }}>
+              <img src="https://images.pexels.com/photos/8112163/pexels-photo-8112163.jpeg?auto=compress&cs=tinysrgb&w=800" alt="Smiling agent holding keys with clients" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '20px', marginBottom: '20px', border: '2px solid #3f3f3f', display: 'block' }} />
+              <span className="explore-btn" style={{ display: 'inline-block', padding: '6px 24px', border: '2px solid #333', borderRadius: '50px', fontSize: '1rem', fontWeight: '700', color: '#000', marginBottom: '12px', cursor: 'pointer', transition: 'all 0.3s ease' }}>Contact Agents</span>
+              <p style={{ fontSize: '0.9rem', color: '#666', lineHeight: '1.6', marginTop: '8px' }}>
+                Connect with trusted property agents for expert guidance. Get answers, schedule visits, and receive help every step of the way.
+              </p>
+            </div>
+          </div>
+
         </div>
       </section>
 
@@ -128,9 +234,19 @@ export default function LandingPage() {
              >
                Here at MBC we...
              </ScrollFloat>
-             <p style={{ fontSize: '1rem', color: '#4b5563', lineHeight: '1.8', maxWidth: '550px', marginTop: '25px' }}>
-               Lorem ipsum is simply dummy text of the printing and typesetting industry. Lorem ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem ipsum.
-             </p>
+             <div style={{ fontSize: '1rem', color: '#4b5563', lineHeight: '1.8', maxWidth: '550px', marginTop: '25px' }}>
+               <p style={{ marginBottom: '12px' }}>
+                 Connect people to the best land and homes across Metro Bacolod. Our goal is to make property searching simple and accessible for everyone, whether you’re buying your first home, investing in land, or exploring new opportunities in the area.
+               </p>
+
+               <p style={{ marginBottom: '12px' }}>
+                 We bring together verified listings, clear and reliable information, and trusted real estate agents in one easy-to-use platform. By removing confusion and guesswork, we help you compare options confidently and focus on what truly matters—finding the right property for your needs.
+               </p>
+
+               <p style={{ marginBottom: 0 }}>
+                 At MetroBacolodConnect, we believe real estate decisions should feel informed, secure, and stress-free. That’s why we’re committed to building a platform that connects communities, supports smart choices, and guides you every step of the way.
+               </p>
+             </div>
           </div>
           <div className="about-image" style={{ flex: 1, minWidth: '300px', display: 'flex', justifyContent: 'center' }}>
              <div style={{ width: '100%', maxWidth: '500px', height: '400px', background: '#D3D3D3', borderRadius: '20px' }}></div>
@@ -201,6 +317,73 @@ export default function LandingPage() {
 
       {/* --- MOBILE RESPONSIVE CSS INJECTION --- */}
       <style>{`
+        /* Hero button animations */
+        .hero-btn {
+          position: relative;
+          overflow: hidden;
+        }
+        .hero-btn::before {
+          content: '';
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          width: 0;
+          height: 0;
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.2);
+          transform: translate(-50%, -50%);
+          transition: width 0.6s, height 0.6s;
+        }
+        .hero-btn:hover::before {
+          width: 300px;
+          height: 300px;
+        }
+        .hero-btn-outline:hover {
+          background: #000 !important;
+          color: #fff !important;
+          transform: translateY(-2px);
+          box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+        }
+        .hero-btn-filled:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 25px rgba(0,0,0,0.5) !important;
+        }
+
+        /* Navbar link underline animation */
+        .nav-link-item::after {
+          content: '';
+          position: absolute;
+          bottom: -4px;
+          left: 0;
+          width: 0;
+          height: 2px;
+          background: #000;
+          transition: width 0.3s ease;
+        }
+        .nav-link-item:hover::after {
+          width: 100%;
+        }
+        .nav-link-item:hover {
+          opacity: 1 !important;
+        }
+
+        /* Explore button hover effects */
+        .explore-btn:hover {
+          background-color: #000 !important;
+          color: #fff !important;
+          transform: scale(1.05);
+          box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+        }
+
+        /* Timeline card image hover */
+        .timeline-card img {
+          transition: transform 0.4s ease, box-shadow 0.4s ease;
+        }
+        .timeline-card img:hover {
+          transform: scale(1.03);
+          box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+
         @media (max-width: 768px) {
             /* 1. Navbar Adjustments */
             .landing-nav {
@@ -247,6 +430,21 @@ export default function LandingPage() {
             }
             .landing-footer h3 {
                 font-size: 1rem !important;
+            }
+
+            /* 6. Timeline / Explore Section */
+            .timeline-track {
+                left: 20px !important;
+                transform: none !important;
+            }
+            .timeline-row-right,
+            .timeline-row-left {
+                padding-left: 50px !important;
+                padding-right: 0 !important;
+                justify-content: flex-start !important;
+            }
+            .timeline-card {
+                max-width: 100% !important;
             }
         }
       `}</style>
