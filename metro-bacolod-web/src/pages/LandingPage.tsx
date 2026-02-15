@@ -60,7 +60,7 @@ export default function LandingPage() {
       gsap.fromTo(row, 
         { opacity: 0, x: 80 },
         { opacity: 1, x: 0, duration: 0.8, ease: 'power3.out',
-          scrollTrigger: { trigger: row, start: 'top 85%', end: 'top 55%', scrub: 0.4 }
+          scrollTrigger: { trigger: row, start: 'top 85%', end: 'top 55%', scrub: 1.4 }
         }
       );
     });
@@ -69,7 +69,7 @@ export default function LandingPage() {
       gsap.fromTo(row, 
         { opacity: 0, x: -80 },
         { opacity: 1, x: 0, duration: 0.8, ease: 'power3.out',
-          scrollTrigger: { trigger: row, start: 'top 85%', end: 'top 55%', scrub: 0.4 }
+          scrollTrigger: { trigger: row, start: 'top 85%', end: 'top 55%', scrub: 1.4 }
         }
       );
     });
