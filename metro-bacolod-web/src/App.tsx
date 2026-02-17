@@ -8,6 +8,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import LandingPage from './pages/LandingPage';
 import Archive from "./pages/Archive";
 import VerifyEmail from "./pages/VerifyEmail";
+import Profile from "./pages/Profile";
 import { Analytics } from "@vercel/analytics/react";
 
 function App() {
@@ -48,6 +49,7 @@ function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/register" element={<Register />} />
       <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/profile" element={<Profile />} />
       <Route path="/archive" element={<Archive />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
     </Routes>
