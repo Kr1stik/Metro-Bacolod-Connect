@@ -1041,3 +1041,268 @@ ul { list-style: none; }
     display: none;
   }
 }
+
+/* =========================================
+   6. PROFILE PAGE (Glassmorphism + Black Blobs)
+   ========================================= */
+
+.profile-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #e8ecf1 0%, #dde0e6 30%, #e2dfd8 60%, #e8ecf1 100%);
+  font-family: 'Google Sans', sans-serif;
+  color: #111827;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* --- Black ambient blobs --- */
+.profile-blob {
+  position: fixed;
+  border-radius: 50%;
+  background: #111827;
+  filter: blur(90px);
+  opacity: 0.35;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.profile-blob-1 {
+  width: 400px;
+  height: 400px;
+  top: 5%;
+  left: -6%;
+}
+
+.profile-blob-2 {
+  width: 350px;
+  height: 350px;
+  top: 55%;
+  right: -4%;
+}
+
+.profile-blob-3 {
+  width: 280px;
+  height: 280px;
+  bottom: -3%;
+  left: 30%;
+}
+
+.profile-blob-4 {
+  width: 220px;
+  height: 220px;
+  top: 20%;
+  right: 25%;
+  opacity: 0.18;
+}
+
+/* --- Profile Main Layout --- */
+.profile-content {
+  display: flex;
+  gap: 40px;
+  padding: 110px 48px 60px 48px;
+  max-width: 1400px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
+}
+
+/* --- Profile Sidebar (Left) --- */
+.profile-sidebar {
+  width: 320px;
+  min-width: 280px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.profile-avatar-wrapper {
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #d1d5db;
+  flex-shrink: 0;
+}
+
+.profile-avatar-large {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.profile-info-line {
+  font-size: 0.88rem;
+  color: #1d1d1f;
+  line-height: 1.6;
+}
+
+.profile-info-line strong {
+  font-weight: 700;
+}
+
+.profile-bio {
+  font-size: 0.82rem;
+  color: rgba(0, 0, 0, 0.55);
+  line-height: 1.75;
+  margin-top: 8px;
+}
+
+.profile-create-btn {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 12px 30px;
+  background: #111827;
+  color: #ffffff;
+  border: 2px solid #111827;
+  border-radius: 12px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  font-family: 'Google Sans', sans-serif;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: fit-content;
+}
+
+.profile-create-btn:hover {
+  background: #1f2937;
+  border-color: #1f2937;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+/* --- Profile Posts Section (Right) --- */
+.profile-posts-section {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-posts-heading {
+  font-family: 'Google Sans', sans-serif;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1d1d1f;
+  margin-bottom: 28px;
+}
+
+.profile-posts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+
+/* Profile cards: same white glassmorphism as dashboard, sized to fit */
+.profile-card.glass-listing-card {
+  min-height: unset;
+}
+
+.profile-card .glass-card-content {
+  padding: 22px 20px;
+}
+
+.profile-card .glass-card-title {
+  font-size: 1.1rem;
+}
+
+.profile-card .glass-card-bullets li {
+  font-size: 0.78rem;
+}
+
+.profile-card .glass-card-desc {
+  font-size: 0.74rem;
+  -webkit-line-clamp: 3;
+  margin: 0 0 14px 0;
+}
+
+.profile-card .glass-card-right {
+  width: 220px;
+  min-width: 220px;
+  padding: 16px;
+  gap: 12px;
+}
+
+.profile-card .glass-card-image img {
+  max-height: 180px;
+}
+
+.profile-card .glass-card-agent img {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+}
+
+.profile-card .agent-name {
+  font-size: 0.72rem;
+}
+
+.profile-card .agent-rating-text {
+  font-size: 0.62rem;
+}
+
+.profile-card .glass-inquire-btn {
+  padding: 10px 16px;
+  font-size: 0.68rem;
+}
+
+/* --- Profile Page Responsive --- */
+@media (max-width: 1100px) {
+  .profile-posts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 860px) {
+  .profile-content {
+    flex-direction: column;
+    padding: 100px 24px 100px 24px;
+    gap: 32px;
+  }
+
+  .profile-sidebar {
+    width: 100%;
+    min-width: unset;
+    align-items: center;
+    text-align: center;
+  }
+
+  .profile-avatar-wrapper {
+    width: 180px;
+    height: 180px;
+  }
+
+  .profile-posts-heading {
+    text-align: center;
+  }
+}
+
+@media (max-width: 640px) {
+  .profile-content {
+    padding: 90px 16px 100px 16px;
+  }
+
+  .profile-card.glass-listing-card {
+    flex-direction: column;
+  }
+
+  .profile-card .glass-card-right {
+    width: 100%;
+    min-width: unset;
+    padding: 0 16px 16px 16px;
+  }
+  
+  .profile-card .glass-card-image img {
+    max-height: 180px;
+    width: 100%;
+  }
+
+  .profile-avatar-wrapper {
+    width: 150px;
+    height: 150px;
+  }
+}
