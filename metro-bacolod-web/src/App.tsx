@@ -9,6 +9,7 @@ import LandingPage from './pages/LandingPage';
 import Archive from "./pages/Archive";
 import VerifyEmail from "./pages/VerifyEmail";
 import Profile from "./pages/Profile";
+import Settings from "./pages/Settings";
 import { Analytics } from "@vercel/analytics/react";
 
 function App() {
@@ -51,6 +52,7 @@ function App() {
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/profile" element={<Profile />} />
       <Route path="/archive" element={<Archive />} />
+      <Route path="/settings" element={<Settings />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
     </Routes>
     <Analytics />
