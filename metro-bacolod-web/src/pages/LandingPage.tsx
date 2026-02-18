@@ -4,7 +4,8 @@ import { signInWithEmailAndPassword, signInWithPopup, signOut } from "firebase/a
 import { auth, googleProvider } from "../firebase-config";
 import { FcGoogle } from "react-icons/fc";
 import { FaTimes } from "react-icons/fa";
-import logo from "../assets/MBC Logo.png"; 
+import logo from "../assets/MBC Logo.png";
+import mbcVid from "../assets/MBC_Vid_Logo3d.mp4";
 import Antigravity from "../components/Antigravity"; 
 import TextType from "../components/TextType"; 
 import ScrollFloat from "../components/ScrollFloat";
@@ -249,7 +250,14 @@ export default function LandingPage() {
              </div>
           </div>
           <div className="about-image" style={{ flex: 1, minWidth: '300px', display: 'flex', justifyContent: 'center' }}>
-             <div style={{ width: '100%', maxWidth: '500px', height: '400px', background: '#D3D3D3', borderRadius: '20px' }}></div>
+             <video
+               src={mbcVid}
+               autoPlay
+               loop
+               muted
+               playsInline
+               style={{ width: '100%', maxWidth: '500px', height: '400px', objectFit: 'cover', borderRadius: '20px' }}
+             />
           </div>
       </section>
 
