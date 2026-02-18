@@ -7,7 +7,9 @@ import {
   FaSearch, FaUser, FaCog, FaSignOutAlt, FaCaretDown,
   FaImage, FaSpinner, FaHome, FaTrash, FaEnvelope,
   FaPen, FaTimes, FaMapMarkerAlt, FaPlus, FaStar,
-  FaStarHalfAlt, FaRegStar, FaShare, FaChevronDown
+  FaStarHalfAlt, FaRegStar, FaShare, FaChevronDown,
+  FaChevronLeft, FaChevronRight, FaBed, FaBath, FaRulerCombined,
+  FaCalendarAlt, FaPhoneAlt, FaHeart, FaRegHeart
 } from "react-icons/fa";
 import logo from "../assets/MBC Logo.png";
 import "../App.css";
@@ -22,85 +24,165 @@ const MOCK_LISTINGS = [
     id: 'mock-1',
     title: 'The Lazy Den 2',
     rooms: 2,
+    bathrooms: 1,
+    lotArea: '120 sqm',
+    floorArea: '85 sqm',
+    yearBuilt: 2021,
     location: 'Villamonte',
     price: '0.5 million php',
     description: 'Discover available lots in prime locations. Browse land options with complete details to help you choose the perfect place to build or invest.',
+    fullDescription: 'Discover available lots in prime locations. Browse land options with complete details to help you choose the perfect place to build or invest. This cozy 2-bedroom home features an open-plan kitchen, tiled flooring throughout, and a small garden area perfect for morning coffee. Located near schools, churches, and the local market. Fully fenced with a carport for one vehicle.',
+    amenities: ['Carport', 'Garden', 'Tiled Flooring', 'Fenced', 'Near Schools'],
     agentName: 'Wynands Burger',
     agentRating: 3.9,
+    agentPhone: '+63 912 345 6789',
     agentAvatar: 'https://ui-avatars.com/api/?name=WB&background=6366f1&color=fff&rounded=true&size=40',
     image: 'https://images.pexels.com/photos/3013440/pexels-photo-3013440.jpeg?auto=compress&cs=tinysrgb&w=600',
+    images: [
+      'https://images.pexels.com/photos/3013440/pexels-photo-3013440.jpeg?auto=compress&cs=tinysrgb&w=800',
+      'https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=800',
+      'https://images.pexels.com/photos/1643384/pexels-photo-1643384.jpeg?auto=compress&cs=tinysrgb&w=800',
+    ],
     status: 'For Sale',
     type: 'House & Lot',
+    listedDate: 'Jan 15, 2026',
   },
   {
     id: 'mock-2',
     title: 'Greenfield Residences',
     rooms: 3,
+    bathrooms: 2,
+    lotArea: '200 sqm',
+    floorArea: '140 sqm',
+    yearBuilt: 2024,
     location: 'Mandalagan',
     price: '2.8 million php',
     description: 'Modern 3-bedroom home in a peaceful subdivision. Includes carport, garden space, and 24/7 gated security for your family.',
+    fullDescription: 'Modern 3-bedroom home in a peaceful subdivision. Includes carport, garden space, and 24/7 gated security for your family. Features a modern kitchen with granite countertops, spacious living area with high ceilings, master bedroom with en-suite bathroom, and a balcony overlooking the community garden. HOA includes pool, clubhouse, and playground access.',
+    amenities: ['Swimming Pool', 'Clubhouse', 'Playground', 'Gated Security', 'Carport', 'Balcony'],
     agentName: 'Maria Santos',
     agentRating: 4.5,
+    agentPhone: '+63 917 888 1234',
     agentAvatar: 'https://ui-avatars.com/api/?name=MS&background=10b981&color=fff&rounded=true&size=40',
     image: 'https://images.pexels.com/photos/1396122/pexels-photo-1396122.jpeg?auto=compress&cs=tinysrgb&w=600',
+    images: [
+      'https://images.pexels.com/photos/1396122/pexels-photo-1396122.jpeg?auto=compress&cs=tinysrgb&w=800',
+      'https://images.pexels.com/photos/2724749/pexels-photo-2724749.jpeg?auto=compress&cs=tinysrgb&w=800',
+      'https://images.pexels.com/photos/2635038/pexels-photo-2635038.jpeg?auto=compress&cs=tinysrgb&w=800',
+      'https://images.pexels.com/photos/3797991/pexels-photo-3797991.jpeg?auto=compress&cs=tinysrgb&w=800',
+    ],
     status: 'Pre-Selling',
     type: 'House & Lot',
+    listedDate: 'Feb 2, 2026',
   },
   {
     id: 'mock-3',
     title: 'Vista Heights Lot',
     rooms: 0,
+    bathrooms: 0,
+    lotArea: '300 sqm',
+    floorArea: 'N/A',
+    yearBuilt: 0,
     location: 'Taculing',
     price: '1.2 million php',
     description: 'Prime residential lot with scenic hilltop views. Perfect for custom-built dream homes with ample space and complete privacy.',
+    fullDescription: 'Prime residential lot with scenic hilltop views. Perfect for custom-built dream homes with ample space and complete privacy. The lot is flat and ready for construction, with access to main roads, water, and electricity. Located in a fast-developing residential zone with nearby commercial establishments. Ideal for families looking to design their forever home.',
+    amenities: ['Flat Terrain', 'Road Access', 'Water & Electric Ready', 'Hilltop View', 'Near Commercial Area'],
     agentName: 'Carlos Reyes',
     agentRating: 4.2,
+    agentPhone: '+63 920 555 7890',
     agentAvatar: 'https://ui-avatars.com/api/?name=CR&background=f59e0b&color=fff&rounded=true&size=40',
     image: 'https://images.pexels.com/photos/440731/pexels-photo-440731.jpeg?auto=compress&cs=tinysrgb&w=600',
+    images: [
+      'https://images.pexels.com/photos/440731/pexels-photo-440731.jpeg?auto=compress&cs=tinysrgb&w=800',
+      'https://images.pexels.com/photos/259588/pexels-photo-259588.jpeg?auto=compress&cs=tinysrgb&w=800',
+    ],
     status: 'For Sale',
     type: 'Lot Only',
+    listedDate: 'Dec 10, 2025',
   },
   {
     id: 'mock-4',
     title: 'Sunrise Condotel',
     rooms: 1,
+    bathrooms: 1,
+    lotArea: 'N/A',
+    floorArea: '36 sqm',
+    yearBuilt: 2023,
     location: 'Estefania',
     price: '3.5 million php',
     description: 'Fully furnished studio condo with premium amenities. Walking distance to malls and business centers in the heart of the city.',
+    fullDescription: 'Fully furnished studio condo with premium amenities. Walking distance to malls and business centers in the heart of the city. Unit comes with built-in closets, a modern kitchenette, split-type aircon, and premium tiled bathroom. Building amenities include rooftop infinity pool, gym, co-working space, and 24/7 concierge. Perfect for young professionals or as a rental investment.',
+    amenities: ['Furnished', 'Infinity Pool', 'Gym', 'Co-working Space', 'Concierge', 'Aircon'],
     agentName: 'Patricia Lim',
     agentRating: 4.8,
+    agentPhone: '+63 933 222 4567',
     agentAvatar: 'https://ui-avatars.com/api/?name=PL&background=8b5cf6&color=fff&rounded=true&size=40',
     image: 'https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=600',
+    images: [
+      'https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=800',
+      'https://images.pexels.com/photos/2462015/pexels-photo-2462015.jpeg?auto=compress&cs=tinysrgb&w=800',
+      'https://images.pexels.com/photos/2029731/pexels-photo-2029731.jpeg?auto=compress&cs=tinysrgb&w=800',
+      'https://images.pexels.com/photos/1457842/pexels-photo-1457842.jpeg?auto=compress&cs=tinysrgb&w=800',
+      'https://images.pexels.com/photos/3773575/pexels-photo-3773575.png?auto=compress&cs=tinysrgb&w=800',
+    ],
     status: 'Ready for Occupancy',
     type: 'Condo',
+    listedDate: 'Jan 28, 2026',
   },
   {
     id: 'mock-5',
     title: 'Hacienda Grande',
     rooms: 4,
+    bathrooms: 3,
+    lotArea: '450 sqm',
+    floorArea: '280 sqm',
+    yearBuilt: 2019,
     location: 'Bata',
     price: '6.2 million php',
     description: 'Spacious 4-bedroom Spanish-style home with a large backyard. Ideal for growing families seeking a quiet neighborhood.',
+    fullDescription: 'Spacious 4-bedroom Spanish-style home with a large backyard. Ideal for growing families seeking a quiet neighborhood. Features terracotta roof tiles, arched doorways, a wraparound veranda, and mature landscaping. The kitchen is fully equipped with custom cabinetry. The master suite includes a walk-in closet and jacuzzi tub. Two-car garage with maid\'s quarters.',
+    amenities: ['2-Car Garage', 'Maid\'s Quarter', 'Jacuzzi', 'Walk-in Closet', 'Veranda', 'Landscaped Garden'],
     agentName: 'Roberto Cruz',
     agentRating: 4.1,
+    agentPhone: '+63 945 111 3333',
     agentAvatar: 'https://ui-avatars.com/api/?name=RC&background=ef4444&color=fff&rounded=true&size=40',
     image: 'https://images.pexels.com/photos/53610/large-home-residential-house-architecture-53610.jpeg?auto=compress&cs=tinysrgb&w=600',
+    images: [
+      'https://images.pexels.com/photos/53610/large-home-residential-house-architecture-53610.jpeg?auto=compress&cs=tinysrgb&w=800',
+      'https://images.pexels.com/photos/2102587/pexels-photo-2102587.jpeg?auto=compress&cs=tinysrgb&w=800',
+      'https://images.pexels.com/photos/1080721/pexels-photo-1080721.jpeg?auto=compress&cs=tinysrgb&w=800',
+    ],
     status: 'For Sale',
     type: 'House & Lot',
+    listedDate: 'Nov 5, 2025',
   },
   {
     id: 'mock-6',
     title: 'Metro Commercial Space',
     rooms: 0,
+    bathrooms: 1,
+    lotArea: '180 sqm',
+    floorArea: '160 sqm',
+    yearBuilt: 2022,
     location: 'Mansilingan',
     price: '4.0 million php',
     description: 'Commercial space on a high-traffic road. Great for retail shops, offices, or food establishments with high foot traffic.',
+    fullDescription: 'Commercial space on a high-traffic road. Great for retail shops, offices, or food establishments with high foot traffic. Features a wide glass frontage for maximum visibility, a mezzanine level for storage or office use, two comfort rooms, and rear loading access. High-speed internet-ready with existing electrical capacity for commercial equipment.',
+    amenities: ['Glass Frontage', 'Mezzanine', 'Rear Loading', 'Internet Ready', 'High Electrical Capacity'],
     agentName: 'Diana Bermudo',
     agentRating: 3.7,
+    agentPhone: '+63 918 777 9999',
     agentAvatar: 'https://ui-avatars.com/api/?name=DB&background=06b6d4&color=fff&rounded=true&size=40',
     image: 'https://images.pexels.com/photos/443383/pexels-photo-443383.jpeg?auto=compress&cs=tinysrgb&w=600',
+    images: [
+      'https://images.pexels.com/photos/443383/pexels-photo-443383.jpeg?auto=compress&cs=tinysrgb&w=800',
+      'https://images.pexels.com/photos/1098982/pexels-photo-1098982.jpeg?auto=compress&cs=tinysrgb&w=800',
+      'https://images.pexels.com/photos/269077/pexels-photo-269077.jpeg?auto=compress&cs=tinysrgb&w=800',
+    ],
     status: 'For Lease',
     type: 'Commercial',
+    listedDate: 'Feb 10, 2026',
   },
 ];
 
@@ -146,6 +228,11 @@ export default function Dashboard() {
   const [filterStatus, setFilterStatus] = useState("");
   const [filterType, setFilterType] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
+
+  // Detail modal state
+  const [selectedListing, setSelectedListing] = useState<any>(null);
+  const [carouselIndex, setCarouselIndex] = useState(0);
+  const [isLiked, setIsLiked] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -390,20 +477,51 @@ export default function Dashboard() {
     Swal.fire({ title: 'Contact Agent', text: 'Messaging feature is coming soon!', icon: 'info' });
   };
 
+  const openListingModal = (listing: any) => {
+    setSelectedListing(listing);
+    setCarouselIndex(0);
+    setIsLiked(false);
+  };
+
+  const closeListingModal = () => {
+    setSelectedListing(null);
+  };
+
+  const nextImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const imgs = selectedListing?.images || [selectedListing?.image];
+    setCarouselIndex((prev: number) => (prev + 1) % imgs.length);
+  };
+
+  const prevImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const imgs = selectedListing?.images || [selectedListing?.image];
+    setCarouselIndex((prev: number) => (prev - 1 + imgs.length) % imgs.length);
+  };
+
   // --- Build display listings: real posts adapted + mock data ---
   const realListings = posts.map(post => ({
     id: post.id,
     title: post.content?.split('\n')[0]?.substring(0, 40) || 'New Listing',
     rooms: 0,
+    bathrooms: 0,
+    lotArea: 'N/A',
+    floorArea: 'N/A',
+    yearBuilt: 0,
     location: post.location || 'Bacolod',
     price: 'Contact for price',
     description: post.content || 'No description provided.',
+    fullDescription: post.content || 'No description provided.',
+    amenities: [],
     agentName: post.userName || 'Unknown Agent',
     agentRating: 4.0,
+    agentPhone: 'N/A',
     agentAvatar: post.userAvatar || 'https://ui-avatars.com/api/?name=U&rounded=true',
     image: post.images?.[0] || post.image || '',
+    images: post.images || (post.image ? [post.image] : []),
     status: 'For Sale',
     type: 'Property',
+    listedDate: post.createdAt ? new Date(post.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently',
     isReal: true,
     originalPost: post,
   }));
@@ -505,7 +623,7 @@ export default function Dashboard() {
             <p className="no-listings-msg">No listings found. Try adjusting your filters.</p>
           ) : (
             displayListings.map((listing: any) => (
-              <div className="glass-listing-card" key={listing.id}>
+              <div className="glass-listing-card" key={listing.id} onClick={() => openListingModal(listing)} style={{ cursor: 'pointer' }}>
                 {/* Card Info - Left */}
                 <div className="glass-card-content">
                   <div>
@@ -538,7 +656,7 @@ export default function Dashboard() {
                   <div className="glass-card-image">
                     {listing.image && <img src={listing.image} alt={listing.title} />}
                   </div>
-                  <button className="glass-inquire-btn" onClick={() => handleInquire()}>
+                  <button className="glass-inquire-btn" onClick={(e) => { e.stopPropagation(); handleInquire(); }}>
                     INQUIRE NOW →
                   </button>
                 </div>
@@ -546,12 +664,12 @@ export default function Dashboard() {
                 {/* Owner Actions (only for real posts owned by user) */}
                 {listing.isReal && user?.uid === listing.originalPost?.userId && (
                   <div className="glass-card-actions">
-                    <button onClick={() => toggleDropdown(listing.id)} className="glass-dots-btn">&#8942;</button>
+                    <button onClick={(e) => { e.stopPropagation(); toggleDropdown(listing.id); }} className="glass-dots-btn">&#8942;</button>
                     {activeDropdown === listing.id && (
                       <div className="glass-action-dropdown">
-                        <button onClick={() => startEdit(listing.originalPost)}><FaPen size={11} /> Edit</button>
-                        <button onClick={() => handleShare(listing)} className="glass-share-btn"><FaShare size={11} /> Share</button>
-                        <button onClick={() => handleDelete(listing.id)} className="glass-delete-btn"><FaTrash size={11} /> Delete</button>
+                        <button onClick={(e) => { e.stopPropagation(); startEdit(listing.originalPost); }}><FaPen size={11} /> Edit</button>
+                        <button onClick={(e) => { e.stopPropagation(); handleShare(listing); }} className="glass-share-btn"><FaShare size={11} /> Share</button>
+                        <button onClick={(e) => { e.stopPropagation(); handleDelete(listing.id); }} className="glass-delete-btn"><FaTrash size={11} /> Delete</button>
                       </div>
                     )}
                   </div>
@@ -648,6 +766,170 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* ========== LISTING DETAIL MODAL ========== */}
+      {selectedListing && (() => {
+        const imgs = selectedListing.images?.length > 0 ? selectedListing.images : [selectedListing.image];
+        return (
+          <div className="listing-modal-overlay" onClick={closeListingModal}>
+            <div className="listing-modal" onClick={(e) => e.stopPropagation()}>
+              {/* Close Button */}
+              <button className="listing-modal-close" onClick={closeListingModal}>
+                <FaTimes />
+              </button>
+
+              {/* Image Carousel */}
+              <div className="listing-modal-carousel">
+                <img
+                  src={imgs[carouselIndex]}
+                  alt={selectedListing.title}
+                  className="listing-modal-carousel-img"
+                />
+                {imgs.length > 1 && (
+                  <>
+                    <button className="carousel-arrow carousel-arrow-left" onClick={prevImage}>
+                      <FaChevronLeft />
+                    </button>
+                    <button className="carousel-arrow carousel-arrow-right" onClick={nextImage}>
+                      <FaChevronRight />
+                    </button>
+                    <div className="carousel-dots">
+                      {imgs.map((_: any, i: number) => (
+                        <span
+                          key={i}
+                          className={`carousel-dot ${i === carouselIndex ? 'carousel-dot-active' : ''}`}
+                          onClick={(e) => { e.stopPropagation(); setCarouselIndex(i); }}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+                {/* Status Badge */}
+                <span className="listing-modal-status">{selectedListing.status}</span>
+                {/* Like Button */}
+                <button className="listing-modal-like" onClick={() => setIsLiked(!isLiked)}>
+                  {isLiked ? <FaHeart color="#ef4444" /> : <FaRegHeart />}
+                </button>
+                {/* Image Counter */}
+                <span className="listing-modal-counter">{carouselIndex + 1} / {imgs.length}</span>
+              </div>
+
+              {/* Modal Body */}
+              <div className="listing-modal-body">
+                <div className="listing-modal-body-left">
+                  {/* Title & Price */}
+                  <div className="listing-modal-title-row">
+                    <div>
+                      <h2 className="listing-modal-title">{selectedListing.title}</h2>
+                      <p className="listing-modal-location">
+                        <FaMapMarkerAlt size={12} /> {selectedListing.location}, Bacolod City
+                      </p>
+                    </div>
+                    <div className="listing-modal-price">{selectedListing.price}</div>
+                  </div>
+
+                  {/* Property Details Grid */}
+                  <div className="listing-modal-details">
+                    {selectedListing.rooms > 0 && (
+                      <div className="listing-detail-item">
+                        <FaBed className="listing-detail-icon" />
+                        <div>
+                          <span className="listing-detail-value">{selectedListing.rooms}</span>
+                          <span className="listing-detail-label">Bedrooms</span>
+                        </div>
+                      </div>
+                    )}
+                    {selectedListing.bathrooms > 0 && (
+                      <div className="listing-detail-item">
+                        <FaBath className="listing-detail-icon" />
+                        <div>
+                          <span className="listing-detail-value">{selectedListing.bathrooms}</span>
+                          <span className="listing-detail-label">Bathrooms</span>
+                        </div>
+                      </div>
+                    )}
+                    <div className="listing-detail-item">
+                      <FaRulerCombined className="listing-detail-icon" />
+                      <div>
+                        <span className="listing-detail-value">{selectedListing.lotArea}</span>
+                        <span className="listing-detail-label">Lot Area</span>
+                      </div>
+                    </div>
+                    {selectedListing.floorArea !== 'N/A' && (
+                      <div className="listing-detail-item">
+                        <FaRulerCombined className="listing-detail-icon" />
+                        <div>
+                          <span className="listing-detail-value">{selectedListing.floorArea}</span>
+                          <span className="listing-detail-label">Floor Area</span>
+                        </div>
+                      </div>
+                    )}
+                    {selectedListing.yearBuilt > 0 && (
+                      <div className="listing-detail-item">
+                        <FaCalendarAlt className="listing-detail-icon" />
+                        <div>
+                          <span className="listing-detail-value">{selectedListing.yearBuilt}</span>
+                          <span className="listing-detail-label">Year Built</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Description */}
+                  <div className="listing-modal-section">
+                    <h4 className="listing-modal-section-title">Description</h4>
+                    <p className="listing-modal-desc">{selectedListing.fullDescription || selectedListing.description}</p>
+                  </div>
+
+                  {/* Amenities */}
+                  {selectedListing.amenities?.length > 0 && (
+                    <div className="listing-modal-section">
+                      <h4 className="listing-modal-section-title">Amenities & Features</h4>
+                      <div className="listing-modal-amenities">
+                        {selectedListing.amenities.map((a: string, i: number) => (
+                          <span key={i} className="listing-amenity-tag">{a}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Listing Info */}
+                  <div className="listing-modal-meta">
+                    <span>Type: <strong>{selectedListing.type}</strong></span>
+                    <span>Listed: <strong>{selectedListing.listedDate || 'Recently'}</strong></span>
+                  </div>
+                </div>
+
+                {/* Agent Sidebar */}
+                <div className="listing-modal-agent-card">
+                  <img
+                    src={selectedListing.agentAvatar}
+                    alt={selectedListing.agentName}
+                    className="listing-modal-agent-avatar"
+                  />
+                  <h4 className="listing-modal-agent-name">{selectedListing.agentName}</h4>
+                  <span className="listing-modal-agent-role">Listing Agent</span>
+                  <div className="listing-modal-agent-rating">
+                    <RatingStars rating={selectedListing.agentRating} />
+                    <span>{selectedListing.agentRating} Stars</span>
+                  </div>
+                  {selectedListing.agentPhone && selectedListing.agentPhone !== 'N/A' && (
+                    <p className="listing-modal-agent-phone">
+                      <FaPhoneAlt size={11} /> {selectedListing.agentPhone}
+                    </p>
+                  )}
+                  <button className="listing-modal-inquire-btn" onClick={() => handleInquire()}>
+                    INQUIRE NOW →
+                  </button>
+                  <button className="listing-modal-share-btn" onClick={() => handleShare(selectedListing)}>
+                    <FaShare size={12} /> Share Listing
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ========== MOBILE BOTTOM NAV ========== */}
       <div className="dash-mobile-nav">
