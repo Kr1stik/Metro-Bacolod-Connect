@@ -285,7 +285,18 @@ export default function Profile() {
             />
           </div>
         </div>
-        <div className="dash-nav-right">
+        <div className="dash-nav-right" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          
+          {/* --- NEW DESKTOP MESSAGES ICON --- */}
+          <div 
+            onClick={() => navigate('/messages')} 
+            style={{ cursor: 'pointer', color: '#4b5563', display: 'flex', alignItems: 'center', transition: '0.2s' }} 
+            title="Messages"
+            className="desktop-msg-icon"
+          >
+            <FaEnvelope size={22} />
+          </div>
+
           <div
             className="dash-user-trigger"
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -670,17 +681,16 @@ export default function Profile() {
 
       {/* ========== MOBILE BOTTOM NAV ========== */}
       <div className="dash-mobile-nav">
-        <div className="mobile-nav-item" onClick={() => navigate("/dashboard")}>
-          <FaHome />
-          <span>Home</span>
+        <div className="dash-mobile-nav-item" onClick={() => navigate("/dashboard")}>
+          <FaHome size={22} /><span>Home</span>
         </div>
-        <div className="mobile-nav-item active">
-          <FaUser />
-          <span>Profile</span>
+        
+        <div className="dash-mobile-nav-item" onClick={() => navigate("/messages")}>
+          <FaEnvelope size={22} /><span>Messages</span>
         </div>
-        <div className="mobile-nav-item" onClick={() => navigate("/dashboard")}>
-          <FaEnvelope />
-          <span>Messages</span>
+
+        <div className="dash-mobile-nav-item active" onClick={() => navigate("/profile")}>
+          <FaUser size={22} /><span>Profile</span>
         </div>
       </div>
     </div>

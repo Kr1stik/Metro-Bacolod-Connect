@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { auth, db } from "../firebase-config";
 import { signOut } from "firebase/auth";
-import { doc, getDoc, collection, query, orderBy, getDocs, addDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, collection, query, orderBy, getDocs, addDoc, updateDoc, setDoc, onSnapshot, where } from "firebase/firestore";
 import {
   FaSearch, FaUser, FaCog, FaSignOutAlt, FaCaretDown,
   FaImage, FaSpinner, FaHome, FaTrash, FaEnvelope,
@@ -17,174 +17,6 @@ import Swal from 'sweetalert2';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { BACOLOD_LOCATIONS } from "../constants/locations";
-
-// --- MOCK LISTINGS DATA ---
-const MOCK_LISTINGS = [
-  {
-    id: 'mock-1',
-    title: 'The Lazy Den 2',
-    rooms: 2,
-    bathrooms: 1,
-    lotArea: '120 sqm',
-    floorArea: '85 sqm',
-    yearBuilt: 2021,
-    location: 'Villamonte',
-    price: '0.5 million php',
-    description: 'Discover available lots in prime locations. Browse land options with complete details to help you choose the perfect place to build or invest.',
-    fullDescription: 'Discover available lots in prime locations. Browse land options with complete details to help you choose the perfect place to build or invest. This cozy 2-bedroom home features an open-plan kitchen, tiled flooring throughout, and a small garden area perfect for morning coffee. Located near schools, churches, and the local market. Fully fenced with a carport for one vehicle.',
-    amenities: ['Carport', 'Garden', 'Tiled Flooring', 'Fenced', 'Near Schools'],
-    agentName: 'Wynands Burger',
-    agentRating: 3.9,
-    agentPhone: '+63 912 345 6789',
-    agentAvatar: 'https://ui-avatars.com/api/?name=WB&background=6366f1&color=fff&rounded=true&size=40',
-    image: 'https://images.pexels.com/photos/3013440/pexels-photo-3013440.jpeg?auto=compress&cs=tinysrgb&w=600',
-    images: [
-      'https://images.pexels.com/photos/3013440/pexels-photo-3013440.jpeg?auto=compress&cs=tinysrgb&w=800',
-      'https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=800',
-      'https://images.pexels.com/photos/1643384/pexels-photo-1643384.jpeg?auto=compress&cs=tinysrgb&w=800',
-    ],
-    status: 'For Sale',
-    type: 'House & Lot',
-    listedDate: 'Jan 15, 2026',
-  },
-  {
-    id: 'mock-2',
-    title: 'Greenfield Residences',
-    rooms: 3,
-    bathrooms: 2,
-    lotArea: '200 sqm',
-    floorArea: '140 sqm',
-    yearBuilt: 2024,
-    location: 'Mandalagan',
-    price: '2.8 million php',
-    description: 'Modern 3-bedroom home in a peaceful subdivision. Includes carport, garden space, and 24/7 gated security for your family.',
-    fullDescription: 'Modern 3-bedroom home in a peaceful subdivision. Includes carport, garden space, and 24/7 gated security for your family. Features a modern kitchen with granite countertops, spacious living area with high ceilings, master bedroom with en-suite bathroom, and a balcony overlooking the community garden. HOA includes pool, clubhouse, and playground access.',
-    amenities: ['Swimming Pool', 'Clubhouse', 'Playground', 'Gated Security', 'Carport', 'Balcony'],
-    agentName: 'Maria Santos',
-    agentRating: 4.5,
-    agentPhone: '+63 917 888 1234',
-    agentAvatar: 'https://ui-avatars.com/api/?name=MS&background=10b981&color=fff&rounded=true&size=40',
-    image: 'https://images.pexels.com/photos/1396122/pexels-photo-1396122.jpeg?auto=compress&cs=tinysrgb&w=600',
-    images: [
-      'https://images.pexels.com/photos/1396122/pexels-photo-1396122.jpeg?auto=compress&cs=tinysrgb&w=800',
-      'https://images.pexels.com/photos/2724749/pexels-photo-2724749.jpeg?auto=compress&cs=tinysrgb&w=800',
-      'https://images.pexels.com/photos/2635038/pexels-photo-2635038.jpeg?auto=compress&cs=tinysrgb&w=800',
-      'https://images.pexels.com/photos/3797991/pexels-photo-3797991.jpeg?auto=compress&cs=tinysrgb&w=800',
-    ],
-    status: 'Pre-Selling',
-    type: 'House & Lot',
-    listedDate: 'Feb 2, 2026',
-  },
-  {
-    id: 'mock-3',
-    title: 'Vista Heights Lot',
-    rooms: 0,
-    bathrooms: 0,
-    lotArea: '300 sqm',
-    floorArea: 'N/A',
-    yearBuilt: 0,
-    location: 'Taculing',
-    price: '1.2 million php',
-    description: 'Prime residential lot with scenic hilltop views. Perfect for custom-built dream homes with ample space and complete privacy.',
-    fullDescription: 'Prime residential lot with scenic hilltop views. Perfect for custom-built dream homes with ample space and complete privacy. The lot is flat and ready for construction, with access to main roads, water, and electricity. Located in a fast-developing residential zone with nearby commercial establishments. Ideal for families looking to design their forever home.',
-    amenities: ['Flat Terrain', 'Road Access', 'Water & Electric Ready', 'Hilltop View', 'Near Commercial Area'],
-    agentName: 'Carlos Reyes',
-    agentRating: 4.2,
-    agentPhone: '+63 920 555 7890',
-    agentAvatar: 'https://ui-avatars.com/api/?name=CR&background=f59e0b&color=fff&rounded=true&size=40',
-    image: 'https://images.pexels.com/photos/440731/pexels-photo-440731.jpeg?auto=compress&cs=tinysrgb&w=600',
-    images: [
-      'https://images.pexels.com/photos/440731/pexels-photo-440731.jpeg?auto=compress&cs=tinysrgb&w=800',
-      'https://images.pexels.com/photos/259588/pexels-photo-259588.jpeg?auto=compress&cs=tinysrgb&w=800',
-    ],
-    status: 'For Sale',
-    type: 'Lot Only',
-    listedDate: 'Dec 10, 2025',
-  },
-  {
-    id: 'mock-4',
-    title: 'Sunrise Condotel',
-    rooms: 1,
-    bathrooms: 1,
-    lotArea: 'N/A',
-    floorArea: '36 sqm',
-    yearBuilt: 2023,
-    location: 'Estefania',
-    price: '3.5 million php',
-    description: 'Fully furnished studio condo with premium amenities. Walking distance to malls and business centers in the heart of the city.',
-    fullDescription: 'Fully furnished studio condo with premium amenities. Walking distance to malls and business centers in the heart of the city. Unit comes with built-in closets, a modern kitchenette, split-type aircon, and premium tiled bathroom. Building amenities include rooftop infinity pool, gym, co-working space, and 24/7 concierge. Perfect for young professionals or as a rental investment.',
-    amenities: ['Furnished', 'Infinity Pool', 'Gym', 'Co-working Space', 'Concierge', 'Aircon'],
-    agentName: 'Patricia Lim',
-    agentRating: 4.8,
-    agentPhone: '+63 933 222 4567',
-    agentAvatar: 'https://ui-avatars.com/api/?name=PL&background=8b5cf6&color=fff&rounded=true&size=40',
-    image: 'https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=600',
-    images: [
-      'https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=800',
-      'https://images.pexels.com/photos/2462015/pexels-photo-2462015.jpeg?auto=compress&cs=tinysrgb&w=800',
-      'https://images.pexels.com/photos/2029731/pexels-photo-2029731.jpeg?auto=compress&cs=tinysrgb&w=800',
-      'https://images.pexels.com/photos/1457842/pexels-photo-1457842.jpeg?auto=compress&cs=tinysrgb&w=800',
-      'https://images.pexels.com/photos/3773575/pexels-photo-3773575.png?auto=compress&cs=tinysrgb&w=800',
-    ],
-    status: 'Ready for Occupancy',
-    type: 'Condo',
-    listedDate: 'Jan 28, 2026',
-  },
-  {
-    id: 'mock-5',
-    title: 'Hacienda Grande',
-    rooms: 4,
-    bathrooms: 3,
-    lotArea: '450 sqm',
-    floorArea: '280 sqm',
-    yearBuilt: 2019,
-    location: 'Bata',
-    price: '6.2 million php',
-    description: 'Spacious 4-bedroom Spanish-style home with a large backyard. Ideal for growing families seeking a quiet neighborhood.',
-    fullDescription: 'Spacious 4-bedroom Spanish-style home with a large backyard. Ideal for growing families seeking a quiet neighborhood. Features terracotta roof tiles, arched doorways, a wraparound veranda, and mature landscaping. The kitchen is fully equipped with custom cabinetry. The master suite includes a walk-in closet and jacuzzi tub. Two-car garage with maid\'s quarters.',
-    amenities: ['2-Car Garage', 'Maid\'s Quarter', 'Jacuzzi', 'Walk-in Closet', 'Veranda', 'Landscaped Garden'],
-    agentName: 'Roberto Cruz',
-    agentRating: 4.1,
-    agentPhone: '+63 945 111 3333',
-    agentAvatar: 'https://ui-avatars.com/api/?name=RC&background=ef4444&color=fff&rounded=true&size=40',
-    image: 'https://images.pexels.com/photos/53610/large-home-residential-house-architecture-53610.jpeg?auto=compress&cs=tinysrgb&w=600',
-    images: [
-      'https://images.pexels.com/photos/53610/large-home-residential-house-architecture-53610.jpeg?auto=compress&cs=tinysrgb&w=800',
-      'https://images.pexels.com/photos/2102587/pexels-photo-2102587.jpeg?auto=compress&cs=tinysrgb&w=800',
-      'https://images.pexels.com/photos/1080721/pexels-photo-1080721.jpeg?auto=compress&cs=tinysrgb&w=800',
-    ],
-    status: 'For Sale',
-    type: 'House & Lot',
-    listedDate: 'Nov 5, 2025',
-  },
-  {
-    id: 'mock-6',
-    title: 'Metro Commercial Space',
-    rooms: 0,
-    bathrooms: 1,
-    lotArea: '180 sqm',
-    floorArea: '160 sqm',
-    yearBuilt: 2022,
-    location: 'Mansilingan',
-    price: '4.0 million php',
-    description: 'Commercial space on a high-traffic road. Great for retail shops, offices, or food establishments with high foot traffic.',
-    fullDescription: 'Commercial space on a high-traffic road. Great for retail shops, offices, or food establishments with high foot traffic. Features a wide glass frontage for maximum visibility, a mezzanine level for storage or office use, two comfort rooms, and rear loading access. High-speed internet-ready with existing electrical capacity for commercial equipment.',
-    amenities: ['Glass Frontage', 'Mezzanine', 'Rear Loading', 'Internet Ready', 'High Electrical Capacity'],
-    agentName: 'Diana Bermudo',
-    agentRating: 3.7,
-    agentPhone: '+63 918 777 9999',
-    agentAvatar: 'https://ui-avatars.com/api/?name=DB&background=06b6d4&color=fff&rounded=true&size=40',
-    image: 'https://images.pexels.com/photos/443383/pexels-photo-443383.jpeg?auto=compress&cs=tinysrgb&w=600',
-    images: [
-      'https://images.pexels.com/photos/443383/pexels-photo-443383.jpeg?auto=compress&cs=tinysrgb&w=800',
-      'https://images.pexels.com/photos/1098982/pexels-photo-1098982.jpeg?auto=compress&cs=tinysrgb&w=800',
-      'https://images.pexels.com/photos/269077/pexels-photo-269077.jpeg?auto=compress&cs=tinysrgb&w=800',
-    ],
-    status: 'For Lease',
-    type: 'Commercial',
-    listedDate: 'Feb 10, 2026',
-  },
-];
 
 // --- Rating Stars Component ---
 const RatingStars = ({ rating }: { rating: number }) => {
@@ -204,12 +36,25 @@ export default function Dashboard() {
   const [userData, setUserData] = useState<any>(null);
 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
   const [posts, setPosts] = useState<any[]>([]);
-  const [newCaption, setNewCaption] = useState("");
-  const [postLocation, setPostLocation] = useState("");
   const [filterLocation, setFilterLocation] = useState("");
+
+  // --- COMPREHENSIVE LISTING STATE ---
+  const [listingTitle, setListingTitle] = useState("");
+  const [listingDescription, setListingDescription] = useState("");
+  const [listingPrice, setListingPrice] = useState("");
+  const [listingLocation, setListingLocation] = useState("");
+  const [listingStatus, setListingStatus] = useState("For Sale");
+  const [listingType, setListingType] = useState("House & Lot");
+  const [listingRooms, setListingRooms] = useState("");
+  const [listingBathrooms, setListingBathrooms] = useState("");
+  const [listingLotArea, setListingLotArea] = useState("");
+  const [listingFloorArea, setListingFloorArea] = useState("");
+  const [listingYearBuilt, setListingYearBuilt] = useState("");
+  const [listingAmenities, setListingAmenities] = useState("");
 
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -267,6 +112,20 @@ export default function Dashboard() {
     });
     return () => unsubscribe();
   }, [navigate]);
+
+  // --- LISTEN FOR UNREAD MESSAGES ---
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, "chats"), where("participants", "array-contains", user.uid));
+    const unsub = onSnapshot(q, (snap: any) => {
+      let count = 0;
+      snap.forEach((doc: any) => {
+        if (doc.data().hasUnread?.[user.uid]) count++;
+      });
+      setUnreadCount(count);
+    });
+    return () => unsub();
+  }, [user]);
 
   // --- WELCOME TOAST ---
   useEffect(() => {
@@ -332,16 +191,34 @@ export default function Dashboard() {
     setImageFiles(newFiles);
   };
 
-  const handleCreatePost = async () => {
+  const resetCreateForm = () => {
+    setListingTitle("");
+    setListingDescription("");
+    setListingPrice("");
+    setListingLocation("");
+    setListingStatus("For Sale");
+    setListingType("House & Lot");
+    setListingRooms("");
+    setListingBathrooms("");
+    setListingLotArea("");
+    setListingFloorArea("");
+    setListingYearBuilt("");
+    setListingAmenities("");
+    setImageFiles([]);
+  };
+
+  const handleCreateListing = async () => {
+    if (!listingTitle.trim()) return toast.warning("Enter a listing title.");
+    if (!listingLocation) return toast.warning("Select a location.");
+    if (!listingPrice.trim()) return toast.warning("Enter a price.");
     if (imageFiles.length === 0) return toast.warning("Upload at least 1 image.");
-    if (!postLocation) return toast.warning("Select a location!");
+
     setIsUploading(true);
     try {
-      const uniqueId = userData?.customId || "USER";
-      const role = userData?.role || "Client";
-      const imageUrls: string[] = [];
       const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || "dg6kzqq5n";
       const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || "jdj7tsar";
+      const imageUrls: string[] = [];
+
       for (const file of imageFiles) {
         const formData = new FormData();
         formData.append("file", file);
@@ -352,29 +229,46 @@ export default function Dashboard() {
         if (data.secure_url) imageUrls.push(data.secure_url);
         else throw new Error("Image upload failed");
       }
+
+      const amenitiesArray = listingAmenities
+        .split(",")
+        .map((a) => a.trim())
+        .filter((a) => a.length > 0);
+
       await addDoc(collection(db, "posts"), {
         userId: user.uid,
         userName: userData?.firstName ? `${userData.firstName} ${userData.lastName}` : (user.displayName || "Metro User"),
         userAvatar: user.photoURL,
-        userCustomId: uniqueId,
-        userRole: role,
-        content: newCaption,
-        location: postLocation,
+        userCustomId: userData?.customId || "USER",
+        userRole: userData?.role || "Client",
+        title: listingTitle,
+        content: listingDescription,
+        location: listingLocation,
+        price: listingPrice,
+        status: listingStatus,
+        type: listingType,
+        rooms: parseInt(listingRooms) || 0,
+        bathrooms: parseInt(listingBathrooms) || 0,
+        lotArea: listingLotArea || "N/A",
+        floorArea: listingFloorArea || "N/A",
+        yearBuilt: parseInt(listingYearBuilt) || 0,
+        amenities: amenitiesArray,
         images: imageUrls,
         image: imageUrls[0],
         createdAt: new Date().toISOString(),
         likes: 0,
         likedBy: [],
         savedBy: [],
-        isArchived: false
+        isArchived: false,
       });
+
       toast.success("Listing published!");
-      setNewCaption(""); setPostLocation(""); setImageFiles([]);
+      resetCreateForm();
       setShowCreateModal(false);
       fetchPosts(filterLocation);
     } catch (error: any) {
       console.error(error);
-      toast.error("Failed to post: " + error.message);
+      toast.error("Failed to publish: " + error.message);
     } finally {
       setIsUploading(false);
     }
@@ -473,8 +367,59 @@ export default function Dashboard() {
     });
   };
 
-  const handleInquire = () => {
-    Swal.fire({ title: 'Contact Agent', text: 'Messaging feature is coming soon!', icon: 'info' });
+  const handleInquire = async (listing?: any) => {
+    if (!listing) return;
+
+    const agentId = listing.originalPost?.userId;
+    
+    // Prevent messaging yourself
+    if (user?.uid === agentId) {
+      return toast.info("You cannot inquire about your own listing.");
+    }
+
+    try {
+      // 1. Create a unique, deterministic ID so a Client and Agent only ever share ONE chat room
+      const ids = [user.uid, agentId].sort();
+      const chatId = `${ids[0]}_${ids[1]}`;
+      const chatRef = doc(db, "chats", chatId);
+      const chatSnap = await getDoc(chatRef);
+
+      // 2. If they have never chatted before, create the chat document
+      if (!chatSnap.exists()) {
+          await setDoc(chatRef, {
+              participants: [user.uid, agentId],
+              users: {
+                  [user.uid]: {
+                      name: userData?.firstName ? `${userData.firstName} ${userData.lastName}` : (user.displayName || "User"),
+                      avatar: user.photoURL || "https://ui-avatars.com/api/?name=U"
+                  },
+                  [agentId]: {
+                      name: listing.agentName,
+                      avatar: listing.agentAvatar
+                  }
+              },
+              lastMessage: `Interested in: ${listing.title}`,
+              updatedAt: new Date(),
+              hasUnread: {
+                  [user.uid]: false, 
+                  [agentId]: true 
+              }
+          });
+          // 3. Send an automatic first message on behalf of the client
+          await addDoc(collection(db, `chats/${chatId}/messages`), {
+              text: `Hi ${listing.agentName}, I am interested in your listing: "${listing.title}" located in ${listing.location}. Is it still available?`,
+              senderId: user.uid,
+              createdAt: new Date()
+          });
+      }
+
+      // 4. Teleport the user to the messages page
+      navigate('/messages');
+
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to start chat.");
+    }
   };
 
   const openListingModal = (listing: any) => {
@@ -499,34 +444,31 @@ export default function Dashboard() {
     setCarouselIndex((prev: number) => (prev - 1 + imgs.length) % imgs.length);
   };
 
-  // --- Build display listings: real posts adapted + mock data ---
-  const realListings = posts.map(post => ({
+  // --- Build display listings: only real posts ---
+  const displayListings = posts.map(post => ({
     id: post.id,
-    title: post.content?.split('\n')[0]?.substring(0, 40) || 'New Listing',
-    rooms: 0,
-    bathrooms: 0,
-    lotArea: 'N/A',
-    floorArea: 'N/A',
-    yearBuilt: 0,
+    title: post.title || post.content?.split('\n')[0]?.substring(0, 40) || 'New Listing',
+    rooms: post.rooms || 0,
+    bathrooms: post.bathrooms || 0,
+    lotArea: post.lotArea || 'N/A',
+    floorArea: post.floorArea || 'N/A',
+    yearBuilt: post.yearBuilt || 0,
     location: post.location || 'Bacolod',
-    price: 'Contact for price',
+    price: post.price || 'Contact for price',
     description: post.content || 'No description provided.',
     fullDescription: post.content || 'No description provided.',
-    amenities: [],
+    amenities: post.amenities || [],
     agentName: post.userName || 'Unknown Agent',
     agentRating: 4.0,
-    agentPhone: 'N/A',
+    agentPhone: post.phone || 'N/A',
     agentAvatar: post.userAvatar || 'https://ui-avatars.com/api/?name=U&rounded=true',
     image: post.images?.[0] || post.image || '',
     images: post.images || (post.image ? [post.image] : []),
-    status: 'For Sale',
-    type: 'Property',
+    status: post.status || 'For Sale',
+    type: post.type || 'Property',
     listedDate: post.createdAt ? new Date(post.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently',
-    isReal: true,
     originalPost: post,
   }));
-
-  const displayListings = [...realListings, ...MOCK_LISTINGS.map(m => ({ ...m, isReal: false, originalPost: null }))];
 
   return (
     <div className="dashboard-revamp">
@@ -541,7 +483,23 @@ export default function Dashboard() {
             <input type="text" placeholder="Look for agents..." className="dash-search-input" />
           </div>
         </div>
-        <div className="dash-nav-right">
+        <div className="dash-nav-right" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          
+          {/* --- DESKTOP MESSAGES ICON --- */}
+          <div 
+            onClick={() => navigate('/messages')} 
+            style={{ cursor: 'pointer', color: '#4b5563', display: 'flex', alignItems: 'center', transition: '0.2s', position: 'relative' }} 
+            title="Messages"
+            className="desktop-msg-icon"
+          >
+            <FaEnvelope size={22} />
+            {unreadCount > 0 && (
+              <span style={{ position: 'absolute', top: '-5px', right: '-8px', background: '#ef4444', color: 'white', fontSize: '0.65rem', fontWeight: 'bold', width: '18px', height: '18px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white' }}>
+                {unreadCount}
+              </span>
+            )}
+          </div>
+
           <div className="dash-user-trigger" onClick={() => setIsDropdownOpen(!isDropdownOpen)}>
             <div className="dash-user-text">
               <span className="dash-user-name">
@@ -656,13 +614,13 @@ export default function Dashboard() {
                   <div className="glass-card-image">
                     {listing.image && <img src={listing.image} alt={listing.title} />}
                   </div>
-                  <button className="glass-inquire-btn" onClick={(e) => { e.stopPropagation(); handleInquire(); }}>
+                  <button className="glass-inquire-btn" onClick={(e) => { e.stopPropagation(); handleInquire(listing); }}>
                     INQUIRE NOW →
-                  </button>
+                </button>
                 </div>
 
-                {/* Owner Actions (only for real posts owned by user) */}
-                {listing.isReal && user?.uid === listing.originalPost?.userId && (
+                {/* Owner Actions (only for posts owned by user) */}
+                {user?.uid === listing.originalPost?.userId && (
                   <div className="glass-card-actions">
                     <button onClick={(e) => { e.stopPropagation(); toggleDropdown(listing.id); }} className="glass-dots-btn">&#8942;</button>
                     {activeDropdown === listing.id && (
@@ -687,41 +645,209 @@ export default function Dashboard() {
         </button>
       )}
 
-      {/* ========== CREATE POST MODAL ========== */}
+      {/* ========== CREATE LISTING MODAL ========== */}
       {showCreateModal && (
-        <div className="dash-modal-overlay" onClick={() => setShowCreateModal(false)}>
-          <div className="dash-modal-card" onClick={e => e.stopPropagation()}>
-            <div className="dash-modal-header">
+        <div className="create-listing-overlay" onClick={() => setShowCreateModal(false)}>
+          <div className="create-listing-modal" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="create-listing-header">
               <h2>New Listing</h2>
-              <FaTimes className="dash-modal-close" onClick={() => setShowCreateModal(false)} />
+              <FaTimes className="create-listing-close" onClick={() => setShowCreateModal(false)} />
             </div>
-            <textarea
-              className="dash-modal-textarea"
-              placeholder={`What are you listing today, ${userData?.firstName || 'Agent'}?`}
-              value={newCaption}
-              onChange={(e) => setNewCaption(e.target.value)}
-            />
-            {imageFiles.length > 0 && (
-              <div className="dash-modal-previews">
+
+            {/* Scrollable Body */}
+            <div className="create-listing-body">
+              {/* Title */}
+              <div className="create-listing-field">
+                <label>Listing Title *</label>
+                <input
+                  type="text"
+                  className="create-listing-input"
+                  placeholder="e.g. Greenfield Residences"
+                  value={listingTitle}
+                  onChange={(e) => setListingTitle(e.target.value)}
+                />
+              </div>
+
+              {/* Two-column row: Price + Location */}
+              <div className="create-listing-row">
+                <div className="create-listing-field">
+                  <label>Price *</label>
+                  <input
+                    type="text"
+                    className="create-listing-input"
+                    placeholder="e.g. 2.8 million php"
+                    value={listingPrice}
+                    onChange={(e) => setListingPrice(e.target.value)}
+                  />
+                </div>
+                <div className="create-listing-field">
+                  <label>Location *</label>
+                  <select
+                    className="create-listing-select"
+                    value={listingLocation}
+                    onChange={(e) => setListingLocation(e.target.value)}
+                  >
+                    <option value="" disabled>Select location</option>
+                    {BACOLOD_LOCATIONS.map((loc) => (
+                      <option key={loc} value={loc}>{loc}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Two-column row: Status + Type */}
+              <div className="create-listing-row">
+                <div className="create-listing-field">
+                  <label>Status</label>
+                  <select
+                    className="create-listing-select"
+                    value={listingStatus}
+                    onChange={(e) => setListingStatus(e.target.value)}
+                  >
+                    <option value="For Sale">For Sale</option>
+                    <option value="Pre-Selling">Pre-Selling</option>
+                    <option value="Ready for Occupancy">Ready for Occupancy</option>
+                    <option value="For Lease">For Lease</option>
+                  </select>
+                </div>
+                <div className="create-listing-field">
+                  <label>Type</label>
+                  <select
+                    className="create-listing-select"
+                    value={listingType}
+                    onChange={(e) => setListingType(e.target.value)}
+                  >
+                    <option value="House & Lot">House & Lot</option>
+                    <option value="Lot Only">Lot Only</option>
+                    <option value="Condo">Condo</option>
+                    <option value="Commercial">Commercial</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Section Title */}
+              <div className="create-listing-section-title">Property Details</div>
+
+              {/* Four-column row: Rooms, Bathrooms, Lot Area, Floor Area */}
+              <div className="create-listing-row create-listing-row-4">
+                <div className="create-listing-field">
+                  <label>Bedrooms</label>
+                  <input
+                    type="number"
+                    className="create-listing-input"
+                    placeholder="0"
+                    min="0"
+                    value={listingRooms}
+                    onChange={(e) => setListingRooms(e.target.value)}
+                  />
+                </div>
+                <div className="create-listing-field">
+                  <label>Bathrooms</label>
+                  <input
+                    type="number"
+                    className="create-listing-input"
+                    placeholder="0"
+                    min="0"
+                    value={listingBathrooms}
+                    onChange={(e) => setListingBathrooms(e.target.value)}
+                  />
+                </div>
+                <div className="create-listing-field">
+                  <label>Lot Area</label>
+                  <input
+                    type="text"
+                    className="create-listing-input"
+                    placeholder="e.g. 200 sqm"
+                    value={listingLotArea}
+                    onChange={(e) => setListingLotArea(e.target.value)}
+                  />
+                </div>
+                <div className="create-listing-field">
+                  <label>Floor Area</label>
+                  <input
+                    type="text"
+                    className="create-listing-input"
+                    placeholder="e.g. 140 sqm"
+                    value={listingFloorArea}
+                    onChange={(e) => setListingFloorArea(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Year Built */}
+              <div className="create-listing-row">
+                <div className="create-listing-field">
+                  <label>Year Built</label>
+                  <input
+                    type="number"
+                    className="create-listing-input"
+                    placeholder="e.g. 2024"
+                    min="1900"
+                    max="2030"
+                    value={listingYearBuilt}
+                    onChange={(e) => setListingYearBuilt(e.target.value)}
+                  />
+                </div>
+                <div className="create-listing-field">
+                  <label>Amenities</label>
+                  <input
+                    type="text"
+                    className="create-listing-input"
+                    placeholder="Separate by commas (e.g. Pool, Gym, Parking)"
+                    value={listingAmenities}
+                    onChange={(e) => setListingAmenities(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Description */}
+              <div className="create-listing-field">
+                <label>Description</label>
+                <textarea
+                  className="create-listing-textarea"
+                  placeholder="Describe the property, its features, and surroundings..."
+                  value={listingDescription}
+                  onChange={(e) => setListingDescription(e.target.value)}
+                />
+              </div>
+
+              {/* Image Upload */}
+              <div className="create-listing-section-title">Photos *</div>
+              <div className="create-listing-photos">
                 {imageFiles.map((file, i) => (
-                  <div key={i} className="dash-modal-preview-item">
+                  <div key={i} className="create-listing-photo-item">
                     <img src={URL.createObjectURL(file)} alt="" />
-                    <button onClick={() => removeImage(i)} className="dash-preview-remove">&#215;</button>
+                    <button onClick={() => removeImage(i)} className="create-listing-photo-remove">&#215;</button>
                   </div>
                 ))}
+                <button
+                  className="create-listing-photo-add"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <FaImage size={20} />
+                  <span>Add Photos</span>
+                </button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  hidden
+                  accept="image/*"
+                  multiple
+                  onChange={handleFileSelect}
+                />
               </div>
-            )}
-            <div className="dash-modal-actions">
-              <button onClick={() => fileInputRef.current?.click()} className="dash-modal-action-btn"><FaImage /> Photos</button>
-              <input type="file" ref={fileInputRef} hidden accept="image/*" multiple onChange={handleFileSelect} />
-              <select value={postLocation} onChange={(e) => setPostLocation(e.target.value)} className="dash-modal-select">
-                <option value="" disabled>Select Location</option>
-                {BACOLOD_LOCATIONS.map(loc => <option key={loc} value={loc}>{loc}</option>)}
-              </select>
             </div>
-            <button onClick={handleCreatePost} disabled={isUploading} className="dash-modal-publish">
-              {isUploading ? <FaSpinner className="spin" /> : 'Publish Listing'}
-            </button>
+
+            {/* Footer */}
+            <div className="create-listing-footer">
+              <button className="create-listing-cancel" onClick={() => { resetCreateForm(); setShowCreateModal(false); }}>
+                Cancel
+              </button>
+              <button className="create-listing-publish" onClick={handleCreateListing} disabled={isUploading}>
+                {isUploading ? <><FaSpinner className="spin" /> Publishing...</> : 'Publish Listing'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -918,7 +1044,7 @@ export default function Dashboard() {
                       <FaPhoneAlt size={11} /> {selectedListing.agentPhone}
                     </p>
                   )}
-                  <button className="listing-modal-inquire-btn" onClick={() => handleInquire()}>
+                  <button className="listing-modal-inquire-btn" onClick={() => handleInquire(selectedListing)}>
                     INQUIRE NOW →
                   </button>
                   <button className="listing-modal-share-btn" onClick={() => handleShare(selectedListing)}>
@@ -936,6 +1062,20 @@ export default function Dashboard() {
         <div onClick={() => navigate('/dashboard')} className="dash-mobile-nav-item active">
           <FaHome size={22} /><span>Home</span>
         </div>
+        
+        {/* --- ADDED MESSAGES FOR MOBILE --- */}
+        <div onClick={() => navigate('/messages')} className="dash-mobile-nav-item">
+          <div style={{ position: 'relative' }}>
+            <FaEnvelope size={22} />
+            {unreadCount > 0 && (
+              <span style={{ position: 'absolute', top: '-2px', right: '-10px', background: '#ef4444', color: 'white', fontSize: '0.6rem', fontWeight: 'bold', width: '16px', height: '16px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white' }}>
+                {unreadCount}
+              </span>
+            )}
+          </div>
+          <span>Messages</span>
+        </div>
+
         {userData?.role === 'Agent' && (
           <div onClick={() => navigate('/archive')} className="dash-mobile-nav-item">
             <FaTrash size={22} /><span>Trash</span>
@@ -943,9 +1083,6 @@ export default function Dashboard() {
         )}
         <div onClick={() => navigate('/profile')} className="dash-mobile-nav-item">
           <FaUser size={22} /><span>Profile</span>
-        </div>
-        <div onClick={handleLogout} className="dash-mobile-nav-item">
-          <FaSignOutAlt size={22} /><span>Logout</span>
         </div>
       </div>
     </div>

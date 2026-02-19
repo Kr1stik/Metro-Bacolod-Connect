@@ -14,6 +14,7 @@ import Properties from "./pages/Properties";
 import Professionals from "./pages/Professionals";
 import Services from "./pages/Services";
 import Resources from "./pages/Resources";
+import Messages from "./pages/Messages";
 import { Analytics } from "@vercel/analytics/react";
 
 function App() {
@@ -62,6 +63,7 @@ function App() {
       <Route path="/services" element={<Services />} />
       <Route path="/resources" element={<Resources />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
+      <Route path="/messages" element={<Messages />} />
     </Routes>
     <Analytics />
   </>
