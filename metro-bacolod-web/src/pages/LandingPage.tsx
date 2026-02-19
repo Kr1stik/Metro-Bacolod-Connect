@@ -128,7 +128,7 @@ export default function LandingPage() {
             <img src={logo} alt="Logo" style={{ width: '60px', height: 'auto' }} />
             <div className="nav-links" style={{ display: 'flex', gap: '30px' }}>
                 {['Properties', 'Professionals', 'Services', 'Resources'].map((item) => (
-                    <a key={item} href="#" className="nav-link-item" style={{ color: '#000', fontWeight: '600', fontSize: '0.9rem', opacity: 0.7, transition: '0.2s', textDecoration: 'none', position: 'relative' }}>{item}</a>
+                    <a key={item} href={`/${item.toLowerCase()}`} className="nav-link-item" style={{ color: '#000', fontWeight: '600', fontSize: '0.9rem', opacity: 0.7, transition: '0.2s', textDecoration: 'none', position: 'relative' }}>{item}</a>
                 ))}
             </div>
         </div>
@@ -305,9 +305,9 @@ export default function LandingPage() {
           <div>
             <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '15px' }}>Quick Links</h3>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-              <li style={{ marginBottom: '10px' }}><a href="#" style={{ color: '#ccc', textDecoration: 'none', transition: '0.2s' }}>Properties</a></li>
-              <li style={{ marginBottom: '10px' }}><a href="#" style={{ color: '#ccc', textDecoration: 'none', transition: '0.2s' }}>Professionals</a></li>
-              <li style={{ marginBottom: '10px' }}><a href="#" style={{ color: '#ccc', textDecoration: 'none', transition: '0.2s' }}>Resources</a></li>
+              <li style={{ marginBottom: '10px' }}><a href="/properties" style={{ color: '#ccc', textDecoration: 'none', transition: '0.2s' }}>Properties</a></li>
+              <li style={{ marginBottom: '10px' }}><a href="/professionals" style={{ color: '#ccc', textDecoration: 'none', transition: '0.2s' }}>Professionals</a></li>
+              <li style={{ marginBottom: '10px' }}><a href="/resources" style={{ color: '#ccc', textDecoration: 'none', transition: '0.2s' }}>Resources</a></li>
             </ul>
           </div>
           <div>

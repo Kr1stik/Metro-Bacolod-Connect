@@ -10,6 +10,10 @@ import Archive from "./pages/Archive";
 import VerifyEmail from "./pages/VerifyEmail";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
+import Properties from "./pages/Properties";
+import Professionals from "./pages/Professionals";
+import Services from "./pages/Services";
+import Resources from "./pages/Resources";
 import { Analytics } from "@vercel/analytics/react";
 
 function App() {
@@ -53,6 +57,10 @@ function App() {
       <Route path="/profile" element={<Profile />} />
       <Route path="/archive" element={<Archive />} />
       <Route path="/settings" element={<Settings />} />
+      <Route path="/properties" element={<Properties />} />
+      <Route path="/professionals" element={<Professionals />} />
+      <Route path="/services" element={<Services />} />
+      <Route path="/resources" element={<Resources />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
     </Routes>
     <Analytics />
