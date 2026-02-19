@@ -120,29 +120,34 @@ export default function LandingPage() {
   };
 
   return (
-    <div style={{ position: 'relative', width: '100vw', minHeight: '100vh', overflowX: 'hidden', fontFamily: "'Inter', sans-serif", background: '#ffffff' }}>
+    <div style={{ position: 'relative', width: '100vw', minHeight: '100vh', overflowX: 'hidden', fontFamily: "'Inter', sans-serif", background: 'linear-gradient(135deg, #e8ecf1 0%, #d6dce5 25%, #e2dfd8 50%, #dde4e0 75%, #e8ecf1 100%)' }}>
       
+      {/* Ambient blobs */}
+      <div className="info-blob info-blob-1" />
+      <div className="info-blob info-blob-2" />
+      <div className="info-blob info-blob-3" />
+
       {/* NAVBAR */}
-      <nav className="landing-nav" style={{ position: 'absolute', top: 0, left: 0, width: '100%', padding: '35px 5%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 50 }}>
+      <nav className="landing-nav" style={{ position: 'fixed', top: 0, left: 0, width: '100%', padding: '20px 5%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 50, background: 'transparent' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '50px' }}>
-            <img src={logo} alt="Logo" style={{ width: '60px', height: 'auto' }} />
+            <img src={logo} alt="Logo" style={{ width: '50px', height: 'auto' }} />
             <div className="nav-links" style={{ display: 'flex', gap: '30px' }}>
                 {['Properties', 'Professionals', 'Services', 'Resources'].map((item) => (
-                    <a key={item} href={`/${item.toLowerCase()}`} className="nav-link-item" style={{ color: '#000', fontWeight: '600', fontSize: '0.9rem', opacity: 0.7, transition: '0.2s', textDecoration: 'none', position: 'relative' }}>{item}</a>
+                    <a key={item} href={`/${item.toLowerCase()}`} className="nav-link-item" style={{ color: '#1d1d1f', fontWeight: '600', fontSize: '0.9rem', opacity: 0.7, transition: '0.2s', textDecoration: 'none', position: 'relative' }}>{item}</a>
                 ))}
             </div>
         </div>
         <div className="nav-buttons" style={{ display: 'flex', gap: '15px' }}>
-            <button onClick={() => setShowLogin(true)} className="hero-btn hero-btn-outline" style={{ background: 'transparent', border: '1px solid black', color: 'black', padding: '12px 35px', fontSize: '0.9rem', fontWeight: '700', borderRadius: '50px', cursor: 'pointer', transition: 'all 0.3s ease' }}>LOGIN</button>
-            <button onClick={() => navigate('/register')} className="hero-btn hero-btn-filled" style={{ background: 'black', color: 'white', padding: '12px 35px', fontSize: '0.9rem', fontWeight: '700', borderRadius: '50px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 14px 0 rgba(0,0,0,0.39)', transition: 'all 0.3s ease' }}>CREATE ACCOUNT</button>
+            <button onClick={() => setShowLogin(true)} className="hero-btn hero-btn-outline" style={{ background: 'transparent', border: '1px solid #1d1d1f', color: '#1d1d1f', padding: '12px 35px', fontSize: '0.9rem', fontWeight: '700', borderRadius: '50px', cursor: 'pointer', transition: 'all 0.3s ease' }}>LOGIN</button>
+            <button onClick={() => navigate('/register')} className="hero-btn hero-btn-filled" style={{ background: '#1d1d1f', color: 'white', padding: '12px 35px', fontSize: '0.9rem', fontWeight: '700', borderRadius: '50px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 14px 0 rgba(0,0,0,0.25)', transition: 'all 0.3s ease' }}>CREATE ACCOUNT</button>
         </div>
       </nav>
 
       {/* HERO */}
-      <section className="landing-hero" style={{ minHeight: '100vh', width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', padding: '0 20px', position: 'relative' }}>
-        <Antigravity count={300} color="#000000" particleSize={0.6} />
+      <section className="landing-hero" style={{ minHeight: '100vh', width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', padding: '80px 20px 0', position: 'relative' }}>
+        <Antigravity count={300} color="#1d1d1f" particleSize={0.6} />
         {/* Adjusted clamp() lower bound to 2.5rem for mobile safety */}
-        <h1 style={{ fontSize: 'clamp(2.5rem, 6vw, 6rem)', fontWeight: '700', color: '#000', lineHeight: '1.1', marginBottom: '30px', letterSpacing: '-2px', zIndex: 2 }}>
+        <h1 style={{ fontSize: 'clamp(2.5rem, 6vw, 6rem)', fontWeight: '700', color: '#1d1d1f', lineHeight: '1.1', marginBottom: '30px', letterSpacing: '-2px', zIndex: 2 }}>
            <TextType 
              text={["Metro Bacolod \n Connect."]} 
              typingSpeed={100} 
@@ -156,14 +161,14 @@ export default function LandingPage() {
         {showTags && (
           <div ref={tagsRef} style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', justifyContent: 'center', zIndex: 2 }}>
             {['Connect', 'Verify', 'Close'].map(tag => (
-              <span key={tag} style={{ background: '#e5e7eb', color: '#374151', padding: '8px 24px', borderRadius: '25px', fontSize: '0.85rem', fontWeight: '600', opacity: 0 }}>{tag}</span>
+              <span key={tag} style={{ background: 'rgba(255,255,255,0.45)', backdropFilter: 'blur(20px)', color: '#374151', padding: '8px 24px', borderRadius: '25px', fontSize: '0.85rem', fontWeight: '600', opacity: 0, border: '1px solid rgba(255,255,255,0.5)' }}>{tag}</span>
             ))}
           </div>
         )}
       </section>
 
       {/* EXPLORE SECTION */}
-      <section className="landing-explore" style={{ padding: '100px 8%', background: 'white', textAlign: 'center' }}>
+      <section className="landing-explore" style={{ padding: '100px 8%', textAlign: 'center' }}>
         <ScrollFloat
           animationDuration={1}
           ease='back.inOut(2)'
@@ -190,8 +195,8 @@ export default function LandingPage() {
           <div className="timeline-row timeline-row-right" style={{ display: 'flex', justifyContent: 'flex-end', paddingLeft: '55%', marginBottom: '80px', position: 'relative' }}>
             <div className="timeline-card" style={{ textAlign: 'center', maxWidth: '380px' }}>
               <img src="https://images.pexels.com/photos/3013440/pexels-photo-3013440.jpeg?auto=compress&cs=tinysrgb&w=800" alt="Green grass field landscape" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '20px', marginBottom: '20px', border: '2px solid #3f3f3f', display: 'block' }} />
-              <span className="explore-btn" style={{ display: 'inline-block', padding: '6px 24px', border: '2px solid #333', borderRadius: '50px', fontSize: '1rem', fontWeight: '700', color: '#000', marginBottom: '12px', cursor: 'pointer', transition: 'all 0.3s ease' }}>View Lands</span>
-              <p style={{ fontSize: '0.9rem', color: '#666', lineHeight: '1.6', marginTop: '8px' }}>
+              <span className="explore-btn" style={{ display: 'inline-block', padding: '6px 24px', border: '2px solid #333', borderRadius: '50px', fontSize: '1rem', fontWeight: '700', color: '#1d1d1f', marginBottom: '12px', cursor: 'pointer', transition: 'all 0.3s ease' }}>View Lands</span>
+              <p style={{ fontSize: '0.9rem', color: 'rgba(0,0,0,0.5)', lineHeight: '1.6', marginTop: '8px' }}>
                 Discover available lots in prime locations. Browse land options with complete details to help you choose the perfect place to build or invest.
               </p>
             </div>
@@ -201,8 +206,8 @@ export default function LandingPage() {
           <div className="timeline-row timeline-row-left" style={{ display: 'flex', justifyContent: 'flex-start', paddingRight: '55%', marginBottom: '80px', position: 'relative' }}>
             <div className="timeline-card" style={{ textAlign: 'center', maxWidth: '380px' }}>
               <img src="https://images.pexels.com/photos/9203777/pexels-photo-9203777.jpeg?auto=compress&cs=tinysrgb&w=800" alt="Aerial shot of a neighborhood" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '20px', marginBottom: '20px', border: '2px solid #3f3f3f', display: 'block' }} />
-              <span className="explore-btn" style={{ display: 'inline-block', padding: '6px 24px', border: '2px solid #333', borderRadius: '50px', fontSize: '1rem', fontWeight: '700', color: '#000', marginBottom: '12px', cursor: 'pointer', transition: 'all 0.3s ease' }}>See Homes</span>
-              <p style={{ fontSize: '0.9rem', color: '#666', lineHeight: '1.6', marginTop: '8px' }}>
+              <span className="explore-btn" style={{ display: 'inline-block', padding: '6px 24px', border: '2px solid #333', borderRadius: '50px', fontSize: '1rem', fontWeight: '700', color: '#1d1d1f', marginBottom: '12px', cursor: 'pointer', transition: 'all 0.3s ease' }}>See Homes</span>
+              <p style={{ fontSize: '0.9rem', color: 'rgba(0,0,0,0.5)', lineHeight: '1.6', marginTop: '8px' }}>
                 Explore ready-to-move and pre-selling homes. View layouts, photos, and features to find a home that fits your lifestyle and budget.
               </p>
             </div>
@@ -212,8 +217,8 @@ export default function LandingPage() {
           <div className="timeline-row timeline-row-right" style={{ display: 'flex', justifyContent: 'flex-end', paddingLeft: '55%', position: 'relative' }}>
             <div className="timeline-card" style={{ textAlign: 'center', maxWidth: '380px' }}>
               <img src="https://images.pexels.com/photos/8112163/pexels-photo-8112163.jpeg?auto=compress&cs=tinysrgb&w=800" alt="Smiling agent holding keys with clients" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '20px', marginBottom: '20px', border: '2px solid #3f3f3f', display: 'block' }} />
-              <span className="explore-btn" style={{ display: 'inline-block', padding: '6px 24px', border: '2px solid #333', borderRadius: '50px', fontSize: '1rem', fontWeight: '700', color: '#000', marginBottom: '12px', cursor: 'pointer', transition: 'all 0.3s ease' }}>Contact Agents</span>
-              <p style={{ fontSize: '0.9rem', color: '#666', lineHeight: '1.6', marginTop: '8px' }}>
+              <span className="explore-btn" style={{ display: 'inline-block', padding: '6px 24px', border: '2px solid #333', borderRadius: '50px', fontSize: '1rem', fontWeight: '700', color: '#1d1d1f', marginBottom: '12px', cursor: 'pointer', transition: 'all 0.3s ease' }}>Contact Agents</span>
+              <p style={{ fontSize: '0.9rem', color: 'rgba(0,0,0,0.5)', lineHeight: '1.6', marginTop: '8px' }}>
                 Connect with trusted property agents for expert guidance. Get answers, schedule visits, and receive help every step of the way.
               </p>
             </div>
@@ -223,7 +228,7 @@ export default function LandingPage() {
       </section>
 
       {/* ABOUT SECTION */}
-      <section className="landing-about" style={{ padding: '100px 8%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '60px', flexWrap: 'wrap', background: 'white' }}>
+      <section className="landing-about" style={{ padding: '100px 8%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '60px', flexWrap: 'wrap' }}>
           <div className="about-text" style={{ flex: 1, minWidth: '300px' }}>
              <ScrollFloat
                animationDuration={1}
@@ -235,7 +240,7 @@ export default function LandingPage() {
              >
                Here at MBC we...
              </ScrollFloat>
-             <div style={{ fontSize: '1rem', color: '#4b5563', lineHeight: '1.8', maxWidth: '550px', marginTop: '25px' }}>
+             <div style={{ fontSize: '1rem', color: 'rgba(0,0,0,0.5)', lineHeight: '1.8', maxWidth: '550px', marginTop: '25px' }}>
                <p style={{ marginBottom: '12px' }}>
                  Connect people to the best land and homes across Metro Bacolod. Our goal is to make property searching simple and accessible for everyone, whether you’re buying your first home, investing in land, or exploring new opportunities in the area.
                </p>
@@ -347,10 +352,10 @@ export default function LandingPage() {
           height: 300px;
         }
         .hero-btn-outline:hover {
-          background: #000 !important;
+          background: #1d1d1f !important;
           color: #fff !important;
           transform: translateY(-2px);
-          box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+          box-shadow: 0 6px 20px rgba(0,0,0,0.15);
         }
         .hero-btn-filled:hover {
           transform: translateY(-2px);
@@ -365,7 +370,7 @@ export default function LandingPage() {
           left: 0;
           width: 0;
           height: 2px;
-          background: #000;
+          background: #1d1d1f;
           transition: width 0.3s ease;
         }
         .nav-link-item:hover::after {
