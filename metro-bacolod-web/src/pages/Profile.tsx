@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { auth, db } from "../firebase-config";
-import { doc, getDoc, collection, addDoc } from "firebase/firestore";
+import { doc, getDoc, collection, addDoc, query, where, orderBy, getDocs } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import {
   FaSearch, FaUser, FaCog, FaSignOutAlt, FaCaretDown,
@@ -12,7 +12,7 @@ import {
   FaHeart, FaRegHeart, FaMap, FaCalculator,
   FaFacebookF, FaTwitter, FaInstagram
 } from "react-icons/fa";
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import logo from "../assets/MBC Logo.png";
@@ -21,6 +21,7 @@ import Swal from "sweetalert2";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { BACOLOD_LOCATIONS } from "../constants/locations";
+import { canCreateListings, canAccessTrash } from "../constants/roles";
 
 // --- MOCK RECENT POSTS ---
 const MOCK_RECENT_POSTS = [
@@ -217,9 +218,24 @@ const RatingStars = ({ rating }: { rating: number }) => {
   return <span className="rating-stars">{stars}</span>;
 };
 
+// --- Map Click Handler for pin placement ---
+function MapClickHandler({ onPin }: { onPin: (coords: [number, number]) => void }) {
+  useMapEvents({
+    click(e) {
+      onPin([e.latlng.lat, e.latlng.lng]);
+    },
+  });
+  return null;
+}
+
 export default function Profile() {
+  const { userId: routeUserId } = useParams<{ userId?: string }>();
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
+  const [viewedUser, setViewedUser] = useState<any>(null);
+  const [viewedUserData, setViewedUserData] = useState<any>(null);
+  const [viewedPosts, setViewedPosts] = useState<any[]>([]);
+  const isViewingOther = !!routeUserId && routeUserId !== user?.uid;
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const navigate = useNavigate();
 
@@ -251,6 +267,8 @@ export default function Profile() {
   const [listingFloorArea, setListingFloorArea] = useState("");
   const [listingYearBuilt, setListingYearBuilt] = useState("");
   const [listingAmenities, setListingAmenities] = useState("");
+  const [listingPinCoords, setListingPinCoords] = useState<[number, number] | null>(null);
+  const [createMapStyle, setCreateMapStyle] = useState<'street' | 'satellite'>('street');
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
@@ -271,6 +289,64 @@ export default function Profile() {
     });
     return () => unsubscribe();
   }, [navigate]);
+
+  // Fetch viewed agent's data and posts when viewing another profile
+  useEffect(() => {
+    if (!routeUserId || routeUserId === user?.uid) {
+      setViewedUser(null);
+      setViewedUserData(null);
+      setViewedPosts([]);
+      return;
+    }
+    const fetchAgent = async () => {
+      try {
+        const userDocRef = doc(db, "users", routeUserId);
+        const userSnap = await getDoc(userDocRef);
+        if (userSnap.exists()) {
+          setViewedUserData(userSnap.data());
+          setViewedUser({ uid: routeUserId, ...userSnap.data() });
+        }
+        // Fetch their posts
+        const postsQuery = query(
+          collection(db, "posts"),
+          where("userId", "==", routeUserId),
+          orderBy("createdAt", "desc")
+        );
+        const postsSnap = await getDocs(postsQuery);
+        const agentPosts = postsSnap.docs.map(d => {
+          const p = d.data();
+          return {
+            id: d.id,
+            title: p.title || p.content?.split('\n')[0]?.substring(0, 40) || 'New Listing',
+            rooms: p.rooms || 0,
+            bathrooms: p.bathrooms || 0,
+            lotArea: p.lotArea || 'N/A',
+            floorArea: p.floorArea || 'N/A',
+            yearBuilt: p.yearBuilt || 0,
+            location: p.location || 'Bacolod',
+            price: p.price || 'Contact for price',
+            description: p.content || 'No description provided.',
+            fullDescription: p.content || 'No description provided.',
+            amenities: p.amenities || [],
+            agentName: p.userName || 'Unknown Agent',
+            agentRating: 4.0,
+            agentPhone: p.phone || 'N/A',
+            agentAvatar: p.userAvatar || 'https://ui-avatars.com/api/?name=U&rounded=true',
+            image: p.images?.[0] || p.image || '',
+            images: p.images || (p.image ? [p.image] : []),
+            status: p.status || 'For Sale',
+            type: p.type || 'Property',
+            listedDate: p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently',
+            originalPost: { ...p, id: d.id },
+          };
+        });
+        setViewedPosts(agentPosts);
+      } catch (err) {
+        console.error("Error fetching agent profile:", err);
+      }
+    };
+    fetchAgent();
+  }, [routeUserId, user?.uid]);
 
   const handleLogout = async () => {
     const result = await Swal.fire({
@@ -371,13 +447,17 @@ export default function Profile() {
     setListingYearBuilt("");
     setListingAmenities("");
     setImageFiles([]);
+    setListingPinCoords(null);
+    setCreateMapStyle('street');
   };
 
   const handleCreateListing = async () => {
+    if (!canCreateListings(userData?.role, user?.email)) return toast.error("Only agents can create listings.");
     if (!listingTitle.trim()) return toast.warning("Enter a listing title.");
     if (!listingLocation) return toast.warning("Select a location.");
     if (!listingPrice.trim()) return toast.warning("Enter a price.");
     if (imageFiles.length === 0) return toast.warning("Upload at least 1 image.");
+    if (!listingPinCoords) return toast.warning("Pin the listing location on the map.");
 
     setIsUploading(true);
     try {
@@ -421,6 +501,7 @@ export default function Profile() {
         amenities: amenitiesArray,
         images: imageUrls,
         image: imageUrls[0],
+        pinCoords: listingPinCoords,
         createdAt: new Date().toISOString(),
         likes: 0,
         likedBy: [],
@@ -439,11 +520,23 @@ export default function Profile() {
     }
   };
 
-  const displayName = userData?.firstName
+  // Use viewed agent data if viewing another profile, otherwise own data
+  const profileData = isViewingOther ? viewedUserData : userData;
+  const profileUser = isViewingOther ? viewedUser : user;
+
+  // Navbar always shows the logged-in user
+  const navDisplayName = userData?.firstName
     ? `${userData.firstName} ${userData.lastName}`
     : user?.displayName || "User";
 
+  // Profile sidebar shows the viewed agent (or self)
+  const displayName = profileData?.firstName
+    ? `${profileData.firstName} ${profileData.lastName}`
+    : profileUser?.displayName || profileUser?.userName || "User";
+
   const userRole = userData?.role || "Client";
+  const isAgent = canCreateListings(userData?.role, user?.email);
+  const profileListings = isViewingOther ? viewedPosts : MOCK_RECENT_POSTS;
 
   return (
     <div className="profile-page">
@@ -489,7 +582,7 @@ export default function Profile() {
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
           >
             <div className="dash-user-text">
-              <span className="dash-user-name">{displayName}</span>
+              <span className="dash-user-name">{navDisplayName}</span>
               <span className="dash-user-role">{userRole}</span>
             </div>
             <img
@@ -521,7 +614,7 @@ export default function Profile() {
               >
                 <FaCog /> Settings
               </div>
-              {userData?.role === "Agent" && (
+              {canAccessTrash(userData?.role, user?.email) && (
                 <div
                   className="dash-dropdown-item"
                   onClick={() => {
@@ -551,8 +644,8 @@ export default function Profile() {
           <div className="profile-avatar-wrapper">
             <img
               src={
-                user?.photoURL ||
-                "https://ui-avatars.com/api/?name=User&background=d1d5db&color=6b7280&rounded=true&size=256"
+                profileUser?.photoURL ||
+                `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=d1d5db&color=6b7280&rounded=true&size=256`
               }
               alt="Profile"
               className="profile-avatar-large"
@@ -564,13 +657,13 @@ export default function Profile() {
             </p>
             <p className="profile-info-line">
               <strong>Location/Office:</strong>{" "}
-              {userData?.address || "Bacolod"}
+              {profileData?.address || "Bacolod"}
             </p>
             <p className="profile-info-line">
-              <strong>Number:</strong> {userData?.phone || "—"}
+              <strong>Number:</strong> {profileData?.phone || "—"}
             </p>
             <p className="profile-info-line">
-              <strong>Email:</strong> {user?.email || "—"}
+              <strong>Email:</strong> {profileUser?.email || "—"}
             </p>
           </div>
           <p className="profile-bio">
@@ -584,19 +677,24 @@ export default function Profile() {
             passages, and more recently with desktop publishing software like
             Aldus PageMaker including versions of Lorem Ipsum.
           </p>
-          <button
-            className="profile-create-btn"
-            onClick={() => setShowCreateModal(true)}
-          >
-            <FaPlus size={12} /> Create Listing
-          </button>
+          {!isViewingOther && isAgent && (
+            <button
+              className="profile-create-btn"
+              onClick={() => setShowCreateModal(true)}
+            >
+              <FaPlus size={12} /> Create Listing
+            </button>
+          )}
         </aside>
 
         {/* --- RIGHT: Recent Posts --- */}
         <section className="profile-posts-section">
-          <h2 className="profile-posts-heading">Recent posts:</h2>
+          <h2 className="profile-posts-heading">{isViewingOther ? 'Listings:' : 'Recent posts:'}</h2>
           <div className="profile-posts-grid">
-            {MOCK_RECENT_POSTS.map((listing) => (
+            {profileListings.length === 0 && (
+              <p style={{ color: '#9ca3af', fontStyle: 'italic', fontSize: '0.85rem' }}>No listings yet.</p>
+            )}
+            {profileListings.map((listing) => (
               <div className="glass-listing-card profile-card" key={listing.id} onClick={() => openListingModal(listing)} style={{ cursor: 'pointer' }}>
                 {/* Card Info - Left */}
                 <div className="glass-card-content">
@@ -850,6 +948,51 @@ export default function Profile() {
                   multiple
                   onChange={handleFileSelect}
                 />
+              </div>
+
+              {/* Pin Location on Map */}
+              <div className="create-listing-section-title">Pin Location on Map *</div>
+              <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: '0 0 8px 0' }}>Click on the map to place a pin where the property is located.</p>
+              <div className="create-listing-map-wrapper">
+                <div className="create-listing-map-toggle">
+                  <button
+                    type="button"
+                    className={`create-map-style-btn ${createMapStyle === 'street' ? 'active' : ''}`}
+                    onClick={() => setCreateMapStyle('street')}
+                  >
+                    Street
+                  </button>
+                  <button
+                    type="button"
+                    className={`create-map-style-btn ${createMapStyle === 'satellite' ? 'active' : ''}`}
+                    onClick={() => setCreateMapStyle('satellite')}
+                  >
+                    Satellite
+                  </button>
+                </div>
+                <MapContainer
+                  center={listingLocation && LOCATION_COORDS[listingLocation] ? LOCATION_COORDS[listingLocation] : BACOLOD_CENTER}
+                  zoom={14}
+                  style={{ height: '260px', width: '100%', borderRadius: '14px', zIndex: 0 }}
+                  key={`create-map-${listingLocation}-${createMapStyle}`}
+                >
+                  {createMapStyle === 'street' ? (
+                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap' />
+                  ) : (
+                    <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" attribution='&copy; Esri' />
+                  )}
+                  <MapClickHandler onPin={(coords) => setListingPinCoords(coords)} />
+                  {listingPinCoords && (
+                    <Marker position={listingPinCoords}>
+                      <Popup>Listing location</Popup>
+                    </Marker>
+                  )}
+                </MapContainer>
+                {listingPinCoords && (
+                  <p style={{ fontSize: '0.72rem', color: '#10b981', marginTop: '6px', fontWeight: 500 }}>
+                    <FaMapMarkerAlt size={10} /> Pinned at {listingPinCoords[0].toFixed(5)}, {listingPinCoords[1].toFixed(5)}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -1179,6 +1322,12 @@ export default function Profile() {
         <div className="dash-mobile-nav-item" onClick={() => navigate("/messages")}>
           <FaEnvelope size={22} /><span>Messages</span>
         </div>
+
+        {canAccessTrash(userData?.role, user?.email) && (
+          <div className="dash-mobile-nav-item" onClick={() => navigate("/archive")}>
+            <FaTrash size={22} /><span>Trash</span>
+          </div>
+        )}
 
         <div className="dash-mobile-nav-item active" onClick={() => navigate("/profile")}>
           <FaUser size={22} /><span>Profile</span>

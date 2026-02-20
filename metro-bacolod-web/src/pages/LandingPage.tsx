@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { signInWithEmailAndPassword, signInWithPopup, signOut } from "firebase/auth";
-import { auth, googleProvider } from "../firebase-config";
+import { auth, googleProvider, db } from "../firebase-config";
+import { doc, getDoc } from "firebase/firestore";
 import { FcGoogle } from "react-icons/fc";
 import { FaTimes } from "react-icons/fa";
 import logo from "../assets/MBC Logo.png";
@@ -100,6 +101,14 @@ export default function LandingPage() {
         return; 
       }
 
+      // Check if account is deactivated
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      if (userDoc.exists() && userDoc.data().isDeactivated) {
+        await signOut(auth);
+        toast.error("This account has been deactivated. Contact support.");
+        return;
+      }
+
       navigate("/dashboard", { state: { welcome: true } });
     } catch (error: any) {
       if (error.code === 'auth/invalid-credential') {
@@ -112,7 +121,17 @@ export default function LandingPage() {
 
   const handleGoogleLogin = async () => {
     try {
-      await signInWithPopup(auth, googleProvider);
+      const result = await signInWithPopup(auth, googleProvider);
+      const gUser = result.user;
+
+      // Check if account is deactivated
+      const userDoc = await getDoc(doc(db, "users", gUser.uid));
+      if (userDoc.exists() && userDoc.data().isDeactivated) {
+        await signOut(auth);
+        toast.error("This account has been deactivated. Contact support.");
+        return;
+      }
+
       navigate("/dashboard", { state: { welcome: true } });
     } catch (error: any) {
       toast.error("Google login failed");

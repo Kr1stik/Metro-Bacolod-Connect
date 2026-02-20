@@ -56,6 +56,7 @@ function App() {
       <Route path="/register" element={<Register />} />
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/profile" element={<Profile />} />
+      <Route path="/profile/:userId" element={<Profile />} />
       <Route path="/archive" element={<Archive />} />
       <Route path="/settings" element={<Settings />} />
       <Route path="/properties" element={<Properties />} />

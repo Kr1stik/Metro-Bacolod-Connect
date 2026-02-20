@@ -13,7 +13,7 @@ import {
   FaMap, FaCalculator,
   FaFacebookF, FaTwitter, FaInstagram
 } from "react-icons/fa";
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import logo from "../assets/MBC Logo.png";
@@ -22,6 +22,7 @@ import Swal from 'sweetalert2';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { BACOLOD_LOCATIONS } from "../constants/locations";
+import { canCreateListings, canAccessTrash, canManagePost } from "../constants/roles";
 
 // --- Rating Stars Component ---
 const RatingStars = ({ rating }: { rating: number }) => {
@@ -35,6 +36,16 @@ const RatingStars = ({ rating }: { rating: number }) => {
   }
   return <span className="rating-stars">{stars}</span>;
 };
+
+// --- Map Click Handler for pin placement ---
+function MapClickHandler({ onPin }: { onPin: (coords: [number, number]) => void }) {
+  useMapEvents({
+    click(e) {
+      onPin([e.latlng.lat, e.latlng.lng]);
+    },
+  });
+  return null;
+}
 
 // --- Fix Leaflet default marker icons ---
 // @ts-ignore
@@ -149,6 +160,8 @@ export default function Dashboard() {
   const [filterStatus, setFilterStatus] = useState("");
   const [filterType, setFilterType] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [listingPinCoords, setListingPinCoords] = useState<[number, number] | null>(null);
+  const [createMapStyle, setCreateMapStyle] = useState<'street' | 'satellite'>('street');
 
   // Detail modal state
   const [selectedListing, setSelectedListing] = useState<any>(null);
@@ -289,13 +302,17 @@ export default function Dashboard() {
     setListingYearBuilt("");
     setListingAmenities("");
     setImageFiles([]);
+    setListingPinCoords(null);
+    setCreateMapStyle('street');
   };
 
   const handleCreateListing = async () => {
+    if (!canCreateListings(userData?.role, user?.email)) return toast.error("Only agents can create listings.");
     if (!listingTitle.trim()) return toast.warning("Enter a listing title.");
     if (!listingLocation) return toast.warning("Select a location.");
     if (!listingPrice.trim()) return toast.warning("Enter a price.");
     if (imageFiles.length === 0) return toast.warning("Upload at least 1 image.");
+    if (!listingPinCoords) return toast.warning("Pin the listing location on the map.");
 
     setIsUploading(true);
     try {
@@ -339,6 +356,7 @@ export default function Dashboard() {
         amenities: amenitiesArray,
         images: imageUrls,
         image: imageUrls[0],
+        pinCoords: listingPinCoords,
         createdAt: new Date().toISOString(),
         likes: 0,
         likedBy: [],
@@ -383,6 +401,14 @@ export default function Dashboard() {
     if (editImages.length === 0 && newEditFiles.length === 0) return toast.warning("Post must have at least one image.");
     setIsUploading(true);
     try {
+      // Verify ownership before saving edit
+      const postRef = doc(db, "posts", editingPostId);
+      const postSnap = await getDoc(postRef);
+      if (!postSnap.exists() || !canManagePost(user?.uid, postSnap.data()?.userId, user?.email, userData?.role)) {
+        toast.error("You don't have permission to edit this post.");
+        setIsUploading(false);
+        return;
+      }
       const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || "dg6kzqq5n";
       const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || "jdj7tsar";
       const newUrls: string[] = [];
@@ -396,7 +422,6 @@ export default function Dashboard() {
         if (data.secure_url) newUrls.push(data.secure_url);
       }
       const finalImages = [...editImages, ...newUrls];
-      const postRef = doc(db, "posts", editingPostId);
       await updateDoc(postRef, { content: editCaption, images: finalImages, image: finalImages[0] });
       toast.success("Listing updated!");
       setEditingPostId(null);
@@ -423,6 +448,12 @@ export default function Dashboard() {
     if (result.isConfirmed) {
       try {
         const postRef = doc(db, "posts", postId);
+        // Verify ownership before deleting
+        const postSnap = await getDoc(postRef);
+        if (!postSnap.exists() || !canManagePost(user?.uid, postSnap.data()?.userId, user?.email, userData?.role)) {
+          toast.error("You don't have permission to delete this post.");
+          return;
+        }
         await updateDoc(postRef, { deletedAt: new Date().toISOString(), isArchived: true });
         setPosts(posts.filter(p => p.id !== postId));
         toast.success("Listing moved to Trash");
@@ -609,7 +640,7 @@ export default function Dashboard() {
             <div className="dash-dropdown">
               <div className="dash-dropdown-item" onClick={() => { navigate('/profile'); setIsDropdownOpen(false); }}><FaUser /> Profile</div>
               <div className="dash-dropdown-item" onClick={() => { navigate('/settings'); setIsDropdownOpen(false); }}><FaCog /> Settings</div>
-              {userData?.role === 'Agent' && (
+              {canAccessTrash(userData?.role, user?.email) && (
                 <div className="dash-dropdown-item" onClick={() => { navigate('/archive'); setIsDropdownOpen(false); }}><FaTrash /> Trash</div>
               )}
               <div className="dash-dropdown-divider" />
@@ -691,7 +722,16 @@ export default function Dashboard() {
                     <div className="glass-card-agent">
                       <img src={listing.agentAvatar} alt={listing.agentName} />
                       <div className="agent-meta">
-                        <span className="agent-name">{listing.agentName}</span>
+                        <span
+                          className="agent-name agent-name-link"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const agentId = listing.originalPost?.userId;
+                            if (agentId) navigate(`/profile/${agentId}`);
+                          }}
+                        >
+                          {listing.agentName}
+                        </span>
                         <span className="agent-rating-row">
                           <RatingStars rating={listing.agentRating} />
                           <span className="agent-rating-text">{listing.agentRating} Stars</span>
@@ -712,7 +752,7 @@ export default function Dashboard() {
                 </div>
 
                 {/* Owner Actions (only for posts owned by user) */}
-                {user?.uid === listing.originalPost?.userId && (
+                {canManagePost(user?.uid, listing.originalPost?.userId, user?.email, userData?.role) && (
                   <div className="glass-card-actions">
                     <button onClick={(e) => { e.stopPropagation(); toggleDropdown(listing.id); }} className="glass-dots-btn">&#8942;</button>
                     {activeDropdown === listing.id && (
@@ -731,7 +771,7 @@ export default function Dashboard() {
       </div>
 
       {/* ========== AGENT FAB ========== */}
-      {userData?.role === 'Agent' && (
+      {canCreateListings(userData?.role, user?.email) && (
         <button className="agent-fab" onClick={() => setShowCreateModal(true)} title="Create Listing">
           <FaPlus size={20} />
         </button>
@@ -928,6 +968,51 @@ export default function Dashboard() {
                   multiple
                   onChange={handleFileSelect}
                 />
+              </div>
+
+              {/* Pin Location on Map */}
+              <div className="create-listing-section-title">Pin Location on Map *</div>
+              <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: '0 0 8px 0' }}>Click on the map to place a pin where the property is located.</p>
+              <div className="create-listing-map-wrapper">
+                <div className="create-listing-map-toggle">
+                  <button
+                    type="button"
+                    className={`create-map-style-btn ${createMapStyle === 'street' ? 'active' : ''}`}
+                    onClick={() => setCreateMapStyle('street')}
+                  >
+                    Street
+                  </button>
+                  <button
+                    type="button"
+                    className={`create-map-style-btn ${createMapStyle === 'satellite' ? 'active' : ''}`}
+                    onClick={() => setCreateMapStyle('satellite')}
+                  >
+                    Satellite
+                  </button>
+                </div>
+                <MapContainer
+                  center={listingLocation && LOCATION_COORDS[listingLocation] ? LOCATION_COORDS[listingLocation] : BACOLOD_CENTER}
+                  zoom={14}
+                  style={{ height: '260px', width: '100%', borderRadius: '14px', zIndex: 0 }}
+                  key={`create-map-${listingLocation}-${createMapStyle}`}
+                >
+                  {createMapStyle === 'street' ? (
+                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap' />
+                  ) : (
+                    <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" attribution='&copy; Esri' />
+                  )}
+                  <MapClickHandler onPin={(coords) => setListingPinCoords(coords)} />
+                  {listingPinCoords && (
+                    <Marker position={listingPinCoords}>
+                      <Popup>Listing location</Popup>
+                    </Marker>
+                  )}
+                </MapContainer>
+                {listingPinCoords && (
+                  <p style={{ fontSize: '0.72rem', color: '#10b981', marginTop: '6px', fontWeight: 500 }}>
+                    <FaMapMarkerAlt size={10} /> Pinned at {listingPinCoords[0].toFixed(5)}, {listingPinCoords[1].toFixed(5)}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -1391,7 +1476,7 @@ export default function Dashboard() {
           <span>Messages</span>
         </div>
 
-        {userData?.role === 'Agent' && (
+        {canAccessTrash(userData?.role, user?.email) && (
           <div onClick={() => navigate('/archive')} className="dash-mobile-nav-item">
             <FaTrash size={22} /><span>Trash</span>
           </div>
