@@ -228,7 +228,6 @@ export default function Profile() {
         const postsQuery = query(
           collection(db, "posts"),
           where("userId", "==", routeUserId),
-          orderBy("createdAt", "desc")
         );
         const postsSnap = await getDocs(postsQuery);
         setViewedPosts(postsSnap.docs.map(formatPostData));
