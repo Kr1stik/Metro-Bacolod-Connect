@@ -523,6 +523,27 @@ ul { list-style: none; }
   font-style: italic;
 }
 
+.agent-name-link {
+  cursor: pointer;
+  position: relative;
+  display: inline-block;
+}
+
+.agent-name-link::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 0;
+  height: 1.5px;
+  background: #1d1d1f;
+  transition: width 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.agent-name-link:hover::after {
+  width: 100%;
+}
+
 .agent-rating-row {
   display: flex;
   align-items: center;
@@ -619,8 +640,8 @@ ul { list-style: none; }
 
 /* Card Right Column (Image + Inquire) */
 .glass-card-right {
-  width: 260px;
-  min-width: 260px;
+  flex: 0 0 60%;
+  max-width: 60%;
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -1048,8 +1069,8 @@ ul { list-style: none; }
   }
 
   .glass-card-right {
-    width: 100%;
-    min-width: unset;
+    flex: 0 0 100%;
+    max-width: 100%;
     padding: 0 20px 20px 20px;
   }
 
@@ -1269,8 +1290,8 @@ ul { list-style: none; }
 }
 
 .profile-card .glass-card-right {
-  width: 220px;
-  min-width: 220px;
+  flex: 0 0 60%;
+  max-width: 60%;
   padding: 16px;
   gap: 12px;
 }
@@ -1339,8 +1360,8 @@ ul { list-style: none; }
   }
 
   .profile-card .glass-card-right {
-    width: 100%;
-    min-width: unset;
+    flex: 0 0 100%;
+    max-width: 100%;
     padding: 0 16px 16px 16px;
   }
   
@@ -3354,6 +3375,42 @@ ul { list-style: none; }
   border-color: #111827;
   color: #111827;
   background: #f9fafb;
+}
+
+/* --- Create Listing Map Pin --- */
+.create-listing-map-wrapper {
+  margin-top: 4px;
+  margin-bottom: 8px;
+  position: relative;
+}
+
+.create-listing-map-toggle {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.create-map-style-btn {
+  padding: 5px 14px !important;
+  font-size: 0.72rem !important;
+  font-weight: 600 !important;
+  border-radius: 8px !important;
+  border: 1.5px solid #e5e7eb !important;
+  background: white !important;
+  color: #6b7280 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+.create-map-style-btn.active {
+  background: #111827 !important;
+  color: white !important;
+  border-color: #111827 !important;
+}
+
+.create-map-style-btn:hover:not(.active) {
+  background: #f3f4f6 !important;
+  border-color: #d1d5db !important;
 }
 
 /* --- Footer --- */

@@ -17,6 +17,7 @@ import Swal from "sweetalert2";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { BACOLOD_LOCATIONS } from "../constants/locations";
+import { canAccessTrash } from "../constants/roles";
 
 type SettingsTab = "general" | "appearance" | "account";
 
@@ -637,7 +638,7 @@ export default function Settings() {
             <div className="dash-dropdown">
               <div className="dash-dropdown-item" onClick={() => { navigate("/profile"); setIsDropdownOpen(false); }}><FaUser /> Profile</div>
               <div className="dash-dropdown-item" onClick={() => { navigate("/settings"); setIsDropdownOpen(false); }}><FaCog /> Settings</div>
-              {userData?.role === "Agent" && (
+              {canAccessTrash(userData?.role, user?.email) && (
                 <div className="dash-dropdown-item" onClick={() => { navigate("/archive"); setIsDropdownOpen(false); }}><FaTrash /> Trash</div>
               )}
               <div className="dash-dropdown-divider" />
@@ -702,6 +703,11 @@ export default function Settings() {
         <div className="dash-mobile-nav-item" onClick={() => navigate("/profile")}>
           <FaUser size={22} /><span>Profile</span>
         </div>
+        {canAccessTrash(userData?.role, user?.email) && (
+          <div className="dash-mobile-nav-item" onClick={() => navigate("/archive")}>
+            <FaTrash size={22} /><span>Trash</span>
+          </div>
+        )}
         <div className="dash-mobile-nav-item active">
           <FaCog size={22} /><span>Settings</span>
         </div>
