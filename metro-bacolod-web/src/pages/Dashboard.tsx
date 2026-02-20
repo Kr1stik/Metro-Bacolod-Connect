@@ -9,8 +9,12 @@ import {
   FaPen, FaTimes, FaMapMarkerAlt, FaPlus, FaStar,
   FaStarHalfAlt, FaRegStar, FaShare, FaChevronDown,
   FaChevronLeft, FaChevronRight, FaBed, FaBath, FaRulerCombined,
-  FaCalendarAlt, FaPhoneAlt, FaHeart, FaRegHeart
+  FaCalendarAlt, FaPhoneAlt, FaHeart, FaRegHeart,
+  FaMap, FaCalculator
 } from "react-icons/fa";
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
 import logo from "../assets/MBC Logo.png";
 import "../App.css";
 import Swal from 'sweetalert2';
@@ -30,6 +34,77 @@ const RatingStars = ({ rating }: { rating: number }) => {
   }
   return <span className="rating-stars">{stars}</span>;
 };
+
+// --- Fix Leaflet default marker icons ---
+// @ts-ignore
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+});
+
+// --- Bacolod location coordinates ---
+const LOCATION_COORDS: Record<string, [number, number]> = {
+  "Alijis": [10.6560, 122.9280],
+  "Banago": [10.7050, 122.9520],
+  "Bata": [10.6870, 122.9580],
+  "Cabug": [10.7200, 122.9400],
+  "Estefania": [10.6790, 122.9530],
+  "Felisa": [10.7010, 122.9500],
+  "Granada": [10.6720, 122.9350],
+  "Handumanan": [10.6480, 122.9530],
+  "Mandalagan": [10.6920, 122.9430],
+  "Mansilingan": [10.6590, 122.9680],
+  "Montevista": [10.6650, 122.9420],
+  "Pahanocoy": [10.6700, 122.9600],
+  "Punta Taytay": [10.7100, 122.9630],
+  "Singcang-Airport": [10.6480, 122.9320],
+  "Sum-ag": [10.6370, 122.9400],
+  "Taculing": [10.6530, 122.9500],
+  "Tangub": [10.7150, 122.9420],
+  "Villamonte": [10.6750, 122.9500],
+  "Vista Alegre": [10.6690, 122.9480],
+};
+
+// Bacolod City center
+const BACOLOD_CENTER: [number, number] = [10.6840, 122.9510];
+
+// --- Mortgage Calculator ---
+function calculateMortgage(propertyPrice: number, downPaymentPercent: number, annualRate: number, termYears: number) {
+  const downPayment = propertyPrice * (downPaymentPercent / 100);
+  const principal = propertyPrice - downPayment;
+  const monthlyRate = annualRate / 100 / 12;
+  const totalPayments = termYears * 12;
+
+  if (monthlyRate === 0) {
+    return {
+      monthlyPayment: principal / totalPayments,
+      totalPayment: principal,
+      totalInterest: 0,
+      principal,
+      downPayment,
+    };
+  }
+
+  const monthlyPayment = principal * (monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / (Math.pow(1 + monthlyRate, totalPayments) - 1);
+  const totalPayment = monthlyPayment * totalPayments;
+  const totalInterest = totalPayment - principal;
+
+  return { monthlyPayment, totalPayment, totalInterest, principal, downPayment };
+}
+
+// --- Parse price string to number ---
+function parsePriceToNumber(priceStr: string): number {
+  if (!priceStr) return 0;
+  const cleaned = priceStr.toLowerCase().replace(/[^0-9.]/g, ' ').trim();
+  const parts = cleaned.split(/\s+/);
+  const num = parseFloat(parts[0]);
+  if (isNaN(num)) return 0;
+  if (priceStr.toLowerCase().includes('million')) return num * 1_000_000;
+  if (priceStr.toLowerCase().includes('billion')) return num * 1_000_000_000;
+  return num;
+}
 
 export default function Dashboard() {
   const [user, setUser] = useState<any>(null);
@@ -78,6 +153,13 @@ export default function Dashboard() {
   const [selectedListing, setSelectedListing] = useState<any>(null);
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
+  const [activeModalTab, setActiveModalTab] = useState<'details' | 'map' | 'calculator'>('details');
+
+  // Mortgage calculator state
+  const [mortgageDownPayment, setMortgageDownPayment] = useState(20);
+  const [mortgageRate, setMortgageRate] = useState(6.5);
+  const [mortgageTerm, setMortgageTerm] = useState(20);
+  const [mapStyle, setMapStyle] = useState<'street' | 'satellite'>('street');
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -426,6 +508,12 @@ export default function Dashboard() {
     setSelectedListing(listing);
     setCarouselIndex(0);
     setIsLiked(false);
+    setActiveModalTab('details');
+    // Reset mortgage to defaults based on listing price
+    setMortgageDownPayment(20);
+    setMortgageRate(6.5);
+    setMortgageTerm(20);
+    setMapStyle('street');
   };
 
   const closeListingModal = () => {
@@ -896,13 +984,21 @@ export default function Dashboard() {
       {/* ========== LISTING DETAIL MODAL ========== */}
       {selectedListing && (() => {
         const imgs = selectedListing.images?.length > 0 ? selectedListing.images : [selectedListing.image];
+        const listingCoords = LOCATION_COORDS[selectedListing.location] || BACOLOD_CENTER;
+        const propertyPrice = parsePriceToNumber(selectedListing.price);
+        const mortgage = propertyPrice > 0 ? calculateMortgage(propertyPrice, mortgageDownPayment, mortgageRate, mortgageTerm) : null;
         return (
           <div className="listing-modal-overlay" onClick={closeListingModal}>
             <div className="listing-modal" onClick={(e) => e.stopPropagation()}>
-              {/* Close Button */}
-              <button className="listing-modal-close" onClick={closeListingModal}>
-                <FaTimes />
-              </button>
+              {/* Top-Right Button Group: Like + Close */}
+              <div className="listing-modal-top-actions">
+                <button className="listing-modal-like" onClick={() => setIsLiked(!isLiked)}>
+                  {isLiked ? <FaHeart color="#ef4444" /> : <FaRegHeart />}
+                </button>
+                <button className="listing-modal-close" onClick={closeListingModal}>
+                  <FaTimes />
+                </button>
+              </div>
 
               {/* Image Carousel */}
               <div className="listing-modal-carousel">
@@ -932,125 +1028,306 @@ export default function Dashboard() {
                 )}
                 {/* Status Badge */}
                 <span className="listing-modal-status">{selectedListing.status}</span>
-                {/* Like Button */}
-                <button className="listing-modal-like" onClick={() => setIsLiked(!isLiked)}>
-                  {isLiked ? <FaHeart color="#ef4444" /> : <FaRegHeart />}
-                </button>
                 {/* Image Counter */}
                 <span className="listing-modal-counter">{carouselIndex + 1} / {imgs.length}</span>
               </div>
 
+              {/* Tab Navigation */}
+              <div className="listing-modal-tabs">
+                <button
+                  className={`listing-modal-tab ${activeModalTab === 'details' ? 'listing-modal-tab-active' : ''}`}
+                  onClick={() => setActiveModalTab('details')}
+                >
+                  <FaHome size={13} /> Details
+                </button>
+                <button
+                  className={`listing-modal-tab ${activeModalTab === 'map' ? 'listing-modal-tab-active' : ''}`}
+                  onClick={() => setActiveModalTab('map')}
+                >
+                  <FaMap size={13} /> Map
+                </button>
+                {propertyPrice > 0 && (
+                  <button
+                    className={`listing-modal-tab ${activeModalTab === 'calculator' ? 'listing-modal-tab-active' : ''}`}
+                    onClick={() => setActiveModalTab('calculator')}
+                  >
+                    <FaCalculator size={13} /> Calculator
+                  </button>
+                )}
+              </div>
+
               {/* Modal Body */}
               <div className="listing-modal-body">
-                <div className="listing-modal-body-left">
-                  {/* Title & Price */}
-                  <div className="listing-modal-title-row">
-                    <div>
-                      <h2 className="listing-modal-title">{selectedListing.title}</h2>
-                      <p className="listing-modal-location">
-                        <FaMapMarkerAlt size={12} /> {selectedListing.location}, Bacolod City
+                {activeModalTab === 'details' && (
+                  <>
+                    <div className="listing-modal-body-left">
+                      {/* Title & Price */}
+                      <div className="listing-modal-title-row">
+                        <div>
+                          <h2 className="listing-modal-title">{selectedListing.title}</h2>
+                          <p className="listing-modal-location">
+                            <FaMapMarkerAlt size={12} /> {selectedListing.location}, Bacolod City
+                          </p>
+                        </div>
+                        <div className="listing-modal-price">{selectedListing.price}</div>
+                      </div>
+
+                      {/* Property Details Grid */}
+                      <div className="listing-modal-details">
+                        {selectedListing.rooms > 0 && (
+                          <div className="listing-detail-item">
+                            <FaBed className="listing-detail-icon" />
+                            <div>
+                              <span className="listing-detail-value">{selectedListing.rooms}</span>
+                              <span className="listing-detail-label">Bedrooms</span>
+                            </div>
+                          </div>
+                        )}
+                        {selectedListing.bathrooms > 0 && (
+                          <div className="listing-detail-item">
+                            <FaBath className="listing-detail-icon" />
+                            <div>
+                              <span className="listing-detail-value">{selectedListing.bathrooms}</span>
+                              <span className="listing-detail-label">Bathrooms</span>
+                            </div>
+                          </div>
+                        )}
+                        <div className="listing-detail-item">
+                          <FaRulerCombined className="listing-detail-icon" />
+                          <div>
+                            <span className="listing-detail-value">{selectedListing.lotArea}</span>
+                            <span className="listing-detail-label">Lot Area</span>
+                          </div>
+                        </div>
+                        {selectedListing.floorArea !== 'N/A' && (
+                          <div className="listing-detail-item">
+                            <FaRulerCombined className="listing-detail-icon" />
+                            <div>
+                              <span className="listing-detail-value">{selectedListing.floorArea}</span>
+                              <span className="listing-detail-label">Floor Area</span>
+                            </div>
+                          </div>
+                        )}
+                        {selectedListing.yearBuilt > 0 && (
+                          <div className="listing-detail-item">
+                            <FaCalendarAlt className="listing-detail-icon" />
+                            <div>
+                              <span className="listing-detail-value">{selectedListing.yearBuilt}</span>
+                              <span className="listing-detail-label">Year Built</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Description */}
+                      <div className="listing-modal-section">
+                        <h4 className="listing-modal-section-title">Description</h4>
+                        <p className="listing-modal-desc">{selectedListing.fullDescription || selectedListing.description}</p>
+                      </div>
+
+                      {/* Amenities */}
+                      {selectedListing.amenities?.length > 0 && (
+                        <div className="listing-modal-section">
+                          <h4 className="listing-modal-section-title">Amenities & Features</h4>
+                          <div className="listing-modal-amenities">
+                            {selectedListing.amenities.map((a: string, i: number) => (
+                              <span key={i} className="listing-amenity-tag">{a}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Listing Info */}
+                      <div className="listing-modal-meta">
+                        <span>Type: <strong>{selectedListing.type}</strong></span>
+                        <span>Listed: <strong>{selectedListing.listedDate || 'Recently'}</strong></span>
+                      </div>
+                    </div>
+
+                    {/* Agent Sidebar */}
+                    <div className="listing-modal-agent-card">
+                      <img
+                        src={selectedListing.agentAvatar}
+                        alt={selectedListing.agentName}
+                        className="listing-modal-agent-avatar"
+                      />
+                      <h4 className="listing-modal-agent-name">{selectedListing.agentName}</h4>
+                      <span className="listing-modal-agent-role">Listing Agent</span>
+                      <div className="listing-modal-agent-rating">
+                        <RatingStars rating={selectedListing.agentRating} />
+                        <span>{selectedListing.agentRating} Stars</span>
+                      </div>
+                      {selectedListing.agentPhone && selectedListing.agentPhone !== 'N/A' && (
+                        <p className="listing-modal-agent-phone">
+                          <FaPhoneAlt size={11} /> {selectedListing.agentPhone}
+                        </p>
+                      )}
+                      <button className="listing-modal-inquire-btn" onClick={() => handleInquire(selectedListing)}>
+                        INQUIRE NOW →
+                      </button>
+                      <button className="listing-modal-share-btn" onClick={() => handleShare(selectedListing)}>
+                        <FaShare size={12} /> Share Listing
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                {activeModalTab === 'map' && (
+                  <div className="listing-modal-map-container">
+                    <div className="listing-modal-map-header">
+                      <div>
+                        <h3 className="listing-modal-map-title">
+                          <FaMapMarkerAlt size={14} /> {selectedListing.location}, Bacolod City
+                        </h3>
+                        <p className="listing-modal-map-subtitle">Approximate property location</p>
+                      </div>
+                      <div className="listing-modal-map-toggle">
+                        <button
+                          className={`map-style-btn ${mapStyle === 'street' ? 'map-style-btn-active' : ''}`}
+                          onClick={() => setMapStyle('street')}
+                        >
+                          Map
+                        </button>
+                        <button
+                          className={`map-style-btn ${mapStyle === 'satellite' ? 'map-style-btn-active' : ''}`}
+                          onClick={() => setMapStyle('satellite')}
+                        >
+                          Satellite
+                        </button>
+                      </div>
+                    </div>
+                    <div className="listing-modal-map-wrapper">
+                      <MapContainer
+                        center={listingCoords}
+                        zoom={15}
+                        style={{ width: '100%', height: '100%', borderRadius: '16px' }}
+                        scrollWheelZoom={true}
+                        key={`${selectedListing.id}-${mapStyle}`}
+                      >
+                        {mapStyle === 'street' ? (
+                          <TileLayer
+                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                          />
+                        ) : (
+                          <TileLayer
+                            attribution='&copy; <a href="https://www.esri.com/">Esri</a>'
+                            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                          />
+                        )}
+                        <Marker position={listingCoords}>
+                          <Popup>
+                            <strong>{selectedListing.title}</strong><br />
+                            {selectedListing.location}, Bacolod City<br />
+                            {selectedListing.price}
+                          </Popup>
+                        </Marker>
+                      </MapContainer>
+                    </div>
+                  </div>
+                )}
+
+                {activeModalTab === 'calculator' && mortgage && (
+                  <div className="listing-modal-calculator-container">
+                    <div className="listing-modal-calc-header">
+                      <h3 className="listing-modal-calc-title">
+                        <FaCalculator size={14} /> Mortgage Calculator
+                      </h3>
+                      <p className="listing-modal-calc-subtitle">
+                        Estimate your monthly payments for <strong>{selectedListing.title}</strong>
                       </p>
                     </div>
-                    <div className="listing-modal-price">{selectedListing.price}</div>
-                  </div>
 
-                  {/* Property Details Grid */}
-                  <div className="listing-modal-details">
-                    {selectedListing.rooms > 0 && (
-                      <div className="listing-detail-item">
-                        <FaBed className="listing-detail-icon" />
-                        <div>
-                          <span className="listing-detail-value">{selectedListing.rooms}</span>
-                          <span className="listing-detail-label">Bedrooms</span>
+                    <div className="listing-modal-calc-body">
+                      {/* Left: Inputs */}
+                      <div className="listing-modal-calc-inputs">
+                        <div className="calc-input-group">
+                          <label className="calc-label">Property Price</label>
+                          <div className="calc-value-display">₱{propertyPrice.toLocaleString()}</div>
+                        </div>
+
+                        <div className="calc-input-group">
+                          <label className="calc-label">Down Payment: <strong>{mortgageDownPayment}%</strong></label>
+                          <input
+                            type="range"
+                            min="5"
+                            max="50"
+                            step="5"
+                            value={mortgageDownPayment}
+                            onChange={(e) => setMortgageDownPayment(Number(e.target.value))}
+                            className="calc-slider"
+                          />
+                          <div className="calc-range-labels">
+                            <span>5%</span>
+                            <span>₱{mortgage.downPayment.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                            <span>50%</span>
+                          </div>
+                        </div>
+
+                        <div className="calc-input-group">
+                          <label className="calc-label">Annual Interest Rate: <strong>{mortgageRate}%</strong></label>
+                          <input
+                            type="range"
+                            min="1"
+                            max="15"
+                            step="0.5"
+                            value={mortgageRate}
+                            onChange={(e) => setMortgageRate(Number(e.target.value))}
+                            className="calc-slider"
+                          />
+                          <div className="calc-range-labels">
+                            <span>1%</span>
+                            <span></span>
+                            <span>15%</span>
+                          </div>
+                        </div>
+
+                        <div className="calc-input-group">
+                          <label className="calc-label">Loan Term: <strong>{mortgageTerm} years</strong></label>
+                          <input
+                            type="range"
+                            min="5"
+                            max="30"
+                            step="5"
+                            value={mortgageTerm}
+                            onChange={(e) => setMortgageTerm(Number(e.target.value))}
+                            className="calc-slider"
+                          />
+                          <div className="calc-range-labels">
+                            <span>5 yrs</span>
+                            <span></span>
+                            <span>30 yrs</span>
+                          </div>
                         </div>
                       </div>
-                    )}
-                    {selectedListing.bathrooms > 0 && (
-                      <div className="listing-detail-item">
-                        <FaBath className="listing-detail-icon" />
-                        <div>
-                          <span className="listing-detail-value">{selectedListing.bathrooms}</span>
-                          <span className="listing-detail-label">Bathrooms</span>
+
+                      {/* Right: Results */}
+                      <div className="listing-modal-calc-results">
+                        <div className="calc-result-card calc-result-primary">
+                          <span className="calc-result-label">Monthly Payment</span>
+                          <span className="calc-result-value">₱{mortgage.monthlyPayment.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                         </div>
-                      </div>
-                    )}
-                    <div className="listing-detail-item">
-                      <FaRulerCombined className="listing-detail-icon" />
-                      <div>
-                        <span className="listing-detail-value">{selectedListing.lotArea}</span>
-                        <span className="listing-detail-label">Lot Area</span>
+                        <div className="calc-result-card">
+                          <span className="calc-result-label">Loan Amount</span>
+                          <span className="calc-result-value-sm">₱{mortgage.principal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                        </div>
+                        <div className="calc-result-card">
+                          <span className="calc-result-label">Down Payment</span>
+                          <span className="calc-result-value-sm">₱{mortgage.downPayment.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                        </div>
+                        <div className="calc-result-card">
+                          <span className="calc-result-label">Total Interest</span>
+                          <span className="calc-result-value-sm">₱{mortgage.totalInterest.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                        </div>
+                        <div className="calc-result-card">
+                          <span className="calc-result-label">Total Payment</span>
+                          <span className="calc-result-value-sm">₱{mortgage.totalPayment.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                        </div>
+                        <p className="calc-disclaimer">* Estimates only. Actual rates and payments may vary based on lender terms and conditions.</p>
                       </div>
                     </div>
-                    {selectedListing.floorArea !== 'N/A' && (
-                      <div className="listing-detail-item">
-                        <FaRulerCombined className="listing-detail-icon" />
-                        <div>
-                          <span className="listing-detail-value">{selectedListing.floorArea}</span>
-                          <span className="listing-detail-label">Floor Area</span>
-                        </div>
-                      </div>
-                    )}
-                    {selectedListing.yearBuilt > 0 && (
-                      <div className="listing-detail-item">
-                        <FaCalendarAlt className="listing-detail-icon" />
-                        <div>
-                          <span className="listing-detail-value">{selectedListing.yearBuilt}</span>
-                          <span className="listing-detail-label">Year Built</span>
-                        </div>
-                      </div>
-                    )}
                   </div>
-
-                  {/* Description */}
-                  <div className="listing-modal-section">
-                    <h4 className="listing-modal-section-title">Description</h4>
-                    <p className="listing-modal-desc">{selectedListing.fullDescription || selectedListing.description}</p>
-                  </div>
-
-                  {/* Amenities */}
-                  {selectedListing.amenities?.length > 0 && (
-                    <div className="listing-modal-section">
-                      <h4 className="listing-modal-section-title">Amenities & Features</h4>
-                      <div className="listing-modal-amenities">
-                        {selectedListing.amenities.map((a: string, i: number) => (
-                          <span key={i} className="listing-amenity-tag">{a}</span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Listing Info */}
-                  <div className="listing-modal-meta">
-                    <span>Type: <strong>{selectedListing.type}</strong></span>
-                    <span>Listed: <strong>{selectedListing.listedDate || 'Recently'}</strong></span>
-                  </div>
-                </div>
-
-                {/* Agent Sidebar */}
-                <div className="listing-modal-agent-card">
-                  <img
-                    src={selectedListing.agentAvatar}
-                    alt={selectedListing.agentName}
-                    className="listing-modal-agent-avatar"
-                  />
-                  <h4 className="listing-modal-agent-name">{selectedListing.agentName}</h4>
-                  <span className="listing-modal-agent-role">Listing Agent</span>
-                  <div className="listing-modal-agent-rating">
-                    <RatingStars rating={selectedListing.agentRating} />
-                    <span>{selectedListing.agentRating} Stars</span>
-                  </div>
-                  {selectedListing.agentPhone && selectedListing.agentPhone !== 'N/A' && (
-                    <p className="listing-modal-agent-phone">
-                      <FaPhoneAlt size={11} /> {selectedListing.agentPhone}
-                    </p>
-                  )}
-                  <button className="listing-modal-inquire-btn" onClick={() => handleInquire(selectedListing)}>
-                    INQUIRE NOW →
-                  </button>
-                  <button className="listing-modal-share-btn" onClick={() => handleShare(selectedListing)}>
-                    <FaShare size={12} /> Share Listing
-                  </button>
-                </div>
+                )}
               </div>
             </div>
           </div>
