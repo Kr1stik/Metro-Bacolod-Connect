@@ -6,8 +6,15 @@ import { signOut } from "firebase/auth";
 import {
   FaSearch, FaUser, FaCog, FaSignOutAlt, FaCaretDown,
   FaTrash, FaStar, FaStarHalfAlt, FaRegStar, FaHome,
-  FaEnvelope, FaTimes, FaImage, FaSpinner, FaPlus
+  FaEnvelope, FaTimes, FaImage, FaSpinner, FaPlus,
+  FaMapMarkerAlt, FaShare, FaChevronLeft, FaChevronRight,
+  FaBed, FaBath, FaRulerCombined, FaCalendarAlt, FaPhoneAlt,
+  FaHeart, FaRegHeart, FaMap, FaCalculator,
+  FaFacebookF, FaTwitter, FaInstagram
 } from "react-icons/fa";
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
 import logo from "../assets/MBC Logo.png";
 import "../App.css";
 import Swal from "sweetalert2";
@@ -21,63 +28,181 @@ const MOCK_RECENT_POSTS = [
     id: "rp-1",
     title: "The Lazy Den 2",
     rooms: 2,
-    location: "Quezon Locsin",
-    price: "6.8 million php",
+    bathrooms: 1,
+    lotArea: '120 sqm',
+    floorArea: '85 sqm',
+    yearBuilt: 2021,
+    location: "Villamonte",
+    price: "0.5 million php",
     description:
       "Discover available lots in prime locations. Browse land options with complete details to help you choose the perfect place to build or invest.",
+    fullDescription: 'Discover available lots in prime locations. Browse land options with complete details to help you choose the perfect place to build or invest. This cozy 2-bedroom home features an open-plan kitchen, tiled flooring throughout, and a small garden area perfect for morning coffee.',
+    amenities: ['Carport', 'Garden', 'Tiled Flooring', 'Fenced', 'Near Schools'],
     agentName: "Wynands Burger",
     agentRating: 3.8,
+    agentPhone: '+63 912 345 6789',
     agentAvatar:
       "https://ui-avatars.com/api/?name=WB&background=6366f1&color=fff&rounded=true&size=40",
     image:
       "https://images.pexels.com/photos/3013440/pexels-photo-3013440.jpeg?auto=compress&cs=tinysrgb&w=600",
+    images: [
+      'https://images.pexels.com/photos/3013440/pexels-photo-3013440.jpeg?auto=compress&cs=tinysrgb&w=800',
+      'https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=800',
+      'https://images.pexels.com/photos/1643384/pexels-photo-1643384.jpeg?auto=compress&cs=tinysrgb&w=800',
+    ],
+    status: 'For Sale',
+    type: 'House & Lot',
+    listedDate: 'Jan 15, 2026',
   },
   {
     id: "rp-2",
-    title: "The Lazy Den 2",
-    rooms: 2,
-    location: "Quezon Locsin",
-    price: "6.8 million php",
+    title: "Greenfield Residences",
+    rooms: 3,
+    bathrooms: 2,
+    lotArea: '200 sqm',
+    floorArea: '140 sqm',
+    yearBuilt: 2024,
+    location: "Mandalagan",
+    price: "2.8 million php",
     description:
-      "Discover available lots in prime locations. Browse land options with complete details to help you choose the perfect place to build or invest.",
-    agentName: "Wynands Burger",
-    agentRating: 3.8,
+      "Modern 3-bedroom home in a peaceful subdivision. Includes carport, garden space, and 24/7 gated security for your family.",
+    fullDescription: 'Modern 3-bedroom home in a peaceful subdivision. Includes carport, garden space, and 24/7 gated security for your family. Features a modern kitchen with granite countertops, spacious living area with high ceilings, master bedroom with en-suite bathroom.',
+    amenities: ['Swimming Pool', 'Clubhouse', 'Playground', 'Gated Security', 'Carport', 'Balcony'],
+    agentName: "Maria Santos",
+    agentRating: 4.5,
+    agentPhone: '+63 917 888 1234',
     agentAvatar:
-      "https://ui-avatars.com/api/?name=WB&background=6366f1&color=fff&rounded=true&size=40",
+      "https://ui-avatars.com/api/?name=MS&background=10b981&color=fff&rounded=true&size=40",
     image:
       "https://images.pexels.com/photos/1396122/pexels-photo-1396122.jpeg?auto=compress&cs=tinysrgb&w=600",
+    images: [
+      'https://images.pexels.com/photos/1396122/pexels-photo-1396122.jpeg?auto=compress&cs=tinysrgb&w=800',
+      'https://images.pexels.com/photos/2724749/pexels-photo-2724749.jpeg?auto=compress&cs=tinysrgb&w=800',
+      'https://images.pexels.com/photos/2635038/pexels-photo-2635038.jpeg?auto=compress&cs=tinysrgb&w=800',
+    ],
+    status: 'Pre-Selling',
+    type: 'House & Lot',
+    listedDate: 'Feb 2, 2026',
   },
   {
     id: "rp-3",
-    title: "The Lazy Den 2",
-    rooms: 2,
-    location: "Quezon Locsin",
-    price: "6.8 million php",
+    title: "Vista Heights Lot",
+    rooms: 0,
+    bathrooms: 0,
+    lotArea: '300 sqm',
+    floorArea: 'N/A',
+    yearBuilt: 0,
+    location: "Taculing",
+    price: "1.2 million php",
     description:
-      "Discover available lots in prime locations. Browse land options with complete details to help you choose the perfect place to build or invest.",
-    agentName: "Wynands Burger",
-    agentRating: 3.8,
+      "Prime residential lot with scenic hilltop views. Perfect for custom-built dream homes with ample space and complete privacy.",
+    fullDescription: 'Prime residential lot with scenic hilltop views. Perfect for custom-built dream homes with ample space and complete privacy. The lot is flat and ready for construction, with access to main roads, water, and electricity.',
+    amenities: ['Flat Terrain', 'Road Access', 'Water & Electric Ready', 'Hilltop View'],
+    agentName: "Carlos Reyes",
+    agentRating: 4.2,
+    agentPhone: '+63 920 555 7890',
     agentAvatar:
-      "https://ui-avatars.com/api/?name=WB&background=6366f1&color=fff&rounded=true&size=40",
+      "https://ui-avatars.com/api/?name=CR&background=f59e0b&color=fff&rounded=true&size=40",
     image:
       "https://images.pexels.com/photos/440731/pexels-photo-440731.jpeg?auto=compress&cs=tinysrgb&w=600",
+    images: [
+      'https://images.pexels.com/photos/440731/pexels-photo-440731.jpeg?auto=compress&cs=tinysrgb&w=800',
+      'https://images.pexels.com/photos/259588/pexels-photo-259588.jpeg?auto=compress&cs=tinysrgb&w=800',
+    ],
+    status: 'For Sale',
+    type: 'Lot Only',
+    listedDate: 'Dec 10, 2025',
   },
   {
     id: "rp-4",
-    title: "The Lazy Den 2",
-    rooms: 2,
-    location: "Quezon Locsin",
-    price: "6.8 million php",
+    title: "Sunrise Condotel",
+    rooms: 1,
+    bathrooms: 1,
+    lotArea: 'N/A',
+    floorArea: '36 sqm',
+    yearBuilt: 2023,
+    location: "Estefania",
+    price: "3.5 million php",
     description:
-      "Discover available lots in prime locations. Browse land options with complete details to help you choose the perfect place to build or invest.",
-    agentName: "Wynands Burger",
-    agentRating: 3.8,
+      "Fully furnished studio condo with premium amenities. Walking distance to malls and business centers in the heart of the city.",
+    fullDescription: 'Fully furnished studio condo with premium amenities. Walking distance to malls and business centers in the heart of the city. Unit comes with built-in closets, a modern kitchenette, split-type aircon, and premium tiled bathroom.',
+    amenities: ['Furnished', 'Infinity Pool', 'Gym', 'Co-working Space', 'Concierge', 'Aircon'],
+    agentName: "Patricia Lim",
+    agentRating: 4.8,
+    agentPhone: '+63 933 222 4567',
     agentAvatar:
-      "https://ui-avatars.com/api/?name=WB&background=6366f1&color=fff&rounded=true&size=40",
+      "https://ui-avatars.com/api/?name=PL&background=8b5cf6&color=fff&rounded=true&size=40",
     image:
       "https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=600",
+    images: [
+      'https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=800',
+      'https://images.pexels.com/photos/2462015/pexels-photo-2462015.jpeg?auto=compress&cs=tinysrgb&w=800',
+      'https://images.pexels.com/photos/2029731/pexels-photo-2029731.jpeg?auto=compress&cs=tinysrgb&w=800',
+    ],
+    status: 'Ready for Occupancy',
+    type: 'Condo',
+    listedDate: 'Jan 28, 2026',
   },
 ];
+
+// --- Fix Leaflet default marker icons ---
+// @ts-ignore
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+});
+
+// --- Bacolod location coordinates ---
+const LOCATION_COORDS: Record<string, [number, number]> = {
+  "Alijis": [10.6560, 122.9280],
+  "Banago": [10.7050, 122.9520],
+  "Bata": [10.6870, 122.9580],
+  "Cabug": [10.7200, 122.9400],
+  "Estefania": [10.6790, 122.9530],
+  "Felisa": [10.7010, 122.9500],
+  "Granada": [10.6720, 122.9350],
+  "Handumanan": [10.6480, 122.9530],
+  "Mandalagan": [10.6920, 122.9430],
+  "Mansilingan": [10.6590, 122.9680],
+  "Montevista": [10.6650, 122.9420],
+  "Pahanocoy": [10.6700, 122.9600],
+  "Punta Taytay": [10.7100, 122.9630],
+  "Singcang-Airport": [10.6480, 122.9320],
+  "Sum-ag": [10.6370, 122.9400],
+  "Taculing": [10.6530, 122.9500],
+  "Tangub": [10.7150, 122.9420],
+  "Villamonte": [10.6750, 122.9500],
+  "Vista Alegre": [10.6690, 122.9480],
+};
+const BACOLOD_CENTER: [number, number] = [10.6840, 122.9510];
+
+// --- Mortgage Calculator ---
+function calculateMortgage(propertyPrice: number, downPaymentPercent: number, annualRate: number, termYears: number) {
+  const downPayment = propertyPrice * (downPaymentPercent / 100);
+  const principal = propertyPrice - downPayment;
+  const monthlyRate = annualRate / 100 / 12;
+  const totalPayments = termYears * 12;
+  if (monthlyRate === 0) {
+    return { monthlyPayment: principal / totalPayments, totalPayment: principal, totalInterest: 0, principal, downPayment };
+  }
+  const monthlyPayment = principal * (monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / (Math.pow(1 + monthlyRate, totalPayments) - 1);
+  const totalPayment = monthlyPayment * totalPayments;
+  const totalInterest = totalPayment - principal;
+  return { monthlyPayment, totalPayment, totalInterest, principal, downPayment };
+}
+
+function parsePriceToNumber(priceStr: string): number {
+  if (!priceStr) return 0;
+  const cleaned = priceStr.toLowerCase().replace(/[^0-9.]/g, ' ').trim();
+  const parts = cleaned.split(/\s+/);
+  const num = parseFloat(parts[0]);
+  if (isNaN(num)) return 0;
+  if (priceStr.toLowerCase().includes('million')) return num * 1_000_000;
+  if (priceStr.toLowerCase().includes('billion')) return num * 1_000_000_000;
+  return num;
+}
 
 // --- Rating Stars Component ---
 const RatingStars = ({ rating }: { rating: number }) => {
@@ -97,6 +222,17 @@ export default function Profile() {
   const [userData, setUserData] = useState<any>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const navigate = useNavigate();
+
+  // Listing detail modal state
+  const [selectedListing, setSelectedListing] = useState<any>(null);
+  const [carouselIndex, setCarouselIndex] = useState(0);
+  const [isLiked, setIsLiked] = useState(false);
+  const [activeModalTab, setActiveModalTab] = useState<'details' | 'map' | 'calculator'>('details');
+  const [mortgageDownPayment, setMortgageDownPayment] = useState(20);
+  const [mortgageRate, setMortgageRate] = useState(6.5);
+  const [mortgageTerm, setMortgageTerm] = useState(20);
+  const [mapStyle, setMapStyle] = useState<'street' | 'satellite'>('street');
+  const [showShareSocials, setShowShareSocials] = useState(false);
 
   // Create Listing Modal State
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -152,13 +288,64 @@ export default function Profile() {
     }
   };
 
-  const handleInquire = () => {
+  const handleInquire = (listing?: any) => {
     Swal.fire({
       title: "Inquiry Sent!",
       text: "The agent will contact you shortly.",
       icon: "success",
       confirmButtonColor: "#111827",
     });
+  };
+
+  const handleShare = async (listing: any) => {
+    const shareUrl = window.location.href;
+    const shareText = `Check out this listing: ${listing.title} - ${listing.price}`;
+    await Swal.fire({
+      title: '<span style="font-weight:600;font-size:1.1rem;">Share Listing</span>',
+      html: `
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px;">
+          <div id="share-fb" style="padding:14px;cursor:pointer;border:1px solid #e5e7eb;border-radius:10px;font-size:0.9rem;font-weight:500;transition:background 0.2s;" onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='white'">Share to Facebook</div>
+          <div id="share-x" style="padding:14px;cursor:pointer;border:1px solid #e5e7eb;border-radius:10px;font-size:0.9rem;font-weight:500;transition:background 0.2s;" onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='white'">Share to X (Twitter)</div>
+          <div id="share-copy" style="padding:14px;cursor:pointer;border:1px solid #e5e7eb;border-radius:10px;font-size:0.9rem;font-weight:500;transition:background 0.2s;" onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='white'">Copy Link</div>
+        </div>
+      `,
+      showConfirmButton: false, showCloseButton: true, width: '340px',
+      didOpen: () => {
+        document.getElementById('share-fb')?.addEventListener('click', () => { window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, '_blank'); Swal.close(); });
+        document.getElementById('share-x')?.addEventListener('click', () => { window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`, '_blank'); Swal.close(); });
+        document.getElementById('share-copy')?.addEventListener('click', () => { navigator.clipboard.writeText(`${shareText} ${shareUrl}`); toast.success("Link copied!"); Swal.close(); });
+      }
+    });
+  };
+
+  // --- Listing Modal Handlers ---
+  const openListingModal = (listing: any) => {
+    setSelectedListing(listing);
+    setCarouselIndex(0);
+    setIsLiked(false);
+    setActiveModalTab('details');
+    setShowShareSocials(false);
+    setMortgageDownPayment(20);
+    setMortgageRate(6.5);
+    setMortgageTerm(20);
+    setMapStyle('street');
+  };
+
+  const closeListingModal = () => {
+    setSelectedListing(null);
+    setShowShareSocials(false);
+  };
+
+  const nextImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const imgs = selectedListing?.images || [selectedListing?.image];
+    setCarouselIndex((prev: number) => (prev + 1) % imgs.length);
+  };
+
+  const prevImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const imgs = selectedListing?.images || [selectedListing?.image];
+    setCarouselIndex((prev: number) => (prev - 1 + imgs.length) % imgs.length);
   };
 
   // --- Create Listing Handlers ---
@@ -410,7 +597,7 @@ export default function Profile() {
           <h2 className="profile-posts-heading">Recent posts:</h2>
           <div className="profile-posts-grid">
             {MOCK_RECENT_POSTS.map((listing) => (
-              <div className="glass-listing-card profile-card" key={listing.id}>
+              <div className="glass-listing-card profile-card" key={listing.id} onClick={() => openListingModal(listing)} style={{ cursor: 'pointer' }}>
                 {/* Card Info - Left */}
                 <div className="glass-card-content">
                   <div>
@@ -461,7 +648,7 @@ export default function Profile() {
                   </div>
                   <button
                     className="glass-inquire-btn"
-                    onClick={() => handleInquire()}
+                    onClick={(e) => { e.stopPropagation(); handleInquire(listing); }}
                   >
                     INQUIRE NOW →
                   </button>
@@ -678,6 +865,310 @@ export default function Profile() {
           </div>
         </div>
       )}
+
+      {/* ========== LISTING DETAIL MODAL ========== */}
+      {selectedListing && (() => {
+        const imgs = selectedListing.images?.length > 0 ? selectedListing.images : [selectedListing.image];
+        const listingCoords = LOCATION_COORDS[selectedListing.location] || BACOLOD_CENTER;
+        const propertyPrice = parsePriceToNumber(selectedListing.price);
+        const mortgage = propertyPrice > 0 ? calculateMortgage(propertyPrice, mortgageDownPayment, mortgageRate, mortgageTerm) : null;
+        return (
+          <div className="listing-modal-overlay" onClick={closeListingModal}>
+            <div className="listing-modal" onClick={(e) => e.stopPropagation()}>
+              {/* Image Carousel */}
+              <div className="listing-modal-carousel">
+                <img
+                  src={imgs[carouselIndex]}
+                  alt={selectedListing.title}
+                  className="listing-modal-carousel-img"
+                />
+                {imgs.length > 1 && (
+                  <>
+                    <button className="carousel-arrow carousel-arrow-left" onClick={prevImage}>
+                      <FaChevronLeft />
+                    </button>
+                    <button className="carousel-arrow carousel-arrow-right" onClick={nextImage}>
+                      <FaChevronRight />
+                    </button>
+                    <div className="carousel-dots">
+                      {imgs.map((_: any, i: number) => (
+                        <span
+                          key={i}
+                          className={`carousel-dot ${i === carouselIndex ? 'carousel-dot-active' : ''}`}
+                          onClick={(e) => { e.stopPropagation(); setCarouselIndex(i); }}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+                {/* Status Badge */}
+                <span className="listing-modal-status">{selectedListing.status}</span>
+                {/* Top-Right: Like + Close */}
+                <div className="listing-modal-top-actions">
+                  <button className="listing-modal-like" onClick={(e) => { e.stopPropagation(); setIsLiked(!isLiked); }}>
+                    {isLiked ? <FaHeart color="#ef4444" /> : <FaRegHeart />}
+                  </button>
+                  <button className="listing-modal-close" onClick={(e) => { e.stopPropagation(); closeListingModal(); }}>
+                    <FaTimes />
+                  </button>
+                </div>
+                {/* Image Counter */}
+                <span className="listing-modal-counter">{carouselIndex + 1} / {imgs.length}</span>
+              </div>
+
+              {/* Tab Navigation */}
+              <div className="listing-modal-tabs">
+                <button
+                  className={`listing-modal-tab ${activeModalTab === 'details' ? 'listing-modal-tab-active' : ''}`}
+                  onClick={() => setActiveModalTab('details')}
+                >
+                  <FaHome size={13} /> Details
+                </button>
+                <button
+                  className={`listing-modal-tab ${activeModalTab === 'map' ? 'listing-modal-tab-active' : ''}`}
+                  onClick={() => setActiveModalTab('map')}
+                >
+                  <FaMap size={13} /> Map
+                </button>
+                {propertyPrice > 0 && (
+                  <button
+                    className={`listing-modal-tab ${activeModalTab === 'calculator' ? 'listing-modal-tab-active' : ''}`}
+                    onClick={() => setActiveModalTab('calculator')}
+                  >
+                    <FaCalculator size={13} /> Calculator
+                  </button>
+                )}
+              </div>
+
+              {/* Modal Body */}
+              <div className="listing-modal-body">
+                {activeModalTab === 'details' && (
+                  <>
+                    <div className="listing-modal-body-left">
+                      <div className="listing-modal-title-row">
+                        <div>
+                          <h2 className="listing-modal-title">{selectedListing.title}</h2>
+                          <p className="listing-modal-location">
+                            <FaMapMarkerAlt size={12} /> {selectedListing.location}, Bacolod City
+                          </p>
+                        </div>
+                        <div className="listing-modal-price">{selectedListing.price}</div>
+                      </div>
+
+                      <div className="listing-modal-details">
+                        {selectedListing.rooms > 0 && (
+                          <div className="listing-detail-item">
+                            <FaBed className="listing-detail-icon" />
+                            <div>
+                              <span className="listing-detail-value">{selectedListing.rooms}</span>
+                              <span className="listing-detail-label">Bedrooms</span>
+                            </div>
+                          </div>
+                        )}
+                        {selectedListing.bathrooms > 0 && (
+                          <div className="listing-detail-item">
+                            <FaBath className="listing-detail-icon" />
+                            <div>
+                              <span className="listing-detail-value">{selectedListing.bathrooms}</span>
+                              <span className="listing-detail-label">Bathrooms</span>
+                            </div>
+                          </div>
+                        )}
+                        <div className="listing-detail-item">
+                          <FaRulerCombined className="listing-detail-icon" />
+                          <div>
+                            <span className="listing-detail-value">{selectedListing.lotArea}</span>
+                            <span className="listing-detail-label">Lot Area</span>
+                          </div>
+                        </div>
+                        {selectedListing.floorArea !== 'N/A' && (
+                          <div className="listing-detail-item">
+                            <FaRulerCombined className="listing-detail-icon" />
+                            <div>
+                              <span className="listing-detail-value">{selectedListing.floorArea}</span>
+                              <span className="listing-detail-label">Floor Area</span>
+                            </div>
+                          </div>
+                        )}
+                        {selectedListing.yearBuilt > 0 && (
+                          <div className="listing-detail-item">
+                            <FaCalendarAlt className="listing-detail-icon" />
+                            <div>
+                              <span className="listing-detail-value">{selectedListing.yearBuilt}</span>
+                              <span className="listing-detail-label">Year Built</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="listing-modal-section">
+                        <h4 className="listing-modal-section-title">Description</h4>
+                        <p className="listing-modal-desc">{selectedListing.fullDescription || selectedListing.description}</p>
+                      </div>
+
+                      {selectedListing.amenities?.length > 0 && (
+                        <div className="listing-modal-section">
+                          <h4 className="listing-modal-section-title">Amenities & Features</h4>
+                          <div className="listing-modal-amenities">
+                            {selectedListing.amenities.map((a: string, i: number) => (
+                              <span key={i} className="listing-amenity-tag">{a}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="listing-modal-meta">
+                        <span>Type: <strong>{selectedListing.type}</strong></span>
+                        <span>Listed: <strong>{selectedListing.listedDate || 'Recently'}</strong></span>
+                      </div>
+                    </div>
+
+                    <div className="listing-modal-agent-card">
+                      <img src={selectedListing.agentAvatar} alt={selectedListing.agentName} className="listing-modal-agent-avatar" />
+                      <h4 className="listing-modal-agent-name">{selectedListing.agentName}</h4>
+                      <span className="listing-modal-agent-role">Listing Agent</span>
+                      <div className="listing-modal-agent-rating">
+                        <RatingStars rating={selectedListing.agentRating} />
+                        <span>{selectedListing.agentRating} Stars</span>
+                      </div>
+                      {selectedListing.agentPhone && selectedListing.agentPhone !== 'N/A' && (
+                        <p className="listing-modal-agent-phone">
+                          <FaPhoneAlt size={11} /> {selectedListing.agentPhone}
+                        </p>
+                      )}
+                      <button className="listing-modal-inquire-btn" onClick={() => handleInquire(selectedListing)}>
+                        INQUIRE NOW →
+                      </button>
+                      <div className="listing-modal-share-wrapper">
+                        <button className="listing-modal-share-btn" onClick={() => setShowShareSocials(!showShareSocials)}>
+                          <FaShare size={12} /> Share Listing
+                        </button>
+                        <div className={`listing-modal-share-socials ${showShareSocials ? 'show' : ''}`}>
+                          <button
+                            className="modal-social-btn modal-social-fb"
+                            title="Share to Facebook"
+                            onClick={() => {
+                              const url = window.location.href;
+                              window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}&quote=${encodeURIComponent(`${selectedListing.title} - ${selectedListing.price} in ${selectedListing.location}`)}`, '_blank', 'width=600,height=400');
+                            }}
+                          >
+                            <FaFacebookF size={14} />
+                          </button>
+                          <button
+                            className="modal-social-btn modal-social-tw"
+                            title="Share to X (Twitter)"
+                            onClick={() => {
+                              const url = window.location.href;
+                              const text = `Check out this listing: ${selectedListing.title} - ${selectedListing.price} in ${selectedListing.location}`;
+                              window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank', 'width=600,height=400');
+                            }}
+                          >
+                            <FaTwitter size={14} />
+                          </button>
+                          <button
+                            className="modal-social-btn modal-social-ig"
+                            title="Share to Instagram"
+                            onClick={() => {
+                              navigator.clipboard.writeText(`${selectedListing.title} - ${selectedListing.price} in ${selectedListing.location}\n${window.location.href}`);
+                              toast.success('Link copied! Paste it on Instagram.');
+                            }}
+                          >
+                            <FaInstagram size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {activeModalTab === 'map' && (
+                  <div className="listing-modal-map-container">
+                    <div className="listing-modal-map-header">
+                      <div>
+                        <h3 className="listing-modal-map-title">
+                          <FaMapMarkerAlt size={14} /> {selectedListing.location}, Bacolod City
+                        </h3>
+                        <p className="listing-modal-map-subtitle">Approximate property location</p>
+                      </div>
+                      <div className="listing-modal-map-toggle">
+                        <button className={`map-style-btn ${mapStyle === 'street' ? 'map-style-btn-active' : ''}`} onClick={() => setMapStyle('street')}>Map</button>
+                        <button className={`map-style-btn ${mapStyle === 'satellite' ? 'map-style-btn-active' : ''}`} onClick={() => setMapStyle('satellite')}>Satellite</button>
+                      </div>
+                    </div>
+                    <div className="listing-modal-map-wrapper">
+                      <MapContainer center={listingCoords} zoom={15} style={{ width: '100%', height: '100%', borderRadius: '16px' }} scrollWheelZoom={true} key={`${selectedListing.id}-${mapStyle}`}>
+                        {mapStyle === 'street' ? (
+                          <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                        ) : (
+                          <TileLayer attribution='&copy; <a href="https://www.esri.com/">Esri</a>' url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" />
+                        )}
+                        <Marker position={listingCoords}>
+                          <Popup><strong>{selectedListing.title}</strong><br />{selectedListing.location}, Bacolod City<br />{selectedListing.price}</Popup>
+                        </Marker>
+                      </MapContainer>
+                    </div>
+                  </div>
+                )}
+
+                {activeModalTab === 'calculator' && mortgage && (
+                  <div className="listing-modal-calculator-container">
+                    <div className="listing-modal-calc-header">
+                      <h3 className="listing-modal-calc-title"><FaCalculator size={14} /> Mortgage Calculator</h3>
+                      <p className="listing-modal-calc-subtitle">Estimate your monthly payments for <strong>{selectedListing.title}</strong></p>
+                    </div>
+                    <div className="listing-modal-calc-body">
+                      <div className="listing-modal-calc-inputs">
+                        <div className="calc-input-group">
+                          <label className="calc-label">Property Price</label>
+                          <div className="calc-value-display">₱{propertyPrice.toLocaleString()}</div>
+                        </div>
+                        <div className="calc-input-group">
+                          <label className="calc-label">Down Payment: <strong>{mortgageDownPayment}%</strong></label>
+                          <input type="range" min="5" max="50" step="5" value={mortgageDownPayment} onChange={(e) => setMortgageDownPayment(Number(e.target.value))} className="calc-slider" />
+                          <div className="calc-range-labels"><span>5%</span><span>₱{mortgage.downPayment.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span><span>50%</span></div>
+                        </div>
+                        <div className="calc-input-group">
+                          <label className="calc-label">Annual Interest Rate: <strong>{mortgageRate}%</strong></label>
+                          <input type="range" min="1" max="15" step="0.5" value={mortgageRate} onChange={(e) => setMortgageRate(Number(e.target.value))} className="calc-slider" />
+                          <div className="calc-range-labels"><span>1%</span><span></span><span>15%</span></div>
+                        </div>
+                        <div className="calc-input-group">
+                          <label className="calc-label">Loan Term: <strong>{mortgageTerm} years</strong></label>
+                          <input type="range" min="5" max="30" step="5" value={mortgageTerm} onChange={(e) => setMortgageTerm(Number(e.target.value))} className="calc-slider" />
+                          <div className="calc-range-labels"><span>5 yrs</span><span></span><span>30 yrs</span></div>
+                        </div>
+                      </div>
+                      <div className="listing-modal-calc-results">
+                        <div className="calc-result-card calc-result-primary">
+                          <span className="calc-result-label">Monthly Payment</span>
+                          <span className="calc-result-value">₱{mortgage.monthlyPayment.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                        </div>
+                        <div className="calc-result-card">
+                          <span className="calc-result-label">Loan Amount</span>
+                          <span className="calc-result-value-sm">₱{mortgage.principal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                        </div>
+                        <div className="calc-result-card">
+                          <span className="calc-result-label">Down Payment</span>
+                          <span className="calc-result-value-sm">₱{mortgage.downPayment.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                        </div>
+                        <div className="calc-result-card">
+                          <span className="calc-result-label">Total Interest</span>
+                          <span className="calc-result-value-sm">₱{mortgage.totalInterest.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                        </div>
+                        <div className="calc-result-card">
+                          <span className="calc-result-label">Total Payment</span>
+                          <span className="calc-result-value-sm">₱{mortgage.totalPayment.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                        </div>
+                        <p className="calc-disclaimer">* Estimates only. Actual rates and payments may vary based on lender terms and conditions.</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ========== MOBILE BOTTOM NAV ========== */}
       <div className="dash-mobile-nav">
