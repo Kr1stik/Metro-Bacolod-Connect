@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { signInWithEmailAndPassword, signInWithPopup, signOut } from "firebase/auth";
 import { auth, googleProvider } from "../firebase-config";
@@ -7,7 +7,7 @@ import { FaTimes } from "react-icons/fa";
 import {
   FaHome, FaStar, FaStarHalfAlt, FaRegStar, FaPhoneAlt,
   FaEnvelope, FaCheckCircle, FaMapMarkerAlt,
-  FaComments
+  FaComments, FaChevronLeft, FaChevronRight
 } from "react-icons/fa";
 import logo from "../assets/MBC Logo.png";
 import "../App.css";
@@ -118,6 +118,36 @@ export default function Professionals() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
+
+  const checkScrollButtons = () => {
+    const el = carouselRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 5);
+    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 5);
+  };
+
+  useEffect(() => {
+    const el = carouselRef.current;
+    if (!el) return;
+    checkScrollButtons();
+    el.addEventListener('scroll', checkScrollButtons);
+    window.addEventListener('resize', checkScrollButtons);
+    return () => {
+      el.removeEventListener('scroll', checkScrollButtons);
+      window.removeEventListener('resize', checkScrollButtons);
+    };
+  }, []);
+
+  const scrollCarousel = (direction: 'left' | 'right') => {
+    const el = carouselRef.current;
+    if (!el) return;
+    const cardWidth = el.querySelector('.info-agent-card')?.clientWidth || 340;
+    const scrollAmount = cardWidth + 24; // card width + gap
+    el.scrollBy({ left: direction === 'left' ? -scrollAmount : scrollAmount, behavior: 'smooth' });
+  };
 
   const closeLogin = () => { setShowLogin(false); setEmail(""); setPassword(""); };
 
@@ -177,34 +207,46 @@ export default function Professionals() {
           </p>
         </section>
 
-        {/* Agent Cards Grid */}
+        {/* Agent Cards Carousel */}
         <section className="info-section">
-          <h2 className="info-section-title">Meet Our Agents</h2>
-          <div className="info-agents-grid">
-            {AGENTS.map((agent, i) => (
-              <div className="info-agent-card" key={i}>
-                <img src={agent.avatar} alt={agent.name} className="info-agent-avatar" />
-                <h3 className="info-agent-name">{agent.name}</h3>
-                <span className="info-agent-agency">{agent.agency}</span>
-                <div className="info-agent-rating">
-                  <RatingStars rating={agent.rating} />
-                  <span>{agent.rating}</span>
+          <h2 className="info-section-title" style={{ textAlign: 'center' }}>Meet Our Agents</h2>
+          <div className="info-agents-carousel-wrapper">
+            {canScrollLeft && (
+              <button className="info-carousel-arrow info-carousel-arrow-left" onClick={() => scrollCarousel('left')} aria-label="Scroll left">
+                <FaChevronLeft size={18} />
+              </button>
+            )}
+            <div className="info-agents-carousel" ref={carouselRef}>
+              {AGENTS.map((agent, i) => (
+                <div className="info-agent-card" key={i}>
+                  <img src={agent.avatar} alt={agent.name} className="info-agent-avatar" />
+                  <h3 className="info-agent-name">{agent.name}</h3>
+                  <span className="info-agent-agency">{agent.agency}</span>
+                  <div className="info-agent-rating">
+                    <RatingStars rating={agent.rating} />
+                    <span>{agent.rating}</span>
+                  </div>
+                  <div className="info-agent-details">
+                    <span className="info-agent-tag">{agent.specialization}</span>
+                    <span className="info-agent-tag">{agent.experience} yrs exp.</span>
+                  </div>
+                  <p className="info-agent-bio">{agent.bio}</p>
+                  <div className="info-agent-contact">
+                    <a href={`tel:${agent.phone}`} className="info-agent-contact-btn">
+                      <FaPhoneAlt size={12} /> {agent.phone}
+                    </a>
+                    <a href={`mailto:${agent.email}`} className="info-agent-contact-btn info-agent-email-btn">
+                      <FaEnvelope size={12} /> Email
+                    </a>
+                  </div>
                 </div>
-                <div className="info-agent-details">
-                  <span className="info-agent-tag">{agent.specialization}</span>
-                  <span className="info-agent-tag">{agent.experience} yrs exp.</span>
-                </div>
-                <p className="info-agent-bio">{agent.bio}</p>
-                <div className="info-agent-contact">
-                  <a href={`tel:${agent.phone}`} className="info-agent-contact-btn">
-                    <FaPhoneAlt size={12} /> {agent.phone}
-                  </a>
-                  <a href={`mailto:${agent.email}`} className="info-agent-contact-btn info-agent-email-btn">
-                    <FaEnvelope size={12} /> Email
-                  </a>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
+            {canScrollRight && (
+              <button className="info-carousel-arrow info-carousel-arrow-right" onClick={() => scrollCarousel('right')} aria-label="Scroll right">
+                <FaChevronRight size={18} />
+              </button>
+            )}
           </div>
         </section>
 

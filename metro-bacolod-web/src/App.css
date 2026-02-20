@@ -3618,9 +3618,10 @@ ul { list-style: none; }
    PROPERTY CATEGORIES CARDS (image + content)
    ------------------------------------------- */
 .info-cards-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  display: flex;
+  flex-wrap: wrap;
   gap: 24px;
+  justify-content: center;
 }
 
 .info-card {
@@ -3636,6 +3637,9 @@ ul { list-style: none; }
     0 2px 8px rgba(0, 0, 0, 0.04),
     inset 0 1px 0 rgba(255, 255, 255, 0.7),
     inset 0 -1px 0 rgba(255, 255, 255, 0.2);
+  width: calc(50% - 12px);
+  min-width: 280px;
+  max-width: 480px;
 }
 
 .info-card:hover {
@@ -3697,9 +3701,10 @@ ul { list-style: none; }
    TRUST POINTS GRID
    ------------------------------------------- */
 .info-trust-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 22px;
+  justify-content: center;
 }
 
 .info-trust-card {
@@ -3710,6 +3715,9 @@ ul { list-style: none; }
   border-radius: 20px;
   padding: 30px 26px;
   text-align: center;
+  width: calc(33.333% - 15px);
+  min-width: 260px;
+  max-width: 380px;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   box-shadow:
     0 4px 20px rgba(0, 0, 0, 0.06),
@@ -3969,12 +3977,91 @@ ul { list-style: none; }
 }
 
 /* -------------------------------------------
+   AGENT CAROUSEL (Professionals Page)
+   ------------------------------------------- */
+.info-agents-carousel-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.info-agents-carousel {
+  display: flex;
+  gap: 24px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: 10px 4px 16px 4px;
+}
+
+.info-agents-carousel::-webkit-scrollbar {
+  display: none;
+}
+
+.info-agents-carousel .info-agent-card {
+  min-width: 320px;
+  max-width: 340px;
+  flex-shrink: 0;
+  scroll-snap-align: start;
+}
+
+.info-carousel-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #111827 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  transition: all 0.25s ease;
+  padding: 0 !important;
+}
+
+.info-carousel-arrow:hover {
+  background: #111827 !important;
+  color: white !important;
+  border-color: #111827;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+.info-carousel-arrow-left {
+  left: -22px;
+}
+
+.info-carousel-arrow-right {
+  right: -22px;
+}
+
+@media (max-width: 860px) {
+  .info-carousel-arrow-left {
+    left: -6px;
+  }
+  .info-carousel-arrow-right {
+    right: -6px;
+  }
+  .info-agents-carousel .info-agent-card {
+    min-width: 280px;
+  }
+}
+
+/* -------------------------------------------
    SERVICES CARDS (Services Page)
    ------------------------------------------- */
 .info-services-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 22px;
+  justify-content: center;
 }
 
 .info-service-card {
@@ -3984,6 +4071,10 @@ ul { list-style: none; }
   border: 1.5px solid rgba(255, 255, 255, 0.5);
   border-radius: 20px;
   padding: 32px 28px;
+  text-align: center;
+  width: calc(33.333% - 15px);
+  min-width: 300px;
+  max-width: 400px;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   box-shadow:
     0 4px 20px rgba(0, 0, 0, 0.06),
@@ -4273,11 +4364,7 @@ ul { list-style: none; }
 /* -------------------------------------------
    INFO PAGES — RESPONSIVE
    ------------------------------------------- */
-@media (max-width: 1000px) {
-  .info-agents-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
+
 
 @media (max-width: 860px) {
   .info-content {
@@ -4295,12 +4382,15 @@ ul { list-style: none; }
     font-size: 0.92rem;
   }
 
-  .info-cards-grid {
-    grid-template-columns: 1fr;
+  .info-cards-grid > * {
+    width: 100% !important;
+    max-width: 100% !important;
   }
 
-  .info-agents-grid {
-    grid-template-columns: 1fr;
+  .info-trust-grid > *,
+  .info-services-grid > * {
+    width: 100% !important;
+    max-width: 100% !important;
   }
 
   .info-steps-grid {

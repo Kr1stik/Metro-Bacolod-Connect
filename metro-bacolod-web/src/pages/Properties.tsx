@@ -137,7 +137,7 @@ export default function Properties() {
 
         {/* Property Categories */}
         <section className="info-section">
-          <h2 className="info-section-title">Property Categories</h2>
+          <h2 className="info-section-title" style={{ textAlign: 'center' }}>Property Categories</h2>
           <div className="info-cards-grid">
             {PROPERTY_CATEGORIES.map((cat, i) => (
               <div className="info-card info-card-with-image" key={i}>
@@ -156,7 +156,7 @@ export default function Properties() {
 
         {/* Trust Points */}
         <section className="info-section">
-          <h2 className="info-section-title">What Makes Our Listings Trusted</h2>
+          <h2 className="info-section-title" style={{ textAlign: 'center' }}>What Makes Our Listings Trusted</h2>
           <div className="info-trust-grid">
             {TRUST_POINTS.map((point, i) => (
               <div className="info-trust-card" key={i}>
