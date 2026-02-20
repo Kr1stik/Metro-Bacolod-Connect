@@ -23,129 +23,6 @@ import "react-toastify/dist/ReactToastify.css";
 import { BACOLOD_LOCATIONS } from "../constants/locations";
 import { canCreateListings, canAccessTrash } from "../constants/roles";
 
-// --- MOCK RECENT POSTS ---
-const MOCK_RECENT_POSTS = [
-  {
-    id: "rp-1",
-    title: "The Lazy Den 2",
-    rooms: 2,
-    bathrooms: 1,
-    lotArea: '120 sqm',
-    floorArea: '85 sqm',
-    yearBuilt: 2021,
-    location: "Villamonte",
-    price: "0.5 million php",
-    description:
-      "Discover available lots in prime locations. Browse land options with complete details to help you choose the perfect place to build or invest.",
-    fullDescription: 'Discover available lots in prime locations. Browse land options with complete details to help you choose the perfect place to build or invest. This cozy 2-bedroom home features an open-plan kitchen, tiled flooring throughout, and a small garden area perfect for morning coffee.',
-    amenities: ['Carport', 'Garden', 'Tiled Flooring', 'Fenced', 'Near Schools'],
-    agentName: "Wynands Burger",
-    agentRating: 3.8,
-    agentPhone: '+63 912 345 6789',
-    agentAvatar:
-      "https://ui-avatars.com/api/?name=WB&background=6366f1&color=fff&rounded=true&size=40",
-    image:
-      "https://images.pexels.com/photos/3013440/pexels-photo-3013440.jpeg?auto=compress&cs=tinysrgb&w=600",
-    images: [
-      'https://images.pexels.com/photos/3013440/pexels-photo-3013440.jpeg?auto=compress&cs=tinysrgb&w=800',
-      'https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=800',
-      'https://images.pexels.com/photos/1643384/pexels-photo-1643384.jpeg?auto=compress&cs=tinysrgb&w=800',
-    ],
-    status: 'For Sale',
-    type: 'House & Lot',
-    listedDate: 'Jan 15, 2026',
-  },
-  {
-    id: "rp-2",
-    title: "Greenfield Residences",
-    rooms: 3,
-    bathrooms: 2,
-    lotArea: '200 sqm',
-    floorArea: '140 sqm',
-    yearBuilt: 2024,
-    location: "Mandalagan",
-    price: "2.8 million php",
-    description:
-      "Modern 3-bedroom home in a peaceful subdivision. Includes carport, garden space, and 24/7 gated security for your family.",
-    fullDescription: 'Modern 3-bedroom home in a peaceful subdivision. Includes carport, garden space, and 24/7 gated security for your family. Features a modern kitchen with granite countertops, spacious living area with high ceilings, master bedroom with en-suite bathroom.',
-    amenities: ['Swimming Pool', 'Clubhouse', 'Playground', 'Gated Security', 'Carport', 'Balcony'],
-    agentName: "Maria Santos",
-    agentRating: 4.5,
-    agentPhone: '+63 917 888 1234',
-    agentAvatar:
-      "https://ui-avatars.com/api/?name=MS&background=10b981&color=fff&rounded=true&size=40",
-    image:
-      "https://images.pexels.com/photos/1396122/pexels-photo-1396122.jpeg?auto=compress&cs=tinysrgb&w=600",
-    images: [
-      'https://images.pexels.com/photos/1396122/pexels-photo-1396122.jpeg?auto=compress&cs=tinysrgb&w=800',
-      'https://images.pexels.com/photos/2724749/pexels-photo-2724749.jpeg?auto=compress&cs=tinysrgb&w=800',
-      'https://images.pexels.com/photos/2635038/pexels-photo-2635038.jpeg?auto=compress&cs=tinysrgb&w=800',
-    ],
-    status: 'Pre-Selling',
-    type: 'House & Lot',
-    listedDate: 'Feb 2, 2026',
-  },
-  {
-    id: "rp-3",
-    title: "Vista Heights Lot",
-    rooms: 0,
-    bathrooms: 0,
-    lotArea: '300 sqm',
-    floorArea: 'N/A',
-    yearBuilt: 0,
-    location: "Taculing",
-    price: "1.2 million php",
-    description:
-      "Prime residential lot with scenic hilltop views. Perfect for custom-built dream homes with ample space and complete privacy.",
-    fullDescription: 'Prime residential lot with scenic hilltop views. Perfect for custom-built dream homes with ample space and complete privacy. The lot is flat and ready for construction, with access to main roads, water, and electricity.',
-    amenities: ['Flat Terrain', 'Road Access', 'Water & Electric Ready', 'Hilltop View'],
-    agentName: "Carlos Reyes",
-    agentRating: 4.2,
-    agentPhone: '+63 920 555 7890',
-    agentAvatar:
-      "https://ui-avatars.com/api/?name=CR&background=f59e0b&color=fff&rounded=true&size=40",
-    image:
-      "https://images.pexels.com/photos/440731/pexels-photo-440731.jpeg?auto=compress&cs=tinysrgb&w=600",
-    images: [
-      'https://images.pexels.com/photos/440731/pexels-photo-440731.jpeg?auto=compress&cs=tinysrgb&w=800',
-      'https://images.pexels.com/photos/259588/pexels-photo-259588.jpeg?auto=compress&cs=tinysrgb&w=800',
-    ],
-    status: 'For Sale',
-    type: 'Lot Only',
-    listedDate: 'Dec 10, 2025',
-  },
-  {
-    id: "rp-4",
-    title: "Sunrise Condotel",
-    rooms: 1,
-    bathrooms: 1,
-    lotArea: 'N/A',
-    floorArea: '36 sqm',
-    yearBuilt: 2023,
-    location: "Estefania",
-    price: "3.5 million php",
-    description:
-      "Fully furnished studio condo with premium amenities. Walking distance to malls and business centers in the heart of the city.",
-    fullDescription: 'Fully furnished studio condo with premium amenities. Walking distance to malls and business centers in the heart of the city. Unit comes with built-in closets, a modern kitchenette, split-type aircon, and premium tiled bathroom.',
-    amenities: ['Furnished', 'Infinity Pool', 'Gym', 'Co-working Space', 'Concierge', 'Aircon'],
-    agentName: "Patricia Lim",
-    agentRating: 4.8,
-    agentPhone: '+63 933 222 4567',
-    agentAvatar:
-      "https://ui-avatars.com/api/?name=PL&background=8b5cf6&color=fff&rounded=true&size=40",
-    image:
-      "https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=600",
-    images: [
-      'https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=800',
-      'https://images.pexels.com/photos/2462015/pexels-photo-2462015.jpeg?auto=compress&cs=tinysrgb&w=800',
-      'https://images.pexels.com/photos/2029731/pexels-photo-2029731.jpeg?auto=compress&cs=tinysrgb&w=800',
-    ],
-    status: 'Ready for Occupancy',
-    type: 'Condo',
-    listedDate: 'Jan 28, 2026',
-  },
-];
-
 // --- Fix Leaflet default marker icons ---
 // @ts-ignore
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -228,13 +105,45 @@ function MapClickHandler({ onPin }: { onPin: (coords: [number, number]) => void 
   return null;
 }
 
+// --- Helper function to map Firebase data to UI perfectly ---
+const formatPostData = (d: any) => {
+  const p = d.data();
+  return {
+    id: d.id,
+    title: p.title || p.content?.split('\n')[0]?.substring(0, 40) || 'New Listing',
+    rooms: p.rooms || 0,
+    bathrooms: p.bathrooms || 0,
+    lotArea: p.lotArea || 'N/A',
+    floorArea: p.floorArea || 'N/A',
+    yearBuilt: p.yearBuilt || 0,
+    location: p.location || 'Bacolod',
+    price: p.price || 'Contact for price',
+    description: p.content || 'No description provided.',
+    fullDescription: p.content || 'No description provided.',
+    amenities: p.amenities || [],
+    agentName: p.userName || 'Unknown Agent',
+    agentRating: 4.0,
+    agentPhone: p.phone || 'N/A',
+    agentAvatar: p.userAvatar || 'https://ui-avatars.com/api/?name=U&rounded=true',
+    image: p.images?.[0] || p.image || '',
+    images: p.images || (p.image ? [p.image] : []),
+    status: p.status || 'For Sale',
+    type: p.type || 'Property',
+    listedDate: p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently',
+    originalPost: { ...p, id: d.id },
+  };
+};
+
 export default function Profile() {
   const { userId: routeUserId } = useParams<{ userId?: string }>();
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
+  const [myPosts, setMyPosts] = useState<any[]>([]); // User's own dynamic posts
+
   const [viewedUser, setViewedUser] = useState<any>(null);
   const [viewedUserData, setViewedUserData] = useState<any>(null);
   const [viewedPosts, setViewedPosts] = useState<any[]>([]);
+  
   const isViewingOther = !!routeUserId && routeUserId !== user?.uid;
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const navigate = useNavigate();
@@ -282,6 +191,15 @@ export default function Profile() {
           if (userSnap.exists()) {
             setUserData(userSnap.data());
           }
+
+          // Fetch the current user's actual posts!
+          const postsQuery = query(
+            collection(db, "posts"),
+            where("userId", "==", currentUser.uid)
+          );
+          const postsSnap = await getDocs(postsQuery);
+          setMyPosts(postsSnap.docs.map(formatPostData));
+
         } catch (err) {
           console.error("Error fetching user data:", err);
         }
@@ -306,41 +224,14 @@ export default function Profile() {
           setViewedUserData(userSnap.data());
           setViewedUser({ uid: routeUserId, ...userSnap.data() });
         }
-        // Fetch their posts
+        // Fetch their posts dynamically
         const postsQuery = query(
           collection(db, "posts"),
           where("userId", "==", routeUserId),
           orderBy("createdAt", "desc")
         );
         const postsSnap = await getDocs(postsQuery);
-        const agentPosts = postsSnap.docs.map(d => {
-          const p = d.data();
-          return {
-            id: d.id,
-            title: p.title || p.content?.split('\n')[0]?.substring(0, 40) || 'New Listing',
-            rooms: p.rooms || 0,
-            bathrooms: p.bathrooms || 0,
-            lotArea: p.lotArea || 'N/A',
-            floorArea: p.floorArea || 'N/A',
-            yearBuilt: p.yearBuilt || 0,
-            location: p.location || 'Bacolod',
-            price: p.price || 'Contact for price',
-            description: p.content || 'No description provided.',
-            fullDescription: p.content || 'No description provided.',
-            amenities: p.amenities || [],
-            agentName: p.userName || 'Unknown Agent',
-            agentRating: 4.0,
-            agentPhone: p.phone || 'N/A',
-            agentAvatar: p.userAvatar || 'https://ui-avatars.com/api/?name=U&rounded=true',
-            image: p.images?.[0] || p.image || '',
-            images: p.images || (p.image ? [p.image] : []),
-            status: p.status || 'For Sale',
-            type: p.type || 'Property',
-            listedDate: p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently',
-            originalPost: { ...p, id: d.id },
-          };
-        });
-        setViewedPosts(agentPosts);
+        setViewedPosts(postsSnap.docs.map(formatPostData));
       } catch (err) {
         console.error("Error fetching agent profile:", err);
       }
@@ -512,6 +403,7 @@ export default function Profile() {
       toast.success("Listing published!");
       resetCreateForm();
       setShowCreateModal(false);
+      // Optional: Refresh myPosts here so the UI instantly shows the new listing
     } catch (error: any) {
       console.error(error);
       toast.error("Failed to publish: " + error.message);
@@ -536,7 +428,9 @@ export default function Profile() {
 
   const userRole = userData?.role || "Client";
   const isAgent = canCreateListings(userData?.role, user?.email);
-  const profileListings = isViewingOther ? viewedPosts : MOCK_RECENT_POSTS;
+  
+  // This completely removes the mock data dependency!
+  const profileListings = isViewingOther ? viewedPosts : myPosts;
 
   return (
     <div className="profile-page">
@@ -561,7 +455,7 @@ export default function Profile() {
             <input
               type="text"
               className="dash-search-input"
-              placeholder="Look for agents..."
+              placeholder="Search in Metro Bacolod Connect"
             />
           </div>
         </div>

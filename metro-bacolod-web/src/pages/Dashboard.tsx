@@ -23,6 +23,7 @@ import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { BACOLOD_LOCATIONS } from "../constants/locations";
 import { canCreateListings, canAccessTrash, canManagePost } from "../constants/roles";
+import DOMPurify from 'dompurify';
 
 // --- Rating Stars Component ---
 const RatingStars = ({ rating }: { rating: number }) => {
@@ -176,6 +177,11 @@ export default function Dashboard() {
   const [mapStyle, setMapStyle] = useState<'street' | 'satellite'>('street');
   const [showShareSocials, setShowShareSocials] = useState(false);
 
+  // --- SEARCH STATE ---
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -209,6 +215,38 @@ export default function Dashboard() {
     });
     return () => unsubscribe();
   }, [navigate]);
+
+  const handleSearch = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const queryText = e.target.value;
+    setSearchQuery(queryText);
+
+    if (queryText.trim().length === 0) {
+      setSearchResults([]);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const usersRef = collection(db, "users");
+      const snap = await getDocs(usersRef);
+      
+      // Filter the users in Javascript to allow partial matches (e.g. typing "Wen" finds "Wenard")
+      const results = snap.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter((u: any) => {
+          const fullName = `${u.firstName || ''} ${u.lastName || ''}`.toLowerCase();
+          const searchLower = queryText.toLowerCase();
+          return fullName.includes(searchLower) || u.role?.toLowerCase().includes(searchLower);
+        })
+        .slice(0, 5); // Only show the top 5 results so the UI doesn't break
+
+      setSearchResults(results);
+    } catch (error) {
+      console.error("Search failed:", error);
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   // --- LISTEN FOR UNREAD MESSAGES ---
   useEffect(() => {
@@ -307,7 +345,7 @@ export default function Dashboard() {
   };
 
   const handleCreateListing = async () => {
-    if (!canCreateListings(userData?.role, user?.email)) return toast.error("Only agents can create listings.");
+    if (!canCreateListings(userData?.role, user?.email)) return toast.error("Only sellers can create listings.");
     if (!listingTitle.trim()) return toast.warning("Enter a listing title.");
     if (!listingLocation) return toast.warning("Select a location.");
     if (!listingPrice.trim()) return toast.warning("Enter a price.");
@@ -336,14 +374,19 @@ export default function Dashboard() {
         .map((a) => a.trim())
         .filter((a) => a.length > 0);
 
+      // --- SECURITY FIX: SANITIZE INPUTS ---
+      const safeTitle = DOMPurify.sanitize(listingTitle);
+      const safeDescription = DOMPurify.sanitize(listingDescription);
+      // ---------------------------------------
+
       await addDoc(collection(db, "posts"), {
         userId: user.uid,
         userName: userData?.firstName ? `${userData.firstName} ${userData.lastName}` : (user.displayName || "Metro User"),
         userAvatar: user.photoURL,
         userCustomId: userData?.customId || "USER",
         userRole: userData?.role || "Client",
-        title: listingTitle,
-        content: listingDescription,
+        title: safeTitle,         // <-- Now using the clean, safe title
+        content: safeDescription, // <-- Now using the clean, safe description
         location: listingLocation,
         price: listingPrice,
         status: listingStatus,
@@ -601,9 +644,53 @@ export default function Dashboard() {
       <nav className="dash-nav">
         <div className="dash-nav-left">
           <img src={logo} alt="MBC" className="dash-logo" />
-          <div className="dash-search-wrapper">
+          <div className="dash-search-wrapper" style={{ position: 'relative' }}>
             <FaSearch className="dash-search-icon" />
-            <input type="text" placeholder="Look for agents..." className="dash-search-input" />
+            <input 
+              type="text" 
+              placeholder="Search people..." 
+              className="dash-search-input" 
+              value={searchQuery}
+              onChange={handleSearch}
+            />
+            
+            {/* --- LIVE SEARCH DROPDOWN --- */}
+            {searchQuery.trim().length > 0 && (
+              <div style={{ position: 'absolute', top: '110%', left: 0, width: '100%', background: 'white', borderRadius: '8px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', zIndex: 100, overflow: 'hidden', border: '1px solid #e5e7eb' }}>
+                {isSearching ? (
+                  <div style={{ padding: '15px', textAlign: 'center', color: '#6b7280', fontSize: '0.9rem' }}>Searching...</div>
+                ) : searchResults.length > 0 ? (
+                  searchResults.map(result => (
+                    <div 
+                      key={result.id} 
+                      onClick={() => {
+                        navigate(`/profile/${result.id}`);
+                        setSearchQuery(""); // Clear search after clicking
+                      }}
+                      style={{ padding: '12px 15px', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', borderBottom: '1px solid #f3f4f6', transition: '0.2s' }}
+                      onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+                      onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                    >
+                      <img 
+                        src={result.photoURL || `https://ui-avatars.com/api/?name=${result.firstName}+${result.lastName}`} 
+                        style={{ width: '35px', height: '35px', borderRadius: '50%', objectFit: 'cover' }} 
+                        alt="avatar" 
+                      />
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontWeight: '600', fontSize: '0.9rem', color: '#111' }}>
+                          {result.firstName} {result.lastName}
+                        </span>
+                        <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: '500' }}>
+                          {result.role} • {result.customId}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ padding: '15px', textAlign: 'center', color: '#6b7280', fontSize: '0.9rem' }}>No users found.</div>
+                )}
+              </div>
+            )}
           </div>
         </div>
         <div className="dash-nav-right" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
