@@ -126,7 +126,7 @@ export default function Services() {
 
         {/* Services Grid */}
         <section className="info-section">
-          <h2 className="info-section-title">What We Offer</h2>
+          <h2 className="info-section-title" style={{ textAlign: 'center' }}>What We Offer</h2>
           <div className="info-services-grid">
             {SERVICES.map((service, i) => (
               <div className="info-service-card" key={i}>
