@@ -10,7 +10,8 @@ import {
   FaStarHalfAlt, FaRegStar, FaShare, FaChevronDown,
   FaChevronLeft, FaChevronRight, FaBed, FaBath, FaRulerCombined,
   FaCalendarAlt, FaPhoneAlt, FaHeart, FaRegHeart,
-  FaMap, FaCalculator
+  FaMap, FaCalculator,
+  FaFacebookF, FaTwitter, FaInstagram
 } from "react-icons/fa";
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -160,6 +161,7 @@ export default function Dashboard() {
   const [mortgageRate, setMortgageRate] = useState(6.5);
   const [mortgageTerm, setMortgageTerm] = useState(20);
   const [mapStyle, setMapStyle] = useState<'street' | 'satellite'>('street');
+  const [showShareSocials, setShowShareSocials] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -509,6 +511,7 @@ export default function Dashboard() {
     setCarouselIndex(0);
     setIsLiked(false);
     setActiveModalTab('details');
+    setShowShareSocials(false);
     // Reset mortgage to defaults based on listing price
     setMortgageDownPayment(20);
     setMortgageRate(6.5);
@@ -518,6 +521,7 @@ export default function Dashboard() {
 
   const closeListingModal = () => {
     setSelectedListing(null);
+    setShowShareSocials(false);
   };
 
   const nextImage = (e: React.MouseEvent) => {
@@ -990,16 +994,6 @@ export default function Dashboard() {
         return (
           <div className="listing-modal-overlay" onClick={closeListingModal}>
             <div className="listing-modal" onClick={(e) => e.stopPropagation()}>
-              {/* Top-Right Button Group: Like + Close */}
-              <div className="listing-modal-top-actions">
-                <button className="listing-modal-like" onClick={() => setIsLiked(!isLiked)}>
-                  {isLiked ? <FaHeart color="#ef4444" /> : <FaRegHeart />}
-                </button>
-                <button className="listing-modal-close" onClick={closeListingModal}>
-                  <FaTimes />
-                </button>
-              </div>
-
               {/* Image Carousel */}
               <div className="listing-modal-carousel">
                 <img
@@ -1028,6 +1022,15 @@ export default function Dashboard() {
                 )}
                 {/* Status Badge */}
                 <span className="listing-modal-status">{selectedListing.status}</span>
+                {/* Top-Right: Like + Close */}
+                <div className="listing-modal-top-actions">
+                  <button className="listing-modal-like" onClick={(e) => { e.stopPropagation(); setIsLiked(!isLiked); }}>
+                    {isLiked ? <FaHeart color="#ef4444" /> : <FaRegHeart />}
+                  </button>
+                  <button className="listing-modal-close" onClick={(e) => { e.stopPropagation(); closeListingModal(); }}>
+                    <FaTimes />
+                  </button>
+                </div>
                 {/* Image Counter */}
                 <span className="listing-modal-counter">{carouselIndex + 1} / {imgs.length}</span>
               </div>
@@ -1165,9 +1168,44 @@ export default function Dashboard() {
                       <button className="listing-modal-inquire-btn" onClick={() => handleInquire(selectedListing)}>
                         INQUIRE NOW →
                       </button>
-                      <button className="listing-modal-share-btn" onClick={() => handleShare(selectedListing)}>
-                        <FaShare size={12} /> Share Listing
-                      </button>
+                      <div className="listing-modal-share-wrapper">
+                        <button className="listing-modal-share-btn" onClick={() => setShowShareSocials(!showShareSocials)}>
+                          <FaShare size={12} /> Share Listing
+                        </button>
+                        <div className={`listing-modal-share-socials ${showShareSocials ? 'show' : ''}`}>
+                          <button
+                            className="modal-social-btn modal-social-fb"
+                            title="Share to Facebook"
+                            onClick={() => {
+                              const url = window.location.href;
+                              window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}&quote=${encodeURIComponent(`${selectedListing.title} - ${selectedListing.price} in ${selectedListing.location}`)}`, '_blank', 'width=600,height=400');
+                            }}
+                          >
+                            <FaFacebookF size={14} />
+                          </button>
+                          <button
+                            className="modal-social-btn modal-social-tw"
+                            title="Share to X (Twitter)"
+                            onClick={() => {
+                              const url = window.location.href;
+                              const text = `Check out this listing: ${selectedListing.title} - ${selectedListing.price} in ${selectedListing.location}`;
+                              window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank', 'width=600,height=400');
+                            }}
+                          >
+                            <FaTwitter size={14} />
+                          </button>
+                          <button
+                            className="modal-social-btn modal-social-ig"
+                            title="Share to Instagram"
+                            onClick={() => {
+                              navigator.clipboard.writeText(`${selectedListing.title} - ${selectedListing.price} in ${selectedListing.location}\n${window.location.href}`);
+                              toast.success('Link copied! Paste it on Instagram.');
+                            }}
+                          >
+                            <FaInstagram size={14} />
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </>
                 )}

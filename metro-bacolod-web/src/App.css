@@ -569,6 +569,54 @@ ul { list-style: none; }
   border-color: #333336;
 }
 
+/* Social Share Buttons Row */
+.glass-card-socials {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.glass-social-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50% !important;
+  border: 1.5px solid #e5e7eb !important;
+  background: white !important;
+  color: #6b7280 !important;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 !important;
+  transition: all 0.25s ease;
+  flex-shrink: 0;
+}
+
+.glass-social-btn:hover {
+  transform: scale(1.12);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.1);
+}
+
+.glass-social-btn.glass-social-fb:hover {
+  background: #1877f2 !important;
+  border-color: #1877f2 !important;
+  color: white !important;
+}
+
+.glass-social-btn.glass-social-tw:hover {
+  background: #1d9bf0 !important;
+  border-color: #1d9bf0 !important;
+  color: white !important;
+}
+
+.glass-social-btn.glass-social-ig:hover {
+  background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888) !important;
+  border-color: #dc2743 !important;
+  color: white !important;
+}
+
 /* Card Right Column (Image + Inquire) */
 .glass-card-right {
   width: 260px;
@@ -2041,7 +2089,7 @@ ul { list-style: none; }
   position: absolute;
   top: 16px;
   right: 16px;
-  z-index: 20;
+  z-index: 15;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -2049,32 +2097,36 @@ ul { list-style: none; }
 
 /* --- Close Button --- */
 .listing-modal-close {
-  position: relative;
-  top: auto;
-  right: auto;
-  z-index: 20;
   width: 38px;
   height: 38px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(255, 255, 255, 0.9);
+  border-radius: 50% !important;
+  border: none !important;
+  background: rgba(255, 255, 255, 0.92) !important;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  color: #374151;
+  color: #374151 !important;
   font-size: 0.95rem;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+  padding: 0 !important;
+}
+
+.listing-modal-close svg {
+  fill: #374151;
+  color: #374151;
+  width: 16px;
+  height: 16px;
 }
 
 .listing-modal-close:hover {
-  background: white;
+  background: white !important;
   transform: scale(1.1);
   border-color: transparent !important;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
 /* --- Image Carousel --- */
@@ -2175,31 +2227,35 @@ ul { list-style: none; }
 
 /* Like Button (on image) */
 .listing-modal-like {
-  position: relative;
-  top: auto;
-  right: auto;
   width: 38px;
   height: 38px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(255, 255, 255, 0.9);
+  border-radius: 50% !important;
+  border: none !important;
+  background: rgba(255, 255, 255, 0.92) !important;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  color: #6b7280;
+  color: #6b7280 !important;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 1rem;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  z-index: 10;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+  padding: 0 !important;
+}
+
+.listing-modal-like svg {
+  fill: currentColor;
+  color: inherit;
+  width: 18px;
+  height: 18px;
 }
 
 .listing-modal-like:hover {
   transform: scale(1.15);
   border-color: transparent !important;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
 /* Image Counter */
@@ -2463,6 +2519,101 @@ ul { list-style: none; }
 .listing-modal-share-btn:hover {
   background: #f9fafb;
   border-color: #d1d5db;
+}
+
+/* --- Share Socials in Modal --- */
+.listing-modal-share-wrapper {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.listing-modal-share-wrapper .listing-modal-share-btn {
+  margin-top: 0;
+}
+
+.listing-modal-share-socials {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 0;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.35s ease,
+              margin-top 0.35s ease;
+}
+
+.listing-modal-share-socials.show {
+  max-height: 60px;
+  opacity: 1;
+  margin-top: 10px;
+}
+
+.modal-social-btn {
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  border-radius: 50% !important;
+  border: none !important;
+  color: white !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  padding: 0 !important;
+  transition: transform 0.25s ease, box-shadow 0.25s ease !important;
+  transform: scale(0);
+  animation: none;
+}
+
+.listing-modal-share-socials.show .modal-social-btn {
+  animation: socialPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.listing-modal-share-socials.show .modal-social-btn:nth-child(1) {
+  animation-delay: 0.05s;
+}
+.listing-modal-share-socials.show .modal-social-btn:nth-child(2) {
+  animation-delay: 0.12s;
+}
+.listing-modal-share-socials.show .modal-social-btn:nth-child(3) {
+  animation-delay: 0.19s;
+}
+
+@keyframes socialPop {
+  0% {
+    transform: scale(0) rotate(-45deg);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1) rotate(0);
+    opacity: 1;
+  }
+}
+
+.modal-social-fb {
+  background: #1877F2 !important;
+}
+.modal-social-fb:hover {
+  transform: scale(1.15) !important;
+  box-shadow: 0 4px 14px rgba(24, 119, 242, 0.45) !important;
+}
+
+.modal-social-tw {
+  background: #1DA1F2 !important;
+}
+.modal-social-tw:hover {
+  transform: scale(1.15) !important;
+  box-shadow: 0 4px 14px rgba(29, 161, 242, 0.45) !important;
+}
+
+.modal-social-ig {
+  background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888) !important;
+}
+.modal-social-ig:hover {
+  transform: scale(1.15) !important;
+  box-shadow: 0 4px 14px rgba(225, 48, 108, 0.45) !important;
 }
 
 /* --- Tab Navigation --- */
