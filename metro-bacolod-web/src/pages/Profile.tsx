@@ -905,7 +905,7 @@ export default function Profile() {
       {/* ========== LISTING DETAIL MODAL ========== */}
       {selectedListing && (() => {
         const imgs = selectedListing.images?.length > 0 ? selectedListing.images : [selectedListing.image];
-        const listingCoords = LOCATION_COORDS[selectedListing.location] || BACOLOD_CENTER;
+        const listingCoords = selectedListing.pinCoords || LOCATION_COORDS[selectedListing.location] || BACOLOD_CENTER;
         const propertyPrice = parsePriceToNumber(selectedListing.price);
         const mortgage = propertyPrice > 0 ? calculateMortgage(propertyPrice, mortgageDownPayment, mortgageRate, mortgageTerm) : null;
         return (
@@ -977,7 +977,7 @@ export default function Profile() {
               </div>
 
               {/* Modal Body */}
-              <div className="listing-modal-body">
+              <div className="listing-modal-body" key={activeModalTab}>
                 {activeModalTab === 'details' && (
                   <>
                     <div className="listing-modal-body-left">
@@ -1159,19 +1159,26 @@ export default function Profile() {
                           <div className="calc-value-display">₱{propertyPrice.toLocaleString()}</div>
                         </div>
                         <div className="calc-input-group">
-                          <label className="calc-label">Down Payment: <strong>{mortgageDownPayment}%</strong></label>
-                          <input type="range" min="5" max="50" step="5" value={mortgageDownPayment} onChange={(e) => setMortgageDownPayment(Number(e.target.value))} className="calc-slider" />
-                          <div className="calc-range-labels"><span>5%</span><span>₱{mortgage.downPayment.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span><span>50%</span></div>
+                          <label className="calc-label">Down Payment (%)</label>
+                          <div className="calc-input-row">
+                            <input type="number" min="5" max="50" step="1" value={mortgageDownPayment} onChange={(e) => { const v = Math.min(50, Math.max(5, Number(e.target.value) || 5)); setMortgageDownPayment(v); }} className="calc-number-input" />
+                            <span className="calc-input-suffix">%</span>
+                          </div>
+                          <span className="calc-input-hint">₱{mortgage.downPayment.toLocaleString(undefined, { maximumFractionDigits: 0 })} down payment</span>
                         </div>
                         <div className="calc-input-group">
-                          <label className="calc-label">Annual Interest Rate: <strong>{mortgageRate}%</strong></label>
-                          <input type="range" min="1" max="15" step="0.5" value={mortgageRate} onChange={(e) => setMortgageRate(Number(e.target.value))} className="calc-slider" />
-                          <div className="calc-range-labels"><span>1%</span><span></span><span>15%</span></div>
+                          <label className="calc-label">Annual Interest Rate (%)</label>
+                          <div className="calc-input-row">
+                            <input type="number" min="1" max="15" step="0.1" value={mortgageRate} onChange={(e) => { const v = Math.min(15, Math.max(1, Number(e.target.value) || 1)); setMortgageRate(v); }} className="calc-number-input" />
+                            <span className="calc-input-suffix">%</span>
+                          </div>
                         </div>
                         <div className="calc-input-group">
-                          <label className="calc-label">Loan Term: <strong>{mortgageTerm} years</strong></label>
-                          <input type="range" min="5" max="30" step="5" value={mortgageTerm} onChange={(e) => setMortgageTerm(Number(e.target.value))} className="calc-slider" />
-                          <div className="calc-range-labels"><span>5 yrs</span><span></span><span>30 yrs</span></div>
+                          <label className="calc-label">Loan Term (Years)</label>
+                          <div className="calc-input-row">
+                            <input type="number" min="1" max="30" step="1" value={mortgageTerm} onChange={(e) => { const v = Math.min(30, Math.max(1, Number(e.target.value) || 1)); setMortgageTerm(v); }} className="calc-number-input" />
+                            <span className="calc-input-suffix">yrs</span>
+                          </div>
                         </div>
                       </div>
                       <div className="listing-modal-calc-results">
