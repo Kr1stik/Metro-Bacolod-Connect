@@ -118,6 +118,15 @@ function parsePriceToNumber(priceStr: string): number {
   return num;
 }
 
+// --- Format price number for display ---
+function formatPriceDisplay(price: string): string {
+  const num = parsePriceToNumber(price);
+  if (num <= 0) return price;
+  if (num >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(num % 1_000_000_000 === 0 ? 0 : 1)} Billion PHP`;
+  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(num % 1_000_000 === 0 ? 0 : 1)} Million PHP`;
+  return `₱${num.toLocaleString()}`;
+}
+
 export default function Dashboard() {
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
@@ -171,7 +180,7 @@ export default function Dashboard() {
 
   // Mortgage calculator state
   const [mortgageDownPayment, setMortgageDownPayment] = useState(20);
-  const [mortgageRate, setMortgageRate] = useState(6.5);
+  const [mortgageRate, setMortgageRate] = useState(7);
   const [mortgageTerm, setMortgageTerm] = useState(20);
   const [mapStyle, setMapStyle] = useState<'street' | 'satellite'>('street');
   const [showShareSocials, setShowShareSocials] = useState(false);
@@ -545,7 +554,7 @@ export default function Dashboard() {
     setShowShareSocials(false);
     // Reset mortgage to defaults based on listing price
     setMortgageDownPayment(20);
-    setMortgageRate(6.5);
+    setMortgageRate(7);
     setMortgageTerm(20);
     setMapStyle('street');
   };
@@ -715,7 +724,7 @@ export default function Dashboard() {
                     </h3>
                     <ul className="glass-card-bullets">
                       <li>→ {listing.location} Location</li>
-                      <li>→ {listing.price}</li>
+                      <li>→ {formatPriceDisplay(listing.price)}</li>
                     </ul>
                     <p className="glass-card-desc">{listing.description}</p>
                   </div>
@@ -805,14 +814,19 @@ export default function Dashboard() {
               {/* Two-column row: Price + Location */}
               <div className="create-listing-row">
                 <div className="create-listing-field">
-                  <label>Price *</label>
+                  <label>Price (₱) *</label>
                   <input
-                    type="text"
+                    type="number"
                     className="create-listing-input"
-                    placeholder="e.g. 2.8 million php"
+                    placeholder="e.g. 1000000"
                     value={listingPrice}
-                    onChange={(e) => setListingPrice(e.target.value)}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === '' || Number(v) >= 0) setListingPrice(v);
+                    }}
+                    min="0"
                   />
+                  {listingPrice && <span style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '4px' }}>Display: {formatPriceDisplay(listingPrice)}</span>}
                 </div>
                 <div className="create-listing-field">
                   <label>Location *</label>
@@ -1075,8 +1089,15 @@ export default function Dashboard() {
       {selectedListing && (() => {
         const imgs = selectedListing.images?.length > 0 ? selectedListing.images : [selectedListing.image];
         const listingCoords = selectedListing.pinCoords || LOCATION_COORDS[selectedListing.location] || BACOLOD_CENTER;
-        const propertyPrice = parsePriceToNumber(selectedListing.price);
-        const mortgage = propertyPrice > 0 ? calculateMortgage(propertyPrice, mortgageDownPayment, mortgageRate, mortgageTerm) : null;
+        const listingPrice = parsePriceToNumber(selectedListing.price);
+        const propertyPrice = listingPrice;
+
+        // Validation
+        const downPaymentError = mortgageDownPayment < 10 ? 'Minimum 10%' : mortgageDownPayment > 50 ? 'Maximum 50%' : '';
+        const rateError = mortgageRate < 3 ? 'Minimum 3%' : mortgageRate > 12 ? 'Maximum 12%' : '';
+        const termError = mortgageTerm < 5 ? 'Minimum 5 years' : mortgageTerm > 30 ? 'Maximum 30 years' : '';
+        const hasValidationError = !!(downPaymentError || rateError || termError || propertyPrice <= 0);
+        const mortgage = !hasValidationError && propertyPrice > 0 ? calculateMortgage(propertyPrice, mortgageDownPayment, mortgageRate, mortgageTerm) : null;
         return (
           <div className="listing-modal-overlay" onClick={closeListingModal}>
             <div className="listing-modal" onClick={(e) => e.stopPropagation()}>
@@ -1135,7 +1156,7 @@ export default function Dashboard() {
                 >
                   <FaMap size={13} /> Map
                 </button>
-                {propertyPrice > 0 && (
+                {listingPrice > 0 && (
                   <button
                     className={`listing-modal-tab ${activeModalTab === 'calculator' ? 'listing-modal-tab-active' : ''}`}
                     onClick={() => setActiveModalTab('calculator')}
@@ -1158,7 +1179,7 @@ export default function Dashboard() {
                             <FaMapMarkerAlt size={12} /> {selectedListing.location}, Bacolod City
                           </p>
                         </div>
-                        <div className="listing-modal-price">{selectedListing.price}</div>
+                        <div className="listing-modal-price">{formatPriceDisplay(selectedListing.price)}</div>
                       </div>
 
                       {/* Property Details Grid */}
@@ -1239,8 +1260,20 @@ export default function Dashboard() {
                         src={selectedListing.agentAvatar}
                         alt={selectedListing.agentName}
                         className="listing-modal-agent-avatar"
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => {
+                          const agentId = selectedListing.originalPost?.userId;
+                          if (agentId) { closeListingModal(); navigate(`/profile/${agentId}`); }
+                        }}
                       />
-                      <h4 className="listing-modal-agent-name">{selectedListing.agentName}</h4>
+                      <h4
+                        className="listing-modal-agent-name"
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => {
+                          const agentId = selectedListing.originalPost?.userId;
+                          if (agentId) { closeListingModal(); navigate(`/profile/${agentId}`); }
+                        }}
+                      >{selectedListing.agentName}</h4>
                       <span className="listing-modal-agent-role">Listing Agent</span>
                       <div className="listing-modal-agent-rating">
                         <RatingStars rating={selectedListing.agentRating} />
@@ -1264,7 +1297,7 @@ export default function Dashboard() {
                             title="Share to Facebook"
                             onClick={() => {
                               const url = window.location.href;
-                              window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}&quote=${encodeURIComponent(`${selectedListing.title} - ${selectedListing.price} in ${selectedListing.location}`)}`, '_blank', 'width=600,height=400');
+                              window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}&quote=${encodeURIComponent(`${selectedListing.title} - ${formatPriceDisplay(selectedListing.price)} in ${selectedListing.location}`)}`, '_blank', 'width=600,height=400');
                             }}
                           >
                             <FaFacebookF size={14} />
@@ -1274,7 +1307,7 @@ export default function Dashboard() {
                             title="Share to X (Twitter)"
                             onClick={() => {
                               const url = window.location.href;
-                              const text = `Check out this listing: ${selectedListing.title} - ${selectedListing.price} in ${selectedListing.location}`;
+                              const text = `Check out this listing: ${selectedListing.title} - ${formatPriceDisplay(selectedListing.price)} in ${selectedListing.location}`;
                               window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank', 'width=600,height=400');
                             }}
                           >
@@ -1284,7 +1317,7 @@ export default function Dashboard() {
                             className="modal-social-btn modal-social-ig"
                             title="Share to Instagram"
                             onClick={() => {
-                              navigator.clipboard.writeText(`${selectedListing.title} - ${selectedListing.price} in ${selectedListing.location}\n${window.location.href}`);
+                              navigator.clipboard.writeText(`${selectedListing.title} - ${formatPriceDisplay(selectedListing.price)} in ${selectedListing.location}\n${window.location.href}`);
                               toast.success('Link copied! Paste it on Instagram.');
                             }}
                           >
@@ -1343,7 +1376,7 @@ export default function Dashboard() {
                           <Popup>
                             <strong>{selectedListing.title}</strong><br />
                             {selectedListing.location}, Bacolod City<br />
-                            {selectedListing.price}
+                            {formatPriceDisplay(selectedListing.price)}
                           </Popup>
                         </Marker>
                       </MapContainer>
@@ -1351,107 +1384,117 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {activeModalTab === 'calculator' && mortgage && (
+                {activeModalTab === 'calculator' && (
                   <div className="listing-modal-calculator-container">
                     <div className="listing-modal-calc-header">
-                      <h3 className="listing-modal-calc-title">
-                        <FaCalculator size={14} /> Mortgage Calculator
-                      </h3>
-                      <p className="listing-modal-calc-subtitle">
-                        Estimate your monthly payments for <strong>{selectedListing.title}</strong>
-                      </p>
+                      <h3 className="listing-modal-calc-title"><FaCalculator size={14} /> Mortgage Calculator</h3>
+                      <p className="listing-modal-calc-subtitle">Estimate your monthly payments for <strong>{selectedListing.title}</strong></p>
                     </div>
-
                     <div className="listing-modal-calc-body">
-                      {/* Left: Inputs */}
                       <div className="listing-modal-calc-inputs">
                         <div className="calc-input-group">
-                          <label className="calc-label">Property Price</label>
+                          <label className="calc-label">Property Price (₱)</label>
                           <div className="calc-value-display">₱{propertyPrice.toLocaleString()}</div>
                         </div>
-
                         <div className="calc-input-group">
                           <label className="calc-label">Down Payment (%)</label>
                           <div className="calc-input-row">
                             <input
                               type="number"
-                              min="5"
+                              min="10"
                               max="50"
                               step="1"
                               value={mortgageDownPayment}
                               onChange={(e) => {
-                                const v = Math.min(50, Math.max(5, Number(e.target.value) || 5));
-                                setMortgageDownPayment(v);
+                                const v = Number(e.target.value);
+                                setMortgageDownPayment(v >= 0 ? v : 0);
                               }}
-                              className="calc-number-input"
+                              className={`calc-number-input ${downPaymentError ? 'calc-input-error' : ''}`}
                             />
                             <span className="calc-input-suffix">%</span>
                           </div>
-                          <span className="calc-input-hint">₱{mortgage.downPayment.toLocaleString(undefined, { maximumFractionDigits: 0 })} down payment</span>
+                          {downPaymentError
+                            ? <span className="calc-validation-error">{downPaymentError}</span>
+                            : !hasValidationError && mortgage && <span className="calc-input-hint">₱{mortgage.downPayment.toLocaleString(undefined, { maximumFractionDigits: 0 })} down payment</span>
+                          }
                         </div>
-
                         <div className="calc-input-group">
-                          <label className="calc-label">Annual Interest Rate (%)</label>
+                          <label className="calc-label">Interest Rate (%)</label>
                           <div className="calc-input-row">
                             <input
                               type="number"
-                              min="1"
-                              max="15"
+                              min="3"
+                              max="12"
                               step="0.1"
                               value={mortgageRate}
                               onChange={(e) => {
-                                const v = Math.min(15, Math.max(1, Number(e.target.value) || 1));
-                                setMortgageRate(v);
+                                const v = Number(e.target.value);
+                                setMortgageRate(v >= 0 ? v : 0);
                               }}
-                              className="calc-number-input"
+                              className={`calc-number-input ${rateError ? 'calc-input-error' : ''}`}
                             />
                             <span className="calc-input-suffix">%</span>
                           </div>
+                          {rateError && <span className="calc-validation-error">{rateError}</span>}
                         </div>
-
                         <div className="calc-input-group">
                           <label className="calc-label">Loan Term (Years)</label>
                           <div className="calc-input-row">
                             <input
                               type="number"
-                              min="1"
+                              min="5"
                               max="30"
                               step="1"
                               value={mortgageTerm}
                               onChange={(e) => {
-                                const v = Math.min(30, Math.max(1, Number(e.target.value) || 1));
-                                setMortgageTerm(v);
+                                const v = Number(e.target.value);
+                                setMortgageTerm(v >= 0 ? v : 0);
                               }}
-                              className="calc-number-input"
+                              className={`calc-number-input ${termError ? 'calc-input-error' : ''}`}
                             />
                             <span className="calc-input-suffix">yrs</span>
                           </div>
+                          {termError && <span className="calc-validation-error">{termError}</span>}
                         </div>
                       </div>
-
-                      {/* Right: Results */}
                       <div className="listing-modal-calc-results">
-                        <div className="calc-result-card calc-result-primary">
-                          <span className="calc-result-label">Monthly Payment</span>
-                          <span className="calc-result-value">₱{mortgage.monthlyPayment.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                        {hasValidationError ? (
+                          <div className="calc-result-card" style={{ textAlign: 'center', gridColumn: '1 / -1' }}>
+                            <span className="calc-result-label" style={{ color: '#ef4444' }}>Please fix the input errors above to see results.</span>
+                          </div>
+                        ) : mortgage ? (
+                          <>
+                            <div className="calc-result-card calc-result-primary">
+                              <span className="calc-result-label">Monthly Payment</span>
+                              <span className="calc-result-value">₱{mortgage.monthlyPayment.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                            </div>
+                            <div className="calc-result-card">
+                              <span className="calc-result-label">Loan Amount</span>
+                              <span className="calc-result-value-sm">₱{mortgage.principal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                            </div>
+                            <div className="calc-result-card">
+                              <span className="calc-result-label">Down Payment</span>
+                              <span className="calc-result-value-sm">₱{mortgage.downPayment.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                            </div>
+                            <div className="calc-result-card">
+                              <span className="calc-result-label">Total Interest</span>
+                              <span className="calc-result-value-sm">₱{mortgage.totalInterest.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                            </div>
+                            <div className="calc-result-card">
+                              <span className="calc-result-label">Total Payment</span>
+                              <span className="calc-result-value-sm">₱{mortgage.totalPayment.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                            </div>
+                          </>
+                        ) : null}
+                        <div className="calc-disclaimer" style={{ gridColumn: '1 / -1', marginTop: '8px' }}>
+                          <strong>Disclaimer:</strong>
+                          <p style={{ margin: '6px 0 4px' }}>
+                            This mortgage calculator provides estimated monthly payments based on the listing price. Down payment must be between 10% and 50%. Interest rates must be between 3% and 12%, and loan terms between 5 and 30 years.
+                          </p>
+                          <p style={{ margin: 0 }}>
+                            The property price reflects the listing price and cannot be edited. Actual loan terms, interest rates, and approval are subject to bank policies, credit evaluation, and market conditions. This tool is for informational purposes only and does not constitute a loan offer.
+                          </p>
                         </div>
-                        <div className="calc-result-card">
-                          <span className="calc-result-label">Loan Amount</span>
-                          <span className="calc-result-value-sm">₱{mortgage.principal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                        </div>
-                        <div className="calc-result-card">
-                          <span className="calc-result-label">Down Payment</span>
-                          <span className="calc-result-value-sm">₱{mortgage.downPayment.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                        </div>
-                        <div className="calc-result-card">
-                          <span className="calc-result-label">Total Interest</span>
-                          <span className="calc-result-value-sm">₱{mortgage.totalInterest.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                        </div>
-                        <div className="calc-result-card">
-                          <span className="calc-result-label">Total Payment</span>
-                          <span className="calc-result-value-sm">₱{mortgage.totalPayment.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                        </div>
-                        <p className="calc-disclaimer">* Estimates only. Actual rates and payments may vary based on lender terms and conditions.</p>
                       </div>
                     </div>
                   </div>

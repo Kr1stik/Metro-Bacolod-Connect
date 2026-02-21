@@ -2906,6 +2906,19 @@ ul { list-style: none; }
   box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.08);
 }
 
+.calc-input-error {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12) !important;
+}
+
+.calc-validation-error {
+  font-size: 0.75rem;
+  color: #ef4444;
+  font-weight: 600;
+  font-family: 'Google Sans', sans-serif;
+  margin-top: 2px;
+}
+
 .calc-input-suffix {
   font-size: 0.85rem;
   font-weight: 600;
