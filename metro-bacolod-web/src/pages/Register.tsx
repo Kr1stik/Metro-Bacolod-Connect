@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createUserWithEmailAndPassword, updateProfile, sendEmailVerification, signOut } from "firebase/auth";
 import { auth, db } from "../firebase-config";
-import { doc, setDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import logo from "../assets/MBC Logo.png"; 
@@ -14,7 +14,7 @@ export default function Register() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // --- FORM STATE ---
-  const [isAgent, setIsAgent] = useState(false);
+  const [isSeller, setIsSeller] = useState(false); // Replaces the PRC Checkbox
   
   // Personal
   const [firstName, setFirstName] = useState("");
@@ -39,14 +39,12 @@ export default function Register() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false); 
 
-  // --- HELPERS ---
-  const generateUniqueId = async (role: string) => {
-    const usersRef = collection(db, "users");
-    const q = query(usersRef, where("role", "==", role));
-    const snapshot = await getDocs(q);
-    const count = snapshot.size + 1;
-    const prefix = role === "Agent" ? "AGENT" : "CLIENT";
-    return `${prefix}${count.toString().padStart(3, '0')}`;
+  // --- RANDOM ID GENERATOR ---
+  // Generates IDs like "SELR-X4F9A2" or "CLNT-M7V1Q8"
+  const generateRandomId = (role: string) => {
+    const prefix = role === "Seller" ? "SELR" : "CLNT";
+    const randomChars = Math.random().toString(36).substring(2, 8).toUpperCase(); 
+    return `${prefix}-${randomChars}`;
   };
 
   const handleMiddleInitial = (e: any) => {
@@ -78,8 +76,9 @@ export default function Register() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      const role = isAgent ? "Agent" : "Client";
-      const customId = await generateUniqueId(role);
+      // Determine role based on the checkbox!
+      const accountRole = isSeller ? "Seller" : "Client";
+      const customId = generateRandomId(accountRole);
       const fullMobile = `+63${mobile}`; 
 
       await updateProfile(user, {
@@ -90,8 +89,8 @@ export default function Register() {
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         email: user.email,
-        role: role,
-        customId: customId,
+        role: accountRole, // "Seller" or "Client"
+        customId: customId, // "SELR-123456" or "CLNT-123456"
         firstName, 
         middleName: middleInitial, 
         lastName,
@@ -120,31 +119,10 @@ export default function Register() {
   const isMismatch = password && confirmPassword && password !== confirmPassword;
 
   return (
-    <div style={{ 
-        position: 'fixed',
-        inset: 0,
-        width: '100%',
-        height: '100%',
-        overflowY: 'auto', 
-        backgroundColor: '#ffffff', 
-        fontFamily: "'Inter', sans-serif",
-        zIndex: 9999, 
-        color: '#111'
-    }}>
+    <div style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', overflowY: 'auto', backgroundColor: '#ffffff', fontFamily: "'Inter', sans-serif", zIndex: 9999, color: '#111' }}>
       
       {/* HEADER */}
-      <div style={{ 
-          width: '100%', 
-          padding: '15px 5%', // Reduced padding for mobile
-          borderBottom: '1px solid #e5e7eb', 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'space-between',
-          position: 'sticky',
-          top: 0,
-          background: 'white',
-          zIndex: 50
-      }}>
+      <div style={{ width: '100%', padding: '15px 5%', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, background: 'white', zIndex: 50 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <img src={logo} alt="Logo" style={{ width: '40px' }} />
           <div><h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '700', color: '#111' }}>Create Account</h2></div>
@@ -154,74 +132,26 @@ export default function Register() {
         </button>
       </div>
 
-      {/* BODY - Added className="register-card" for mobile responsiveness */}
-      <div className="register-card" style={{ maxWidth: '1000px', margin: '0 auto', padding: '40px 20px' }}>
+      {/* BODY */}
+      <div className="register-card" style={{ maxWidth: '800px', margin: '0 auto', padding: '40px 20px' }}>
         
         <form onSubmit={handleRegister}>
-          
-          <div style={{ marginBottom: '30px', textAlign: 'center' }}>
+          <div style={{ marginBottom: '40px', textAlign: 'center' }}>
             <h1 style={{ fontSize: '1.8rem', fontWeight: '800', marginBottom: '10px', color: '#111' }}>Join Metro Bacolod Connect</h1>
-            <p style={{ color: '#6b7280', fontSize: '0.95rem' }}>Fill in your details to get verified access to listings and professionals.</p>
-          </div>
-
-          <div style={{ marginBottom: '40px', background: '#f9fafb', padding: '15px', borderRadius: '12px', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'flex-start', gap: '15px' }}>
-             <input type="checkbox" id="agentCheck" checked={isAgent} onChange={e => setIsAgent(e.target.checked)} style={{ width: '22px', height: '22px', accentColor: 'black', marginTop: '3px' }} />
-             <div>
-                <label htmlFor="agentCheck" style={{ fontWeight: '700', fontSize: '1rem', cursor: 'pointer', display: 'block', color: '#111' }}>I am a Licensed Real Estate Agent</label>
-                <span style={{ fontSize: '0.85rem', color: '#6b7280' }}>Check this box if you intend to post listings and sell properties.</span>
-             </div>
+            <p style={{ color: '#6b7280', fontSize: '0.95rem' }}>Create your account to start browsing or listing properties.</p>
           </div>
 
           <section style={{ marginBottom: '40px' }}>
             <h4 style={sectionHeaderStyle}>Personal Details</h4>
-            
-            {/* NAME GRID: Changed to Flex Wrap for Mobile */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', marginBottom: '20px' }}>
-                <div className="form-group" style={{ flex: '2 1 200px' }}>
-                    <label style={labelStyle}>First Name *</label>
-                    <input required type="text" style={inputStyle} value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="e.g. Juan" />
-                </div>
-                
-                <div className="form-group" style={{ flex: '1 1 80px' }}>
-                    <label style={labelStyle}>M.I.</label>
-                    <input 
-                        type="text" 
-                        style={{...inputStyle, textAlign: 'center'}} 
-                        value={middleInitial} 
-                        onChange={handleMiddleInitial} 
-                        placeholder="M."
-                        maxLength={2}
-                    />
-                </div>
-                
-                <div className="form-group" style={{ flex: '2 1 200px' }}>
-                    <label style={labelStyle}>Last Name *</label>
-                    <input required type="text" style={inputStyle} value={lastName} onChange={e => setLastName(e.target.value)} placeholder="e.g. Dela Cruz" />
-                </div>
+                <div className="form-group" style={{ flex: '2 1 200px' }}><label style={labelStyle}>First Name *</label><input required type="text" style={inputStyle} value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="e.g. Juan" /></div>
+                <div className="form-group" style={{ flex: '1 1 80px' }}><label style={labelStyle}>M.I.</label><input type="text" style={{...inputStyle, textAlign: 'center'}} value={middleInitial} onChange={handleMiddleInitial} placeholder="M." maxLength={2} /></div>
+                <div className="form-group" style={{ flex: '2 1 200px' }}><label style={labelStyle}>Last Name *</label><input required type="text" style={inputStyle} value={lastName} onChange={e => setLastName(e.target.value)} placeholder="e.g. Dela Cruz" /></div>
             </div>
-
             <div style={grid3Style}>
-                <div className="form-group" style={{ position: 'relative' }}>
-                    <label style={labelStyle}>Date of Birth *</label>
-                    <input 
-                        required 
-                        type="date" 
-                        style={inputStyle} 
-                        value={dob} 
-                        onChange={e => setDob(e.target.value)} 
-                        className="custom-date-input"
-                    />
-                </div>
-                
-                <div className="form-group"><label style={labelStyle}>Gender *</label>
-                <select required style={inputStyle} value={gender} onChange={e => setGender(e.target.value)}>
-                    <option value="" disabled>Select Gender</option><option value="Male">Male</option><option value="Female">Female</option><option value="Prefer not to say">Prefer not to say</option>
-                </select></div>
-                
-                <div className="form-group"><label style={labelStyle}>Marital Status *</label>
-                <select required style={inputStyle} value={maritalStatus} onChange={e => setMaritalStatus(e.target.value)}>
-                    <option value="" disabled>Select Status</option><option value="Single">Single</option><option value="Married">Married</option><option value="Widowed">Widowed</option><option value="Separated">Separated</option>
-                </select></div>
+                <div className="form-group" style={{ position: 'relative' }}><label style={labelStyle}>Date of Birth *</label><input required type="date" style={inputStyle} value={dob} onChange={e => setDob(e.target.value)} className="custom-date-input" /></div>
+                <div className="form-group"><label style={labelStyle}>Gender *</label><select required style={inputStyle} value={gender} onChange={e => setGender(e.target.value)}><option value="" disabled>Select Gender</option><option value="Male">Male</option><option value="Female">Female</option><option value="Prefer not to say">Prefer not to say</option></select></div>
+                <div className="form-group"><label style={labelStyle}>Marital Status *</label><select required style={inputStyle} value={maritalStatus} onChange={e => setMaritalStatus(e.target.value)}><option value="" disabled>Select Status</option><option value="Single">Single</option><option value="Married">Married</option><option value="Widowed">Widowed</option><option value="Separated">Separated</option></select></div>
             </div>
           </section>
 
@@ -229,48 +159,18 @@ export default function Register() {
 
           <section style={{ marginBottom: '40px' }}>
             <h4 style={sectionHeaderStyle}>Address & Contact</h4>
-            
             <div style={{ marginBottom: '20px' }}>
                 <label style={labelStyle}>Mobile Number *</label>
                 <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #d1d5db', borderRadius: '8px', overflow: 'hidden', background: 'white' }}>
                     <span style={{ background: '#f3f4f6', padding: '12px 15px', color: '#374151', fontWeight: '600', borderRight: '1px solid #d1d5db' }}>+63</span>
-                    <input 
-                        required 
-                        type="tel" 
-                        value={mobile} 
-                        onChange={handleMobile} 
-                        placeholder="917 123 4567" 
-                        style={{ 
-                            border: 'none', 
-                            outline: 'none', 
-                            padding: '12px', 
-                            width: '100%', 
-                            fontSize: '1rem',
-                            color: '#000000', 
-                            background: 'transparent' 
-                        }}
-                    />
+                    <input required type="tel" value={mobile} onChange={handleMobile} placeholder="917 123 4567" style={{ border: 'none', outline: 'none', padding: '12px', width: '100%', fontSize: '1rem', color: '#000000', background: 'transparent' }} />
                 </div>
             </div>
-
             <div style={{ marginBottom: '20px' }}><label style={labelStyle}>Street / Block / Lot *</label><input required type="text" style={inputStyle} value={street} onChange={e => setStreet(e.target.value)} placeholder="e.g. Lacson Street" /></div>
-            
             <div style={grid3Style}>
-                <div className="form-group"><label style={labelStyle}>City / Barangay *</label>
-                <select required style={inputStyle} value={city} onChange={e => setCity(e.target.value)}>
-                    <option value="" disabled>Select Location</option>{BACOLOD_LOCATIONS.map(loc => <option key={loc} value={loc}>{loc}</option>)}
-                </select></div>
-                
+                <div className="form-group"><label style={labelStyle}>City / Barangay *</label><select required style={inputStyle} value={city} onChange={e => setCity(e.target.value)}><option value="" disabled>Select Location</option>{BACOLOD_LOCATIONS.map(loc => <option key={loc} value={loc}>{loc}</option>)}</select></div>
                 <div className="form-group"><label style={labelStyle}>Province</label><input type="text" style={{...inputStyle, background: '#f9fafb', color: '#6b7280'}} value={province} readOnly /></div>
-                
-                <div className="form-group"><label style={labelStyle}>Postal Code</label>
-                    <input 
-                        type="text" 
-                        style={{...inputStyle, background: '#f9fafb', color: '#6b7280', cursor: 'not-allowed'}} 
-                        value="6100" 
-                        readOnly 
-                    />
-                </div>
+                <div className="form-group"><label style={labelStyle}>Postal Code</label><input type="text" style={{...inputStyle, background: '#f9fafb', color: '#6b7280', cursor: 'not-allowed'}} value="6100" readOnly /></div>
             </div>
           </section>
 
@@ -280,32 +180,14 @@ export default function Register() {
              <h4 style={sectionHeaderStyle}>Account Security</h4>
              <div style={grid3Style}>
                 <div className="form-group"><label style={labelStyle}>Email Address *</label><input required type="email" style={inputStyle} value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" /></div>
-                
                 <div className="form-group" style={{ position: 'relative' }}>
                     <label style={labelStyle}>Password *</label>
-                    <input 
-                        required 
-                        type={showPassword ? "text" : "password"} 
-                        style={inputStyle} 
-                        value={password} 
-                        onChange={e => setPassword(e.target.value)} 
-                        placeholder="••••••••" 
-                    />
-                    <div onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '12px', top: '38px', cursor: 'pointer', color: '#6b7280' }}>
-                        {showPassword ? <FaEyeSlash /> : <FaEye />}
-                    </div>
+                    <input required type={showPassword ? "text" : "password"} style={inputStyle} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" />
+                    <div onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '12px', top: '38px', cursor: 'pointer', color: '#6b7280' }}>{showPassword ? <FaEyeSlash /> : <FaEye />}</div>
                 </div>
-
                 <div className="form-group" style={{ position: 'relative' }}>
                     <label style={labelStyle}>Confirm Password *</label>
-                    <input 
-                        required 
-                        type={showPassword ? "text" : "password"} 
-                        style={{...inputStyle, borderColor: isMatch ? '#10B981' : isMismatch ? '#EF4444' : '#d1d5db'}} 
-                        value={confirmPassword} 
-                        onChange={e => setConfirmPassword(e.target.value)} 
-                        placeholder="••••••••" 
-                    />
+                    <input required type={showPassword ? "text" : "password"} style={{...inputStyle, borderColor: isMatch ? '#10B981' : isMismatch ? '#EF4444' : '#d1d5db'}} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="••••••••" />
                     {isMatch && <FaCheckCircle style={{ position: 'absolute', right: '12px', top: '40px', color: '#10B981' }} />}
                     {isMismatch && <FaTimesCircle style={{ position: 'absolute', right: '12px', top: '40px', color: '#EF4444' }} />}
                 </div>
@@ -313,7 +195,16 @@ export default function Register() {
              {isMismatch && <p style={{ color: '#EF4444', fontSize: '0.85rem', marginTop: '-15px', textAlign: 'right' }}>Passwords do not match</p>}
           </section>
 
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginTop: '50px', marginBottom: '50px' }}>
+          {/* --- NEW CHECKBOX FOR SELLERS --- */}
+          <div style={{ marginBottom: '40px', background: '#f9fafb', padding: '15px', borderRadius: '12px', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'flex-start', gap: '15px' }}>
+             <input type="checkbox" id="sellerCheck" checked={isSeller} onChange={e => setIsSeller(e.target.checked)} style={{ width: '22px', height: '22px', accentColor: 'black', marginTop: '3px', cursor: 'pointer' }} />
+             <div>
+                <label htmlFor="sellerCheck" style={{ fontWeight: '700', fontSize: '1rem', cursor: 'pointer', display: 'block', color: '#111' }}>I want to sell properties</label>
+                <span style={{ fontSize: '0.85rem', color: '#6b7280' }}>Check this box if you intend to post listings and connect with buyers.</span>
+             </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginBottom: '50px' }}>
              <button type="submit" disabled={isSubmitting} style={{ padding: '15px 60px', borderRadius: '50px', border: 'none', background: 'black', color: 'white', fontWeight: '700', fontSize: '1rem', cursor: 'pointer', opacity: isSubmitting ? 0.7 : 1, boxShadow: '0 4px 15px rgba(0,0,0,0.2)', width: '100%' }}>
                {isSubmitting ? "Creating Account..." : "Complete Registration"}
              </button>
@@ -322,12 +213,8 @@ export default function Register() {
       </div>
 
       <style>{`
-        input[type="date"]::-webkit-calendar-picker-indicator {
-            cursor: pointer;
-            filter: invert(0); 
-        }
+        input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; filter: invert(0); }
       `}</style>
-      
       <ToastContainer position="top-right" theme="light" />
     </div>
   );

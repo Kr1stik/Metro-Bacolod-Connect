@@ -6,7 +6,7 @@
 export const ADMIN_EMAIL = "kin3.mahinay@gmail.com";
 
 // Role types
-export type UserRole = "Agent" | "Client" | "Admin";
+export type UserRole = "Seller" | "Client" | "Admin";
 
 /**
  * Check if the user is the platform admin.
@@ -20,7 +20,7 @@ export function isAdmin(email?: string | null): boolean {
  * Only Agents and Admins can do this.
  */
 export function canCreateListings(role?: string | null, email?: string | null): boolean {
-  return role === "Agent" || isAdmin(email);
+  return role === "Seller" || isAdmin(email);
 }
 
 /**
@@ -28,7 +28,7 @@ export function canCreateListings(role?: string | null, email?: string | null): 
  * Only Agents and Admins can do this.
  */
 export function canAccessTrash(role?: string | null, email?: string | null): boolean {
-  return role === "Agent" || isAdmin(email);
+  return role === "Seller" || isAdmin(email);
 }
 
 /**

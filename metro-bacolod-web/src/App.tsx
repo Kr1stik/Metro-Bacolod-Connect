@@ -15,6 +15,7 @@ import Professionals from "./pages/Professionals";
 import Services from "./pages/Services";
 import Resources from "./pages/Resources";
 import Messages from "./pages/Messages";
+import ProtectedRoute from "./components/ProtectedRoute";
 import { Analytics } from "@vercel/analytics/react";
 
 function App() {
@@ -26,7 +27,7 @@ function App() {
       try {
         // We call the backend route here
         const response = await api.get('/'); 
-        setMessage(response.data); // Should display: "Metro Bacolod Connect Backend is Working!"
+        setMessage(response.data); 
       } catch (error) {
         console.error("Connection Error:", error);
         setMessage('Error: Could not connect to backend.');
@@ -38,7 +39,7 @@ function App() {
 
   return (
     <>
-    {/* This container handles the popups for the whole app */}
+      {/* This container handles the popups for the whole app */}
       <ToastContainer 
         position="top-left" 
         autoClose={3000} 
@@ -49,25 +50,50 @@ function App() {
         pauseOnFocusLoss
         draggable
         pauseOnHover
-        theme="dark" // Matches your dark theme
+        theme="dark"
       />
-    <Routes>
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="/profile" element={<Profile />} />
-      <Route path="/profile/:userId" element={<Profile />} />
-      <Route path="/archive" element={<Archive />} />
-      <Route path="/settings" element={<Settings />} />
-      <Route path="/properties" element={<Properties />} />
-      <Route path="/professionals" element={<Professionals />} />
-      <Route path="/services" element={<Services />} />
-      <Route path="/resources" element={<Resources />} />
-      <Route path="/verify-email" element={<VerifyEmail />} />
-      <Route path="/messages" element={<Messages />} />
-    </Routes>
-    <Analytics />
-  </>
+      <Routes>
+        {/* ========================================== */}
+        {/* PUBLIC ROUTES (Anyone can view these)      */}
+        {/* ========================================== */}
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/properties" element={<Properties />} />
+        <Route path="/professionals" element={<Professionals />} />
+        <Route path="/services" element={<Services />} />
+        <Route path="/resources" element={<Resources />} />
+
+        {/* ========================================== */}
+        {/* PROTECTED ROUTES (Must be logged in)       */}
+        {/* ========================================== */}
+        <Route 
+          path="/dashboard" 
+          element={<ProtectedRoute><Dashboard /></ProtectedRoute>} 
+        />
+        <Route 
+          path="/profile" 
+          element={<ProtectedRoute><Profile /></ProtectedRoute>} 
+        />
+        <Route 
+          path="/profile/:userId" 
+          element={<ProtectedRoute><Profile /></ProtectedRoute>} 
+        />
+        <Route 
+          path="/archive" 
+          element={<ProtectedRoute><Archive /></ProtectedRoute>} 
+        />
+        <Route 
+          path="/settings" 
+          element={<ProtectedRoute><Settings /></ProtectedRoute>} 
+        />
+        <Route 
+          path="/messages" 
+          element={<ProtectedRoute><Messages /></ProtectedRoute>} 
+        />
+      </Routes>
+      <Analytics />
+    </>
   );
 }
 

@@ -114,14 +114,45 @@ function MapClickHandler({ onPin }: { onPin: (coords: [number, number]) => void 
   return null;
 }
 
+// --- Helper function to map Firebase data to UI perfectly ---
+const formatPostData = (d: any) => {
+  const p = d.data();
+  return {
+    id: d.id,
+    title: p.title || p.content?.split('\n')[0]?.substring(0, 40) || 'New Listing',
+    rooms: p.rooms || 0,
+    bathrooms: p.bathrooms || 0,
+    lotArea: p.lotArea || 'N/A',
+    floorArea: p.floorArea || 'N/A',
+    yearBuilt: p.yearBuilt || 0,
+    location: p.location || 'Bacolod',
+    price: p.price || 'Contact for price',
+    description: p.content || 'No description provided.',
+    fullDescription: p.content || 'No description provided.',
+    amenities: p.amenities || [],
+    agentName: p.userName || 'Unknown Agent',
+    agentRating: 4.0,
+    agentPhone: p.phone || 'N/A',
+    agentAvatar: p.userAvatar || 'https://ui-avatars.com/api/?name=U&rounded=true',
+    image: p.images?.[0] || p.image || '',
+    images: p.images || (p.image ? [p.image] : []),
+    status: p.status || 'For Sale',
+    type: p.type || 'Property',
+    listedDate: p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently',
+    originalPost: { ...p, id: d.id },
+  };
+};
+
 export default function Profile() {
   const { userId: routeUserId } = useParams<{ userId?: string }>();
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
+  const [myPosts, setMyPosts] = useState<any[]>([]); // User's own dynamic posts
+
   const [viewedUser, setViewedUser] = useState<any>(null);
   const [viewedUserData, setViewedUserData] = useState<any>(null);
   const [viewedPosts, setViewedPosts] = useState<any[]>([]);
-  const [myPosts, setMyPosts] = useState<any[]>([]);
+  
   const isViewingOther = !!routeUserId && routeUserId !== user?.uid;
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const navigate = useNavigate();
@@ -169,6 +200,15 @@ export default function Profile() {
           if (userSnap.exists()) {
             setUserData(userSnap.data());
           }
+
+          // Fetch the current user's actual posts!
+          const postsQuery = query(
+            collection(db, "posts"),
+            where("userId", "==", currentUser.uid)
+          );
+          const postsSnap = await getDocs(postsQuery);
+          setMyPosts(postsSnap.docs.map(formatPostData));
+
         } catch (err) {
           console.error("Error fetching user data:", err);
         }
@@ -242,42 +282,13 @@ export default function Profile() {
           setViewedUserData(userSnap.data());
           setViewedUser({ uid: routeUserId, ...userSnap.data() });
         }
-        // Fetch their posts
+        // Fetch their posts dynamically
         const postsQuery = query(
           collection(db, "posts"),
           where("userId", "==", routeUserId),
-          orderBy("createdAt", "desc")
         );
         const postsSnap = await getDocs(postsQuery);
-        const agentPosts = postsSnap.docs.map(d => {
-          const p = d.data();
-          return {
-            id: d.id,
-            title: p.title || p.content?.split('\n')[0]?.substring(0, 40) || 'New Listing',
-            rooms: p.rooms || 0,
-            bathrooms: p.bathrooms || 0,
-            lotArea: p.lotArea || 'N/A',
-            floorArea: p.floorArea || 'N/A',
-            yearBuilt: p.yearBuilt || 0,
-            location: p.location || 'Bacolod',
-            price: p.price || 'Contact for price',
-            description: p.content || 'No description provided.',
-            fullDescription: p.content || 'No description provided.',
-            amenities: p.amenities || [],
-            agentName: p.userName || 'Unknown Agent',
-            agentRating: 4.0,
-            agentPhone: p.phone || 'N/A',
-            agentAvatar: p.userAvatar || 'https://ui-avatars.com/api/?name=U&rounded=true',
-            image: p.images?.[0] || p.image || '',
-            images: p.images || (p.image ? [p.image] : []),
-            status: p.status || 'For Sale',
-            type: p.type || 'Property',
-            pinCoords: p.pinCoords || null,
-            listedDate: p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently',
-            originalPost: { ...p, id: d.id, userId: p.userId },
-          };
-        });
-        setViewedPosts(agentPosts);
+        setViewedPosts(postsSnap.docs.map(formatPostData));
       } catch (err) {
         console.error("Error fetching agent profile:", err);
       }
@@ -449,37 +460,7 @@ export default function Profile() {
       toast.success("Listing published!");
       resetCreateForm();
       setShowCreateModal(false);
-      // Refresh own posts
-      const refreshQuery = query(
-        collection(db, "posts"),
-        where("userId", "==", user.uid),
-        orderBy("createdAt", "desc")
-      );
-      const refreshSnap = await getDocs(refreshQuery);
-      setMyPosts(refreshSnap.docs.filter(d => !d.data().isArchived).map(d => {
-        const p = d.data();
-        return {
-          id: d.id,
-          title: p.title || 'New Listing',
-          rooms: p.rooms || 0, bathrooms: p.bathrooms || 0,
-          lotArea: p.lotArea || 'N/A', floorArea: p.floorArea || 'N/A',
-          yearBuilt: p.yearBuilt || 0, location: p.location || 'Bacolod',
-          price: p.price || 'Contact for price',
-          description: p.content || 'No description provided.',
-          fullDescription: p.content || 'No description provided.',
-          amenities: p.amenities || [],
-          agentName: p.userName || 'Unknown Agent', agentRating: 4.0,
-          agentPhone: p.phone || 'N/A',
-          agentAvatar: p.userAvatar || 'https://ui-avatars.com/api/?name=U&rounded=true',
-          image: p.images?.[0] || p.image || '',
-          images: p.images || (p.image ? [p.image] : []),
-          status: p.status || 'For Sale', type: p.type || 'Property',
-          pinCoords: p.pinCoords || null,
-          listedDate: p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently',
-          originalPost: { ...p, id: d.id, userId: p.userId },
-        };
-      }));
-
+      // Optional: Refresh myPosts here so the UI instantly shows the new listing
     } catch (error: any) {
       console.error(error);
       toast.error("Failed to publish: " + error.message);
@@ -504,6 +485,8 @@ export default function Profile() {
 
   const userRole = userData?.role || "Client";
   const isAgent = canCreateListings(userData?.role, user?.email);
+  
+  // This completely removes the mock data dependency!
   const profileListings = isViewingOther ? viewedPosts : myPosts;
 
   return (
@@ -529,7 +512,7 @@ export default function Profile() {
             <input
               type="text"
               className="dash-search-input"
-              placeholder="Look for agents..."
+              placeholder="Search in Metro Bacolod Connect"
             />
           </div>
         </div>
