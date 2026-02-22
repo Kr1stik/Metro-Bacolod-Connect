@@ -10,8 +10,7 @@ import mbcVid from "../assets/MBC_Vid_Logo3d.mp4";
 import Antigravity from "../components/Antigravity"; 
 import TextType from "../components/TextType"; 
 import ScrollFloat from "../components/ScrollFloat";
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { glassToast } from '../components/GlassToast';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
@@ -97,7 +96,7 @@ export default function LandingPage() {
 
       if (!user.emailVerified) {
         await signOut(auth); 
-        toast.error("Login failed: Email not verified. Please check your inbox.");
+        glassToast.error("Login failed: Email not verified. Please check your inbox.");
         return; 
       }
 
@@ -105,16 +104,16 @@ export default function LandingPage() {
       const userDoc = await getDoc(doc(db, "users", user.uid));
       if (userDoc.exists() && userDoc.data().isDeactivated) {
         await signOut(auth);
-        toast.error("This account has been deactivated. Contact support.");
+        glassToast.error("This account has been deactivated. Contact support.");
         return;
       }
 
       navigate("/dashboard", { state: { welcome: true } });
     } catch (error: any) {
       if (error.code === 'auth/invalid-credential') {
-        toast.error("Incorrect email or password.");
+        glassToast.error("Incorrect email or password.");
       } else {
-        toast.error("Login failed. Please try again.");
+        glassToast.error("Login failed. Please try again.");
       }
     }
   };
@@ -128,13 +127,13 @@ export default function LandingPage() {
       const userDoc = await getDoc(doc(db, "users", gUser.uid));
       if (userDoc.exists() && userDoc.data().isDeactivated) {
         await signOut(auth);
-        toast.error("This account has been deactivated. Contact support.");
+        glassToast.error("This account has been deactivated. Contact support.");
         return;
       }
 
       navigate("/dashboard", { state: { welcome: true } });
     } catch (error: any) {
-      toast.error("Google login failed");
+      glassToast.error("Google login failed");
     }
   };
 
@@ -481,7 +480,6 @@ export default function LandingPage() {
         }
       `}</style>
 
-      <ToastContainer position="top-center" theme="light" />
     </div>
   );
 }

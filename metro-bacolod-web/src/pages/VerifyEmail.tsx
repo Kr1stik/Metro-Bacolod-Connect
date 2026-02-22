@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth } from "../firebase-config";
 import { sendEmailVerification, signOut } from "firebase/auth";
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { glassToast } from '../components/GlassToast';
 import logo from "../assets/MBC Logo.png"; 
 // Removed FaEnvelopeOpenText import as it's no longer needed
 
@@ -18,7 +17,7 @@ export default function VerifyEmail() {
         await user.reload(); 
         if (user.emailVerified) {
           clearInterval(interval);
-          toast.success("Email Verified! Redirecting...");
+          glassToast.success("Email Verified! Redirecting...");
           setTimeout(() => navigate("/dashboard", { state: { welcome: true } }), 2000);
         }
       } else {
@@ -33,10 +32,10 @@ export default function VerifyEmail() {
     try {
       if (auth.currentUser) {
         await sendEmailVerification(auth.currentUser);
-        toast.success("New verification link sent!");
+        glassToast.success("New verification link sent!");
       }
     } catch (error: any) {
-      toast.error("Too many requests. Please wait a moment.");
+      glassToast.error("Too many requests. Please wait a moment.");
     } finally {
       setIsSending(false);
     }
@@ -134,8 +133,6 @@ export default function VerifyEmail() {
           </button>
         </div>
       </div>
-      
-      <ToastContainer position="top-center" theme="light" />
     </div>
   );
 }

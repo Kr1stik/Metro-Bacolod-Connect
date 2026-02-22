@@ -3,8 +3,7 @@ import api from './services/api';
 import { Routes, Route } from 'react-router-dom';
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
-import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import GlassToastContainer from './components/GlassToast';
 import LandingPage from './pages/LandingPage';
 import Archive from "./pages/Archive";
 import VerifyEmail from "./pages/VerifyEmail";
@@ -39,19 +38,8 @@ function App() {
 
   return (
     <>
-      {/* This container handles the popups for the whole app */}
-      <ToastContainer 
-        position="top-left" 
-        autoClose={3000} 
-        hideProgressBar={false}
-        newestOnTop={false}
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="dark"
-      />
+      {/* Glassmorphic toast notifications for the whole app */}
+      <GlassToastContainer />
       <Routes>
         {/* ========================================== */}
         {/* PUBLIC ROUTES (Anyone can view these)      */}

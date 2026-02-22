@@ -11,8 +11,7 @@ import {
 } from "react-icons/fa";
 import logo from "../assets/MBC Logo.png";
 import "../App.css";
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { glassToast } from '../components/GlassToast';
 
 const SERVICES = [
   {
@@ -74,12 +73,12 @@ export default function Services() {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       if (!userCredential.user.emailVerified) {
         await signOut(auth);
-        toast.error("Email not verified. Please check your inbox.");
+        glassToast.error("Email not verified. Please check your inbox.");
         return;
       }
       closeLogin();
       navigate("/dashboard", { state: { welcome: true } });
-    } catch { toast.error("Login failed. Check your credentials."); }
+    } catch { glassToast.error("Login failed. Check your credentials."); }
   };
 
   const handleGoogleLogin = async () => {
@@ -87,12 +86,11 @@ export default function Services() {
       await signInWithPopup(auth, googleProvider);
       closeLogin();
       navigate("/dashboard", { state: { welcome: true } });
-    } catch { toast.error("Google sign-in failed."); }
+    } catch { glassToast.error("Google sign-in failed."); }
   };
 
   return (
     <div className="info-page">
-      <ToastContainer position="top-left" autoClose={3000} theme="dark" />
       <div className="info-blob info-blob-1" />
       <div className="info-blob info-blob-2" />
       <div className="info-blob info-blob-3" />

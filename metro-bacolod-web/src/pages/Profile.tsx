@@ -18,8 +18,7 @@ import L from 'leaflet';
 import logo from "../assets/MBC Logo.png";
 import "../App.css";
 import Swal from "sweetalert2";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { glassToast } from "../components/GlassToast";
 import { BACOLOD_LOCATIONS } from "../constants/locations";
 import { canCreateListings, canAccessTrash } from "../constants/roles";
 
@@ -337,7 +336,7 @@ export default function Profile() {
       didOpen: () => {
         document.getElementById('share-fb')?.addEventListener('click', () => { window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, '_blank'); Swal.close(); });
         document.getElementById('share-x')?.addEventListener('click', () => { window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`, '_blank'); Swal.close(); });
-        document.getElementById('share-copy')?.addEventListener('click', () => { navigator.clipboard.writeText(`${shareText} ${shareUrl}`); toast.success("Link copied!"); Swal.close(); });
+        document.getElementById('share-copy')?.addEventListener('click', () => { navigator.clipboard.writeText(`${shareText} ${shareUrl}`); glassToast.success("Link copied!"); Swal.close(); });
       }
     });
   };
@@ -400,12 +399,12 @@ export default function Profile() {
   };
 
   const handleCreateListing = async () => {
-    if (!canCreateListings(userData?.role, user?.email)) return toast.error("Only agents can create listings.");
-    if (!listingTitle.trim()) return toast.warning("Enter a listing title.");
-    if (!listingLocation) return toast.warning("Select a location.");
-    if (!listingPrice.trim()) return toast.warning("Enter a price.");
-    if (imageFiles.length === 0) return toast.warning("Upload at least 1 image.");
-    if (!listingPinCoords) return toast.warning("Pin the listing location on the map.");
+    if (!canCreateListings(userData?.role, user?.email)) return glassToast.error("Only agents can create listings.");
+    if (!listingTitle.trim()) return glassToast.warning("Enter a listing title.");
+    if (!listingLocation) return glassToast.warning("Select a location.");
+    if (!listingPrice.trim()) return glassToast.warning("Enter a price.");
+    if (imageFiles.length === 0) return glassToast.warning("Upload at least 1 image.");
+    if (!listingPinCoords) return glassToast.warning("Pin the listing location on the map.");
 
     setIsUploading(true);
     try {
@@ -457,13 +456,13 @@ export default function Profile() {
         isArchived: false,
       });
 
-      toast.success("Listing published!");
+      glassToast.success("Listing published!");
       resetCreateForm();
       setShowCreateModal(false);
       // Optional: Refresh myPosts here so the UI instantly shows the new listing
     } catch (error: any) {
       console.error(error);
-      toast.error("Failed to publish: " + error.message);
+      glassToast.error("Failed to publish: " + error.message);
     } finally {
       setIsUploading(false);
     }
@@ -491,7 +490,6 @@ export default function Profile() {
 
   return (
     <div className="profile-page">
-      <ToastContainer position="top-right" theme="light" />
       {/* ========== BLACK BLOBS (background) ========== */}
       <div className="profile-blob profile-blob-1" />
       <div className="profile-blob profile-blob-2" />
@@ -618,15 +616,7 @@ export default function Profile() {
             </p>
           </div>
           <p className="profile-bio">
-            Lorem Ipsum is simply dummy text of the printing and typesetting
-            industry. Lorem Ipsum has been the industry's standard dummy text
-            ever since the 1500s, when an unknown printer took a galley of type
-            and scrambled it to make a type specimen book. It has survived not
-            only five centuries, but also the leap into electronic typesetting,
-            remaining essentially unchanged. It was popularised in the 1960s
-            with the release of Letraset sheets containing Lorem Ipsum
-            passages, and more recently with desktop publishing software like
-            Aldus PageMaker including versions of Lorem Ipsum.
+            {profileData?.description || "No description yet. Add one in Settings > Account."}
           </p>
           {!isViewingOther && isAgent && (
             <button
@@ -1192,7 +1182,7 @@ export default function Profile() {
                             title="Share to Instagram"
                             onClick={() => {
                               navigator.clipboard.writeText(`${selectedListing.title} - ${selectedListing.price} in ${selectedListing.location}\n${window.location.href}`);
-                              toast.success('Link copied! Paste it on Instagram.');
+                              glassToast.success('Link copied! Paste it on Instagram.');
                             }}
                           >
                             <FaInstagram size={14} />

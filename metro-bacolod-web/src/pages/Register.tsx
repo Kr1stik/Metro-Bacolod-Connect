@@ -3,8 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { createUserWithEmailAndPassword, updateProfile, sendEmailVerification, signOut } from "firebase/auth";
 import { auth, db } from "../firebase-config";
 import { doc, setDoc } from "firebase/firestore";
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { glassToast } from '../components/GlassToast';
 import logo from "../assets/MBC Logo.png"; 
 import { BACOLOD_LOCATIONS } from "../constants/locations";
 import { FaEye, FaEyeSlash, FaCheckCircle, FaTimesCircle } from "react-icons/fa"; 
@@ -66,9 +65,9 @@ export default function Register() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password !== confirmPassword) return toast.error("Passwords do not match!");
-    if (!city) return toast.error("Please select a City/Barangay.");
-    if (mobile.length !== 10) return toast.error("Mobile number must be 10 digits (excluding +63).");
+    if (password !== confirmPassword) return glassToast.error("Passwords do not match!");
+    if (!city) return glassToast.error("Please select a City/Barangay.");
+    if (mobile.length !== 10) return glassToast.error("Mobile number must be 10 digits (excluding +63).");
 
     setIsSubmitting(true);
 
@@ -104,12 +103,12 @@ export default function Register() {
       await sendEmailVerification(user);
       
       await signOut(auth);
-      toast.success(`Account created! Please verify your email.`);
+      glassToast.success(`Account created! Please verify your email.`);
       setTimeout(() => navigate("/verify-email"), 1500);
 
     } catch (error: any) {
         console.error(error);
-        toast.error(error.message);
+        glassToast.error(error.message);
     } finally {
         setIsSubmitting(false);
     }
@@ -215,7 +214,6 @@ export default function Register() {
       <style>{`
         input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; filter: invert(0); }
       `}</style>
-      <ToastContainer position="top-right" theme="light" />
     </div>
   );
 }

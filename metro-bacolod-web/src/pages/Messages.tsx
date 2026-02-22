@@ -4,7 +4,7 @@ import { auth, db } from "../firebase-config";
 import { collection, query, where, onSnapshot, addDoc, orderBy, serverTimestamp, doc, updateDoc } from "firebase/firestore";
 import { FaSearch, FaUser, FaCog, FaHome, FaEnvelope, FaPaperPlane, FaArrowLeft } from "react-icons/fa";
 import logo from "../assets/MBC Logo.png";
-import { toast, ToastContainer } from "react-toastify";
+import { glassToast } from "../components/GlassToast";
 
 export default function Messages() {
   const navigate = useNavigate();
@@ -83,7 +83,7 @@ export default function Messages() {
       });
       
     } catch (error) {
-      toast.error("Failed to send message");
+      glassToast.error("Failed to send message");
     }
   };
 
@@ -94,8 +94,6 @@ export default function Messages() {
 
   return (
     <div className="dashboard-revamp" style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <ToastContainer theme="light" />
-
       {/* NAVBAR */}
       <nav className="dash-nav" style={{ flexShrink: 0, zIndex: 100 }}>
         <div className="dash-nav-left" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>

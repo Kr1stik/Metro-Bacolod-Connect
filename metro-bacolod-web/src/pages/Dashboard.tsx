@@ -19,8 +19,7 @@ import L from 'leaflet';
 import logo from "../assets/MBC Logo.png";
 import "../App.css";
 import Swal from 'sweetalert2';
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { glassToast } from '../components/GlassToast';
 import { BACOLOD_LOCATIONS } from "../constants/locations";
 import { canCreateListings, canAccessTrash, canManagePost } from "../constants/roles";
 import DOMPurify from 'dompurify';
@@ -277,7 +276,7 @@ export default function Dashboard() {
       const displayName = userData?.firstName
         ? `${userData.firstName} ${userData.lastName}`
         : (user.displayName || 'User');
-      toast.success(`Welcome back, ${displayName}!`, { theme: "light" });
+      glassToast.success(`Welcome back, ${displayName}!`);
       toastShown.current = true;
       window.history.replaceState({}, document.title);
     }
@@ -354,12 +353,12 @@ export default function Dashboard() {
   };
 
   const handleCreateListing = async () => {
-    if (!canCreateListings(userData?.role, user?.email)) return toast.error("Only sellers can create listings.");
-    if (!listingTitle.trim()) return toast.warning("Enter a listing title.");
-    if (!listingLocation) return toast.warning("Select a location.");
-    if (!listingPrice.trim()) return toast.warning("Enter a price.");
-    if (imageFiles.length === 0) return toast.warning("Upload at least 1 image.");
-    if (!listingPinCoords) return toast.warning("Pin the listing location on the map.");
+    if (!canCreateListings(userData?.role, user?.email)) return glassToast.error("Only sellers can create listings.");
+    if (!listingTitle.trim()) return glassToast.warning("Enter a listing title.");
+    if (!listingLocation) return glassToast.warning("Select a location.");
+    if (!listingPrice.trim()) return glassToast.warning("Enter a price.");
+    if (imageFiles.length === 0) return glassToast.warning("Upload at least 1 image.");
+    if (!listingPinCoords) return glassToast.warning("Pin the listing location on the map.");
 
     setIsUploading(true);
     try {
@@ -416,13 +415,13 @@ export default function Dashboard() {
         isArchived: false,
       });
 
-      toast.success("Listing published!");
+      glassToast.success("Listing published!");
       resetCreateForm();
       setShowCreateModal(false);
       fetchPosts(filterLocation);
     } catch (error: any) {
       console.error(error);
-      toast.error("Failed to publish: " + error.message);
+      glassToast.error("Failed to publish: " + error.message);
     } finally {
       setIsUploading(false);
     }
@@ -450,14 +449,14 @@ export default function Dashboard() {
 
   const saveEdit = async () => {
     if (!editingPostId) return;
-    if (editImages.length === 0 && newEditFiles.length === 0) return toast.warning("Post must have at least one image.");
+    if (editImages.length === 0 && newEditFiles.length === 0) return glassToast.warning("Post must have at least one image.");
     setIsUploading(true);
     try {
       // Verify ownership before saving edit
       const postRef = doc(db, "posts", editingPostId);
       const postSnap = await getDoc(postRef);
       if (!postSnap.exists() || !canManagePost(user?.uid, postSnap.data()?.userId, user?.email, userData?.role)) {
-        toast.error("You don't have permission to edit this post.");
+        glassToast.error("You don't have permission to edit this post.");
         setIsUploading(false);
         return;
       }
@@ -475,11 +474,11 @@ export default function Dashboard() {
       }
       const finalImages = [...editImages, ...newUrls];
       await updateDoc(postRef, { content: editCaption, images: finalImages, image: finalImages[0] });
-      toast.success("Listing updated!");
+      glassToast.success("Listing updated!");
       setEditingPostId(null);
       fetchPosts(filterLocation);
     } catch (error) {
-      toast.error("Failed to update listing");
+      glassToast.error("Failed to update listing");
     } finally {
       setIsUploading(false);
     }
@@ -503,13 +502,13 @@ export default function Dashboard() {
         // Verify ownership before deleting
         const postSnap = await getDoc(postRef);
         if (!postSnap.exists() || !canManagePost(user?.uid, postSnap.data()?.userId, user?.email, userData?.role)) {
-          toast.error("You don't have permission to delete this post.");
+          glassToast.error("You don't have permission to delete this post.");
           return;
         }
         await updateDoc(postRef, { deletedAt: new Date().toISOString(), isArchived: true });
         setPosts(posts.filter(p => p.id !== postId));
-        toast.success("Listing moved to Trash");
-      } catch (error) { toast.error("Failed to move to trash"); }
+        glassToast.success("Listing moved to Trash");
+      } catch (error) { glassToast.error("Failed to move to trash"); }
     }
   };
 
@@ -529,7 +528,7 @@ export default function Dashboard() {
       didOpen: () => {
         document.getElementById('share-fb')?.addEventListener('click', () => { window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, '_blank'); Swal.close(); });
         document.getElementById('share-x')?.addEventListener('click', () => { window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`, '_blank'); Swal.close(); });
-        document.getElementById('share-copy')?.addEventListener('click', () => { navigator.clipboard.writeText(`${shareText} ${shareUrl}`); toast.success("Link copied!"); Swal.close(); });
+        document.getElementById('share-copy')?.addEventListener('click', () => { navigator.clipboard.writeText(`${shareText} ${shareUrl}`); glassToast.success("Link copied!"); Swal.close(); });
       }
     });
   };
@@ -541,7 +540,7 @@ export default function Dashboard() {
     
     // Prevent messaging yourself
     if (user?.uid === agentId) {
-      return toast.info("You cannot inquire about your own listing.");
+      return glassToast.info("You cannot inquire about your own listing.");
     }
 
     try {
@@ -585,7 +584,7 @@ export default function Dashboard() {
 
     } catch (error) {
       console.error(error);
-      toast.error("Failed to start chat.");
+      glassToast.error("Failed to start chat.");
     }
   };
 
@@ -648,7 +647,6 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard-revamp">
-      <ToastContainer position="top-right" theme="light" />
 
       {/* ========== NAVBAR ========== */}
       <nav className="dash-nav">
@@ -1405,7 +1403,7 @@ export default function Dashboard() {
                             title="Share to Instagram"
                             onClick={() => {
                               navigator.clipboard.writeText(`${selectedListing.title} - ${formatPriceDisplay(selectedListing.price)} in ${selectedListing.location}\n${window.location.href}`);
-                              toast.success('Link copied! Paste it on Instagram.');
+                              glassToast.success('Link copied! Paste it on Instagram.');
                             }}
                           >
                             <FaInstagram size={14} />
