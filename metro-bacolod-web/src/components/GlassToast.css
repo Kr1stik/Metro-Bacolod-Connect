@@ -1,0 +1,171 @@
+/* =========================================
+   GLASSMORPHIC TOAST NOTIFICATIONS
+   Matches Apple-style glassmorphism design
+   ========================================= */
+
+.glass-toast-container {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: none;
+  max-width: 420px;
+  width: calc(100vw - 48px);
+}
+
+.glass-toast {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  border: 1.5px solid rgba(255, 255, 255, 0.55);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.1),
+    0 2px 8px rgba(0, 0, 0, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.2);
+  pointer-events: all;
+  overflow: hidden;
+  font-family: 'Google Sans', sans-serif;
+}
+
+/* --- Entry animation --- */
+.glass-toast-enter {
+  animation: glassToastSlideIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes glassToastSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateX(60px) scale(0.92);
+    filter: blur(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+/* --- Exit animation --- */
+.glass-toast-exit {
+  animation: glassToastSlideOut 0.4s cubic-bezier(0.55, 0, 1, 0.45) forwards;
+}
+
+@keyframes glassToastSlideOut {
+  0% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(60px) scale(0.92);
+    filter: blur(4px);
+  }
+}
+
+/* --- Toast body --- */
+.glass-toast-body {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.glass-toast-icon {
+  flex-shrink: 0;
+  font-size: 1.2rem;
+}
+
+.glass-toast-icon-success { color: #22c55e; }
+.glass-toast-icon-error   { color: #ef4444; }
+.glass-toast-icon-info    { color: #3b82f6; }
+.glass-toast-icon-warning { color: #f59e0b; }
+
+.glass-toast-message {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #1d1d1f;
+  line-height: 1.4;
+  letter-spacing: -0.2px;
+}
+
+/* --- Close button --- */
+.glass-toast-close {
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.06);
+  border: none;
+  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #6b7280;
+  transition: background 0.2s, color 0.2s, transform 0.2s;
+  margin-top: 1px;
+}
+
+.glass-toast-close:hover {
+  background: rgba(0, 0, 0, 0.12);
+  color: #111827;
+  transform: scale(1.1);
+}
+
+/* --- Progress bar --- */
+.glass-toast-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  border-radius: 0 0 16px 16px;
+  animation: glassToastProgress 3.5s linear forwards;
+}
+
+.glass-toast-progress-success { background: linear-gradient(90deg, #22c55e, #16a34a); }
+.glass-toast-progress-error   { background: linear-gradient(90deg, #ef4444, #dc2626); }
+.glass-toast-progress-info    { background: linear-gradient(90deg, #3b82f6, #2563eb); }
+.glass-toast-progress-warning { background: linear-gradient(90deg, #f59e0b, #d97706); }
+
+@keyframes glassToastProgress {
+  0%   { width: 100%; }
+  100% { width: 0%; }
+}
+
+/* --- Type accent borders (subtle left stripe) --- */
+.glass-toast-success { border-left: 3px solid #22c55e; }
+.glass-toast-error   { border-left: 3px solid #ef4444; }
+.glass-toast-info    { border-left: 3px solid #3b82f6; }
+.glass-toast-warning { border-left: 3px solid #f59e0b; }
+
+/* --- Mobile adjustments --- */
+@media (max-width: 480px) {
+  .glass-toast-container {
+    top: 12px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-width: none;
+  }
+
+  .glass-toast {
+    padding: 14px 14px;
+    border-radius: 14px;
+  }
+
+  .glass-toast-message {
+    font-size: 0.84rem;
+  }
+}

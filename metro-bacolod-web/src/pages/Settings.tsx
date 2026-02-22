@@ -14,8 +14,7 @@ import {
 import logo from "../assets/MBC Logo.png";
 import "../App.css";
 import Swal from "sweetalert2";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { glassToast } from "../components/GlassToast";
 import { BACOLOD_LOCATIONS } from "../constants/locations";
 import { canAccessTrash } from "../constants/roles";
 
@@ -45,6 +44,7 @@ export default function Settings() {
   const [editUsername, setEditUsername] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editPhone, setEditPhone] = useState("");
+  const [editDescription, setEditDescription] = useState("");
   const [twoFAEnabled, setTwoFAEnabled] = useState(false);
 
   // --- AUTH CHECK ---
@@ -65,6 +65,7 @@ export default function Settings() {
             setEditUsername(data.username || "");
             setEditEmail(currentUser.email || "");
             setEditPhone(data.phone || "");
+            setEditDescription(data.description || "");
             setRegion(data.address || "");
             // Load saved preferences
             if (data.preferences) {
@@ -115,10 +116,10 @@ export default function Settings() {
           theme,
         },
       });
-      toast.success("Preferences saved!");
+      glassToast.success("Preferences saved!");
     } catch (err) {
       console.error(err);
-      toast.error("Failed to save preferences.");
+      glassToast.error("Failed to save preferences.");
     }
   };
 
@@ -141,7 +142,7 @@ export default function Settings() {
       setDataSharing(true);
       setTheme("light");
       setReducedMotion(false);
-      toast.success("Settings reset to defaults.");
+      glassToast.success("Settings reset to defaults.");
     }
   };
 
@@ -182,9 +183,9 @@ export default function Settings() {
         const credential = EmailAuthProvider.credential(user.email, formValues.current);
         await reauthenticateWithCredential(user, credential);
         await updatePassword(user, formValues.newPw);
-        toast.success("Password updated successfully!");
+        glassToast.success("Password updated successfully!");
       } catch (err: any) {
-        toast.error(err.message || "Failed to update password.");
+        glassToast.error(err.message || "Failed to update password.");
       }
     }
   };
@@ -201,13 +202,14 @@ export default function Settings() {
         lastName,
         username: editUsername,
         phone: editPhone,
+        description: editDescription,
         address: region,
       });
-      setUserData((prev: any) => ({ ...prev, firstName, lastName, username: editUsername, phone: editPhone, address: region }));
-      toast.success("Profile updated!");
+      setUserData((prev: any) => ({ ...prev, firstName, lastName, username: editUsername, phone: editPhone, description: editDescription, address: region }));
+      glassToast.success("Profile updated!");
     } catch (err) {
       console.error(err);
-      toast.error("Failed to update profile.");
+      glassToast.error("Failed to update profile.");
     }
   };
 
@@ -229,10 +231,10 @@ export default function Settings() {
     if (result.isConfirmed) {
       try {
         await user.delete();
-        toast.success("Account deleted.");
+        glassToast.success("Account deleted.");
         navigate("/");
       } catch (err: any) {
-        toast.error(err.message || "Failed to delete account. Please re-login and try again.");
+        glassToast.error(err.message || "Failed to delete account. Please re-login and try again.");
       }
     }
   };
@@ -252,10 +254,10 @@ export default function Settings() {
         const userDocRef = doc(db, "users", user.uid);
         await updateDoc(userDocRef, { isDeactivated: true });
         await signOut(auth);
-        toast.success("Account deactivated.");
+        glassToast.success("Account deactivated.");
         navigate("/");
       } catch (err) {
-        toast.error("Failed to deactivate account.");
+        glassToast.error("Failed to deactivate account.");
       }
     }
   };
@@ -273,10 +275,10 @@ export default function Settings() {
     if (result.isConfirmed) {
       try {
         await signOut(auth);
-        toast.success("Logged out from all devices.");
+        glassToast.success("Logged out from all devices.");
         navigate("/");
       } catch (err) {
-        toast.error("Failed to log out.");
+        glassToast.error("Failed to log out.");
       }
     }
   };
@@ -467,6 +469,18 @@ export default function Settings() {
             <label>Phone Number</label>
             <input type="tel" value={editPhone} onChange={(e) => setEditPhone(e.target.value)} className="settings-input" placeholder="+63 900 000 0000" />
           </div>
+          <div className="settings-field">
+            <label>Profile Description</label>
+            <textarea
+              value={editDescription}
+              onChange={(e) => setEditDescription(e.target.value)}
+              className="settings-input settings-textarea"
+              placeholder="Tell others about yourself, your expertise, and what you do..."
+              rows={4}
+              maxLength={500}
+            />
+            <span className="settings-field-hint">{editDescription.length}/500 characters</span>
+          </div>
           <button className="settings-btn-primary" onClick={handleSaveProfile} style={{ marginTop: 8 }}>
             Save Profile
           </button>
@@ -493,7 +507,7 @@ export default function Settings() {
           <div className="settings-divider" />
           <Toggle enabled={twoFAEnabled} onToggle={() => {
             setTwoFAEnabled(!twoFAEnabled);
-            toast.info(twoFAEnabled ? "2FA disabled (mock)" : "2FA enabled (mock)");
+            glassToast.info(twoFAEnabled ? "2FA disabled (mock)" : "2FA enabled (mock)");
           }} label="Two-Factor Authentication (2FA)" />
           <p className="settings-field-hint">Add an extra layer of security with 2FA.</p>
         </div>
@@ -611,7 +625,6 @@ export default function Settings() {
 
   return (
     <div className="settings-page">
-      <ToastContainer position="top-right" theme="light" />
 
       {/* ========== NAVBAR (same as Dashboard/Profile) ========== */}
       <nav className="dash-nav">

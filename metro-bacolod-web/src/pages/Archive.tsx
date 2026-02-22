@@ -5,8 +5,7 @@ import { collection, query, where, getDocs, doc, updateDoc, deleteDoc, getDoc } 
 import { FaArrowLeft, FaTrashRestore, FaTimes, FaHome, FaTrash, FaUser, FaEnvelope, FaCalendarAlt, FaFilter } from "react-icons/fa";
 import { canAccessTrash, canManagePost } from "../constants/roles";
 import Swal from 'sweetalert2';
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { glassToast } from '../components/GlassToast';
 
 export default function Archive() {
   const [deletedPosts, setDeletedPosts] = useState<any[]>([]);
@@ -50,7 +49,7 @@ export default function Archive() {
         setDeletedPosts(posts);
       } catch (error) {
         console.error("Error fetching trash:", error);
-        toast.error("Failed to load trash.");
+        glassToast.error("Failed to load trash.");
       } finally {
         setLoading(false);
       }
@@ -101,14 +100,14 @@ export default function Archive() {
     try {
         const postSnap = await getDoc(doc(db, "posts", id));
         if (!postSnap.exists() || !canManagePost(auth.currentUser?.uid, postSnap.data()?.userId, auth.currentUser?.email)) {
-          toast.error("You don't have permission to restore this post.");
+          glassToast.error("You don't have permission to restore this post.");
           return;
         }
         await updateDoc(doc(db, "posts", id), { isArchived: false, deletedAt: null });
         setDeletedPosts(prev => prev.filter(p => p.id !== id));
-        toast.success("Post Restored!");
+        glassToast.success("Post Restored!");
     } catch (error) {
-        toast.error("Failed to restore.");
+        glassToast.error("Failed to restore.");
     }
   };
 
@@ -127,14 +126,14 @@ export default function Archive() {
         try {
             const postSnap = await getDoc(doc(db, "posts", id));
             if (!postSnap.exists() || !canManagePost(auth.currentUser?.uid, postSnap.data()?.userId, auth.currentUser?.email)) {
-              toast.error("You don't have permission to delete this post.");
+              glassToast.error("You don't have permission to delete this post.");
               return;
             }
             await deleteDoc(doc(db, "posts", id));
             setDeletedPosts(prev => prev.filter(p => p.id !== id));
-            toast.success("Permanently Deleted");
+            glassToast.success("Permanently Deleted");
         } catch (error) {
-            toast.error("Failed to delete.");
+            glassToast.error("Failed to delete.");
         }
     }
   };
@@ -159,8 +158,6 @@ export default function Archive() {
 
   return (
     <div className="dashboard-revamp" style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <ToastContainer position="top-right" theme="light" />
-      
       {/* HEADER */}
       <div style={{ padding: '16px 20px', background: 'white', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: '15px', color: '#111827', flexShrink: 0 }}>
         <button 
