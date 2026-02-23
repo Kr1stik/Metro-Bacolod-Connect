@@ -108,7 +108,7 @@ export default function LandingPage() {
         return;
       }
 
-      navigate("/dashboard", { state: { welcome: true } });
+      navigate("/dashboard");
     } catch (error: any) {
       if (error.code === 'auth/invalid-credential') {
         glassToast.error("Incorrect email or password.");
@@ -131,7 +131,7 @@ export default function LandingPage() {
         return;
       }
 
-      navigate("/dashboard", { state: { welcome: true } });
+      navigate("/dashboard");
     } catch (error: any) {
       glassToast.error("Google login failed");
     }

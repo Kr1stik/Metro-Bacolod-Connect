@@ -18,7 +18,7 @@ export default function VerifyEmail() {
         if (user.emailVerified) {
           clearInterval(interval);
           glassToast.success("Email Verified! Redirecting...");
-          setTimeout(() => navigate("/dashboard", { state: { welcome: true } }), 2000);
+          setTimeout(() => navigate("/dashboard"), 2000);
         }
       } else {
         navigate("/");
