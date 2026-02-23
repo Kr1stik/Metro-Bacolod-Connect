@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase-config";
 import { signOut } from "firebase/auth";
 import { doc, getDoc, collection, query, orderBy, getDocs, addDoc, updateDoc, setDoc, onSnapshot, where } from "firebase/firestore";
@@ -155,7 +155,7 @@ export default function Dashboard() {
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const toastShown = useRef(false);
+
 
   // Edit mode states
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
@@ -191,7 +191,6 @@ export default function Dashboard() {
   const [isSearching, setIsSearching] = useState(false);
 
   const navigate = useNavigate();
-  const location = useLocation();
 
   // --- AUTH CHECK ---
   useEffect(() => {
@@ -270,17 +269,7 @@ export default function Dashboard() {
     return () => unsub();
   }, [user]);
 
-  // --- WELCOME TOAST ---
-  useEffect(() => {
-    if (location.state?.welcome && user && !toastShown.current) {
-      const displayName = userData?.firstName
-        ? `${userData.firstName} ${userData.lastName}`
-        : (user.displayName || 'User');
-      glassToast.success(`Welcome back, ${displayName}!`);
-      toastShown.current = true;
-      window.history.replaceState({}, document.title);
-    }
-  }, [location, user, userData]);
+
 
   const formatTimeAgo = (dateString: string) => {
     if (!dateString) return "Just now";

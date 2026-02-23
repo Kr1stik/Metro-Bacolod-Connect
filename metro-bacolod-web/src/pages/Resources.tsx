@@ -89,7 +89,7 @@ export default function Resources() {
         return;
       }
       closeLogin();
-      navigate("/dashboard", { state: { welcome: true } });
+      navigate("/dashboard");
     } catch { glassToast.error("Login failed. Check your credentials."); }
   };
 
@@ -97,7 +97,7 @@ export default function Resources() {
     try {
       await signInWithPopup(auth, googleProvider);
       closeLogin();
-      navigate("/dashboard", { state: { welcome: true } });
+      navigate("/dashboard");
     } catch { glassToast.error("Google sign-in failed."); }
   };
 
