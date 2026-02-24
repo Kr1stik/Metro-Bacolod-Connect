@@ -15,6 +15,8 @@ import Services from "./pages/Services";
 import Resources from "./pages/Resources";
 import Messages from "./pages/Messages";
 import ProtectedRoute from "./components/ProtectedRoute";
+import { ThemeProvider } from "./context/ThemeContext";
+import "./dark-mode.css";
 import { Analytics } from "@vercel/analytics/react";
 
 function App() {
@@ -37,7 +39,7 @@ function App() {
   }, []);
 
   return (
-    <>
+    <ThemeProvider>
       {/* Glassmorphic toast notifications for the whole app */}
       <GlassToastContainer />
       <Routes>
@@ -81,7 +83,7 @@ function App() {
         />
       </Routes>
       <Analytics />
-    </>
+    </ThemeProvider>
   );
 }
 
