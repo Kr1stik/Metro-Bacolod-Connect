@@ -17,6 +17,8 @@ import Swal from "sweetalert2";
 import { glassToast } from "../components/GlassToast";
 import { BACOLOD_LOCATIONS } from "../constants/locations";
 import { canAccessTrash } from "../constants/roles";
+import { useTheme } from "../context/ThemeContext";
+import { FaMoon } from "react-icons/fa";
 
 type SettingsTab = "general" | "appearance" | "account";
 
@@ -35,8 +37,8 @@ export default function Settings() {
   const [smsAlerts, setSmsAlerts] = useState(false);
   const [dataSharing, setDataSharing] = useState(true);
 
-  // Appearance settings state
-  const [theme, setTheme] = useState<"light" | "dark" | "system">("light");
+  // Appearance settings state — use global theme context
+  const { theme, setTheme } = useTheme();
   const [reducedMotion, setReducedMotion] = useState(false);
 
   // Account settings state
@@ -388,22 +390,20 @@ export default function Settings() {
               {theme === "light" && <FaCheck className="settings-theme-check" />}
             </button>
             <button
-              className={`settings-theme-btn settings-theme-dark-btn`}
-              disabled
-              title="Coming soon"
+              className={`settings-theme-btn settings-theme-dark-btn ${theme === "dark" ? "settings-theme-active" : ""}`}
+              onClick={() => setTheme("dark")}
             >
-              <FaEye size={20} />
+              <FaMoon size={20} />
               <span>Dark</span>
-              <span className="settings-badge-soon">Soon</span>
+              {theme === "dark" && <FaCheck className="settings-theme-check" />}
             </button>
             <button
-              className={`settings-theme-btn settings-theme-system-btn`}
-              disabled
-              title="Coming soon"
+              className={`settings-theme-btn settings-theme-system-btn ${theme === "system" ? "settings-theme-active" : ""}`}
+              onClick={() => setTheme("system")}
             >
               <FaDesktop size={20} />
               <span>System</span>
-              <span className="settings-badge-soon">Soon</span>
+              {theme === "system" && <FaCheck className="settings-theme-check" />}
             </button>
           </div>
         </div>
