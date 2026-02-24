@@ -200,13 +200,17 @@ export default function Profile() {
             setUserData(userSnap.data());
           }
 
-          // Fetch the current user's actual posts!
+          // Fetch the current user's actual posts (exclude trashed/archived)
           const postsQuery = query(
             collection(db, "posts"),
             where("userId", "==", currentUser.uid)
           );
           const postsSnap = await getDocs(postsQuery);
-          setMyPosts(postsSnap.docs.map(formatPostData));
+          setMyPosts(
+            postsSnap.docs
+              .filter(d => !d.data().isArchived && !d.data().isDeleted)
+              .map(formatPostData)
+          );
 
         } catch (err) {
           console.error("Error fetching user data:", err);
@@ -228,7 +232,7 @@ export default function Profile() {
         );
         const postsSnap = await getDocs(postsQuery);
         const ownPosts = postsSnap.docs
-          .filter(d => !d.data().isArchived)
+          .filter(d => !d.data().isArchived && !d.data().isDeleted)
           .map(d => {
             const p = d.data();
             return {
@@ -287,7 +291,11 @@ export default function Profile() {
           where("userId", "==", routeUserId),
         );
         const postsSnap = await getDocs(postsQuery);
-        setViewedPosts(postsSnap.docs.map(formatPostData));
+        setViewedPosts(
+          postsSnap.docs
+            .filter(d => !d.data().isArchived && !d.data().isDeleted)
+            .map(formatPostData)
+        );
       } catch (err) {
         console.error("Error fetching agent profile:", err);
       }
