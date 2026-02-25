@@ -6,6 +6,7 @@ import { FaArrowLeft, FaTrashRestore, FaTimes, FaHome, FaTrash, FaUser, FaEnvelo
 import { canAccessTrash, canManagePost } from "../constants/roles";
 import Swal from 'sweetalert2';
 import { glassToast } from '../components/GlassToast';
+import "../App.css";
 
 export default function Archive() {
   const [deletedPosts, setDeletedPosts] = useState<any[]>([]);
@@ -143,65 +144,52 @@ export default function Archive() {
       .then(async (res) => { if (res.isConfirmed) { await auth.signOut(); navigate("/"); } });
   };
 
-  const quickBtnStyle = (active: boolean): React.CSSProperties => ({
-    padding: '6px 14px',
-    border: active ? '1.5px solid #111827' : '1px solid #e5e7eb',
-    borderRadius: '20px',
-    background: active ? '#111827' : 'white',
-    color: active ? 'white' : '#374151',
-    fontSize: '0.8rem',
-    fontWeight: 500,
-    cursor: 'pointer',
-    transition: '0.2s',
-    whiteSpace: 'nowrap'
-  });
+  const quickBtnClass = (active: boolean) => 
+    `archive-quick-btn ${active ? 'archive-quick-btn-active' : ''}`;
 
   return (
-    <div className="dashboard-revamp" style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div className="dashboard-revamp archive-page">
       {/* HEADER */}
-      <div style={{ padding: '16px 20px', background: 'white', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: '15px', color: '#111827', flexShrink: 0 }}>
-        <button 
-          onClick={() => navigate('/dashboard')} 
-          style={{ background: '#f3f4f6', border: 'none', padding: '10px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        >
+      <div className="archive-header">
+        <button onClick={() => navigate('/dashboard')} className="archive-back-btn">
           <FaArrowLeft />
         </button>
-        <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 'bold' }}>Trash ({filteredPosts.length})</h2>
+        <h2 className="archive-title">Trash ({filteredPosts.length})</h2>
       </div>
 
       {/* DATE FILTER BAR */}
-      <div style={{ padding: '12px 20px', background: 'white', borderBottom: '1px solid #f3f4f6', flexShrink: 0 }}>
+      <div className="archive-filter-bar">
         {/* Quick Filters */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <FaFilter size={13} style={{ color: '#6b7280', marginRight: '2px' }} />
-          <button style={quickBtnStyle(activeQuickFilter === 'all')} onClick={() => applyQuickFilter('all')}>All</button>
-          <button style={quickBtnStyle(activeQuickFilter === 'today')} onClick={() => applyQuickFilter('today')}>Today</button>
-          <button style={quickBtnStyle(activeQuickFilter === 'week')} onClick={() => applyQuickFilter('week')}>This Week</button>
-          <button style={quickBtnStyle(activeQuickFilter === 'month')} onClick={() => applyQuickFilter('month')}>This Month</button>
+        <div className="archive-quick-filters">
+          <FaFilter size={13} className="archive-filter-icon" />
+          <button className={quickBtnClass(activeQuickFilter === 'all')} onClick={() => applyQuickFilter('all')}>All</button>
+          <button className={quickBtnClass(activeQuickFilter === 'today')} onClick={() => applyQuickFilter('today')}>Today</button>
+          <button className={quickBtnClass(activeQuickFilter === 'week')} onClick={() => applyQuickFilter('week')}>This Week</button>
+          <button className={quickBtnClass(activeQuickFilter === 'month')} onClick={() => applyQuickFilter('month')}>This Month</button>
         </div>
         {/* Date Range Inputs */}
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <FaCalendarAlt size={13} style={{ color: '#6b7280' }} />
-            <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>From:</span>
+        <div className="archive-date-range">
+          <div className="archive-date-group">
+            <FaCalendarAlt size={13} className="archive-date-icon" />
+            <span className="archive-date-label">From:</span>
             <input
               type="date"
               value={dateFrom}
               onChange={(e) => { setDateFrom(e.target.value); setActiveQuickFilter("custom"); }}
-              style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '6px 10px', fontSize: '0.85rem', color: '#374151', outline: 'none', background: '#f9fafb' }}
+              className="archive-date-input"
             />
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>To:</span>
+          <div className="archive-date-group">
+            <span className="archive-date-label">To:</span>
             <input
               type="date"
               value={dateTo}
               onChange={(e) => { setDateTo(e.target.value); setActiveQuickFilter("custom"); }}
-              style={{ border: '1px solid #e5e7eb', borderRadius: '8px', padding: '6px 10px', fontSize: '0.85rem', color: '#374151', outline: 'none', background: '#f9fafb' }}
+              className="archive-date-input"
             />
           </div>
           {(dateFrom || dateTo) && activeQuickFilter !== 'all' && (
-            <button onClick={() => applyQuickFilter('all')} style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 500, padding: '4px 8px' }}>
+            <button onClick={() => applyQuickFilter('all')} className="archive-clear-btn">
               Clear
             </button>
           )}
@@ -209,45 +197,45 @@ export default function Archive() {
       </div>
 
       {/* BODY */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', background: '#f9fafb' }}>
-        <main style={{ maxWidth: '800px', width: '100%' }}>
+      <div className="archive-body">
+        <main className="archive-main">
             {loading ? (
-                <div style={{ display: 'flex', justifyContent: 'center', marginTop: '50px' }}>
-                    <div className="spin" style={{ width: '30px', height: '30px', border: '3px solid #e5e7eb', borderTopColor: '#111827', borderRadius: '50%' }}></div>
+                <div className="archive-loading">
+                    <div className="spin archive-spinner"></div>
                 </div>
             ) : filteredPosts.length === 0 ? (
-                <div style={{ textAlign: 'center', color: '#9ca3af', marginTop: '80px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <div style={{ background: '#e5e7eb', padding: '20px', borderRadius: '50%', marginBottom: '15px' }}>
-                        <FaTrash size={40} style={{ color: '#6b7280' }} />
+                <div className="archive-empty">
+                    <div className="archive-empty-icon">
+                        <FaTrash size={40} />
                     </div>
-                    <h3 style={{ color: '#374151', margin: '0 0 5px 0' }}>
+                    <h3 className="archive-empty-title">
                       {deletedPosts.length === 0 ? 'Trash is empty' : 'No items match this date range'}
                     </h3>
-                    <p style={{ margin: 0, fontSize: '0.9rem' }}>
+                    <p className="archive-empty-text">
                       {deletedPosts.length === 0 ? 'Items moved to trash will appear here.' : 'Try adjusting your date filters.'}
                     </p>
                 </div>
             ) : (
                 filteredPosts.map(post => (
-                    <div key={post.id} style={{ background: 'white', padding: '15px', borderRadius: '16px', marginBottom: '15px', border: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
-                        <div style={{ display: 'flex', gap: '15px', alignItems: 'center', flex: 1, minWidth: 0 }}>
+                    <div key={post.id} className="archive-post-card">
+                        <div className="archive-post-info">
                             {post.image ? (
-                                <img src={post.image} style={{ width: 60, height: 60, borderRadius: '10px', objectFit: 'cover', flexShrink: 0 }} alt="Listing" />
+                                <img src={post.image} className="archive-post-image" alt="Listing" />
                             ) : (
-                                <div style={{ width: 60, height: 60, borderRadius: '10px', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', flexShrink: 0 }}>
+                                <div className="archive-post-placeholder">
                                     <FaHome size={24} />
                                 </div>
                             )}
-                            <div style={{ minWidth: 0 }}>
-                                <h4 style={{ color: '#111827', margin: '0 0 4px 0', fontSize: '1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{post.title || post.content?.substring(0, 30) || 'Untitled Listing'}</h4>
-                                <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>Deleted: {new Date(post.deletedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                            <div className="archive-post-details">
+                                <h4 className="archive-post-title">{post.title || post.content?.substring(0, 30) || 'Untitled Listing'}</h4>
+                                <span className="archive-post-date">Deleted: {new Date(post.deletedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
                             </div>
                         </div>
-                        <div style={{ display: 'flex', gap: '10px', flexShrink: 0 }}>
-                            <button onClick={() => handleRestore(post.id)} style={{ background: '#f3f4f6', color: '#111827', border: 'none', padding: '10px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: '0.2s' }} title="Restore">
+                        <div className="archive-post-actions">
+                            <button onClick={() => handleRestore(post.id)} className="archive-restore-btn" title="Restore">
                                 <FaTrashRestore />
                             </button>
-                            <button onClick={() => handlePermanentDelete(post.id)} style={{ background: '#fee2e2', color: '#ef4444', border: 'none', padding: '10px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: '0.2s' }} title="Delete Permanently">
+                            <button onClick={() => handlePermanentDelete(post.id)} className="archive-delete-btn" title="Delete Permanently">
                                 <FaTimes />
                             </button>
                         </div>

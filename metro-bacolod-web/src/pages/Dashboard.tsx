@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase-config";
 import { signOut } from "firebase/auth";
-import { doc, getDoc, collection, query, orderBy, getDocs, addDoc, updateDoc, setDoc, onSnapshot, where } from "firebase/firestore";
+import { doc, getDoc, collection, query, orderBy, getDocs, addDoc, updateDoc, setDoc, onSnapshot, where, arrayUnion, arrayRemove } from "firebase/firestore";
 import {
   FaSearch, FaUser, FaCog, FaSignOutAlt, FaCaretDown,
   FaImage, FaSpinner, FaHome, FaTrash, FaEnvelope,
@@ -580,7 +580,9 @@ export default function Dashboard() {
   const openListingModal = (listing: any) => {
     setSelectedListing(listing);
     setCarouselIndex(0);
-    setIsLiked(false);
+    // Check if current user already liked this post
+    const likedBy = listing.originalPost?.likedBy || [];
+    setIsLiked(user?.uid ? likedBy.includes(user.uid) : false);
     setActiveModalTab('details');
     setShowShareSocials(false);
     // Reset mortgage to defaults based on listing price
@@ -588,6 +590,36 @@ export default function Dashboard() {
     setMortgageRate(7);
     setMortgageTerm(20);
     setMapStyle('street');
+  };
+
+  const handleToggleLike = async () => {
+    if (!user?.uid || !selectedListing?.id) return;
+    const postRef = doc(db, "posts", selectedListing.id);
+    const newLiked = !isLiked;
+    setIsLiked(newLiked);
+    try {
+      if (newLiked) {
+        await updateDoc(postRef, { likedBy: arrayUnion(user.uid) });
+      } else {
+        await updateDoc(postRef, { likedBy: arrayRemove(user.uid) });
+      }
+      // Update local posts state so re-opening the modal reflects the change
+      setPosts(prev => prev.map(p => {
+        if (p.id === selectedListing.id) {
+          const currentLikedBy = p.likedBy || [];
+          return {
+            ...p,
+            likedBy: newLiked
+              ? [...currentLikedBy, user.uid]
+              : currentLikedBy.filter((id: string) => id !== user.uid),
+          };
+        }
+        return p;
+      }));
+    } catch (err) {
+      console.error("Error toggling like:", err);
+      setIsLiked(!newLiked); // revert on error
+    }
   };
 
   const closeListingModal = () => {
@@ -1205,7 +1237,7 @@ export default function Dashboard() {
                 <span className="listing-modal-status">{selectedListing.status}</span>
                 {/* Top-Right: Like + Close */}
                 <div className="listing-modal-top-actions">
-                  <button className="listing-modal-like" onClick={(e) => { e.stopPropagation(); setIsLiked(!isLiked); }}>
+                  <button className="listing-modal-like" onClick={(e) => { e.stopPropagation(); handleToggleLike(); }}>
                     {isLiked ? <FaHeart color="#ef4444" /> : <FaRegHeart />}
                   </button>
                   <button className="listing-modal-close" onClick={(e) => { e.stopPropagation(); closeListingModal(); }}>
