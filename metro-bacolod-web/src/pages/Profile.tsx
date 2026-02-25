@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { auth, db } from "../firebase-config";
-import { doc, getDoc, collection, addDoc, query, where, orderBy, getDocs } from "firebase/firestore";
+import { doc, getDoc, collection, addDoc, query, where, orderBy, getDocs, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import {
   FaSearch, FaUser, FaCog, FaSignOutAlt, FaCaretDown,
@@ -147,6 +147,8 @@ export default function Profile() {
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
   const [myPosts, setMyPosts] = useState<any[]>([]); // User's own dynamic posts
+  const [likedPosts, setLikedPosts] = useState<any[]>([]); // Posts the user has liked
+  const [profileTab, setProfileTab] = useState<'recent' | 'liked'>('recent');
 
   const [viewedUser, setViewedUser] = useState<any>(null);
   const [viewedUserData, setViewedUserData] = useState<any>(null);
@@ -303,6 +305,29 @@ export default function Profile() {
     fetchAgent();
   }, [routeUserId, user?.uid]);
 
+  // Fetch liked posts for the current profile user
+  useEffect(() => {
+    const targetUid = isViewingOther ? routeUserId : user?.uid;
+    if (!targetUid) return;
+    const fetchLikedPosts = async () => {
+      try {
+        const postsQuery = query(
+          collection(db, "posts"),
+          where("likedBy", "array-contains", targetUid)
+        );
+        const postsSnap = await getDocs(postsQuery);
+        setLikedPosts(
+          postsSnap.docs
+            .filter(d => !d.data().isArchived && !d.data().isDeleted)
+            .map(formatPostData)
+        );
+      } catch (err) {
+        console.error("Error fetching liked posts:", err);
+      }
+    };
+    fetchLikedPosts();
+  }, [user?.uid, routeUserId, isViewingOther]);
+
   const handleLogout = async () => {
     const result = await Swal.fire({
       title: "Logout?",
@@ -353,13 +378,60 @@ export default function Profile() {
   const openListingModal = (listing: any) => {
     setSelectedListing(listing);
     setCarouselIndex(0);
-    setIsLiked(false);
+    // Check if current user already liked this post
+    const likedBy = listing.originalPost?.likedBy || [];
+    setIsLiked(user?.uid ? likedBy.includes(user.uid) : false);
     setActiveModalTab('details');
     setShowShareSocials(false);
     setMortgageDownPayment(20);
     setMortgageRate(7);
     setMortgageTerm(20);
     setMapStyle('street');
+  };
+
+  const handleToggleLike = async () => {
+    if (!user?.uid || !selectedListing?.id) return;
+    const postRef = doc(db, "posts", selectedListing.id);
+    const newLiked = !isLiked;
+    setIsLiked(newLiked);
+    try {
+      if (newLiked) {
+        await updateDoc(postRef, { likedBy: arrayUnion(user.uid) });
+      } else {
+        await updateDoc(postRef, { likedBy: arrayRemove(user.uid) });
+      }
+      // Update local posts state so re-opening the modal reflects the change
+      const updatePosts = (prev: any[]) => prev.map(p => {
+        if (p.id === selectedListing.id) {
+          const currentLikedBy = p.originalPost?.likedBy || [];
+          return {
+            ...p,
+            originalPost: {
+              ...p.originalPost,
+              likedBy: newLiked
+                ? [...currentLikedBy, user.uid]
+                : currentLikedBy.filter((id: string) => id !== user.uid),
+            },
+          };
+        }
+        return p;
+      });
+      setMyPosts(updatePosts);
+      setViewedPosts(updatePosts);
+      // Update liked posts tab
+      if (newLiked) {
+        // Add to liked posts if not already there
+        setLikedPosts(prev => {
+          if (prev.some(p => p.id === selectedListing.id)) return prev;
+          return [selectedListing, ...prev];
+        });
+      } else {
+        setLikedPosts(prev => prev.filter(p => p.id !== selectedListing.id));
+      }
+    } catch (err) {
+      console.error("Error toggling like:", err);
+      setIsLiked(!newLiked); // revert on error
+    }
   };
 
   const closeListingModal = () => {
@@ -636,72 +708,158 @@ export default function Profile() {
           )}
         </aside>
 
-        {/* --- RIGHT: Recent Posts --- */}
+        {/* --- RIGHT: Posts with Tabs --- */}
         <section className="profile-posts-section">
-          <h2 className="profile-posts-heading">{isViewingOther ? 'Listings:' : 'Recent posts:'}</h2>
+          {/* Tab Switcher */}
+          <div className="profile-tabs">
+            <button
+              className={`profile-tab ${profileTab === 'recent' ? 'profile-tab-active' : ''}`}
+              onClick={() => setProfileTab('recent')}
+            >
+              {isViewingOther ? 'Listings' : 'Recent Posts'}
+            </button>
+            <button
+              className={`profile-tab ${profileTab === 'liked' ? 'profile-tab-active' : ''}`}
+              onClick={() => setProfileTab('liked')}
+            >
+              <FaHeart size={12} /> Liked Posts
+            </button>
+          </div>
+
           <div className="profile-posts-grid">
-            {profileListings.length === 0 && (
-              <p style={{ color: '#9ca3af', fontStyle: 'italic', fontSize: '0.85rem' }}>No listings yet.</p>
-            )}
-            {profileListings.map((listing) => (
-              <div className="glass-listing-card profile-card" key={listing.id} onClick={() => openListingModal(listing)} style={{ cursor: 'pointer' }}>
-                {/* Card Info - Left */}
-                <div className="glass-card-content">
-                  <div>
-                    <h3 className="glass-card-title">
-                      {listing.title}
-                      {listing.rooms > 0 && (
-                        <>
-                          <br />
-                          <span className="glass-card-rooms">
-                            {listing.rooms} rooms
-                          </span>
-                        </>
-                      )}
-                    </h3>
-                    <ul className="glass-card-bullets">
-                      <li>→ {listing.location} Location</li>
-                      <li>→ {formatPriceDisplay(listing.price)}</li>
-                    </ul>
-                    <p className="glass-card-desc">{listing.description}</p>
-                  </div>
-                  <div className="glass-card-footer">
-                    <div className="glass-card-agent">
-                      <img
-                        src={listing.agentAvatar}
-                        alt={listing.agentName}
-                      />
-                      <div className="agent-meta">
-                        <span className="agent-name">
-                          {listing.agentName}
-                        </span>
-                        <span className="agent-rating-row">
-                          <RatingStars rating={listing.agentRating} />
-                          <span className="agent-rating-text">
-                            {listing.agentRating} Stars
-                          </span>
-                        </span>
+            {profileTab === 'recent' && (
+              <>
+                {profileListings.length === 0 && (
+                  <p style={{ color: '#9ca3af', fontStyle: 'italic', fontSize: '0.85rem' }}>No listings yet.</p>
+                )}
+                {profileListings.map((listing) => (
+                  <div className="glass-listing-card profile-card" key={listing.id} onClick={() => openListingModal(listing)} style={{ cursor: 'pointer' }}>
+                    {/* Card Info - Left */}
+                    <div className="glass-card-content">
+                      <div>
+                        <h3 className="glass-card-title">
+                          {listing.title}
+                          {listing.rooms > 0 && (
+                            <>
+                              <br />
+                              <span className="glass-card-rooms">
+                                {listing.rooms} rooms
+                              </span>
+                            </>
+                          )}
+                        </h3>
+                        <ul className="glass-card-bullets">
+                          <li>→ {listing.location} Location</li>
+                          <li>→ {formatPriceDisplay(listing.price)}</li>
+                        </ul>
+                        <p className="glass-card-desc">{listing.description}</p>
+                      </div>
+                      <div className="glass-card-footer">
+                        <div className="glass-card-agent">
+                          <img
+                            src={listing.agentAvatar}
+                            alt={listing.agentName}
+                          />
+                          <div className="agent-meta">
+                            <span className="agent-name">
+                              {listing.agentName}
+                            </span>
+                            <span className="agent-rating-row">
+                              <RatingStars rating={listing.agentRating} />
+                              <span className="agent-rating-text">
+                                {listing.agentRating} Stars
+                              </span>
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
 
-                {/* Card Right - Image + Inquire */}
-                <div className="glass-card-right">
-                  <div className="glass-card-image">
-                    {listing.image && (
-                      <img src={listing.image} alt={listing.title} />
-                    )}
+                    {/* Card Right - Image + Inquire */}
+                    <div className="glass-card-right">
+                      <div className="glass-card-image">
+                        {listing.image && (
+                          <img src={listing.image} alt={listing.title} />
+                        )}
+                      </div>
+                      <button
+                        className="glass-inquire-btn"
+                        onClick={(e) => { e.stopPropagation(); handleInquire(listing); }}
+                      >
+                        INQUIRE NOW →
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    className="glass-inquire-btn"
-                    onClick={(e) => { e.stopPropagation(); handleInquire(listing); }}
-                  >
-                    INQUIRE NOW →
-                  </button>
-                </div>
-              </div>
-            ))}
+                ))}
+              </>
+            )}
+
+            {profileTab === 'liked' && (
+              <>
+                {likedPosts.length === 0 && (
+                  <p style={{ color: '#9ca3af', fontStyle: 'italic', fontSize: '0.85rem' }}>No liked posts yet.</p>
+                )}
+                {likedPosts.map((listing) => (
+                  <div className="glass-listing-card profile-card" key={listing.id} onClick={() => openListingModal(listing)} style={{ cursor: 'pointer' }}>
+                    {/* Card Info - Left */}
+                    <div className="glass-card-content">
+                      <div>
+                        <h3 className="glass-card-title">
+                          {listing.title}
+                          {listing.rooms > 0 && (
+                            <>
+                              <br />
+                              <span className="glass-card-rooms">
+                                {listing.rooms} rooms
+                              </span>
+                            </>
+                          )}
+                        </h3>
+                        <ul className="glass-card-bullets">
+                          <li>→ {listing.location} Location</li>
+                          <li>→ {formatPriceDisplay(listing.price)}</li>
+                        </ul>
+                        <p className="glass-card-desc">{listing.description}</p>
+                      </div>
+                      <div className="glass-card-footer">
+                        <div className="glass-card-agent">
+                          <img
+                            src={listing.agentAvatar}
+                            alt={listing.agentName}
+                          />
+                          <div className="agent-meta">
+                            <span className="agent-name">
+                              {listing.agentName}
+                            </span>
+                            <span className="agent-rating-row">
+                              <RatingStars rating={listing.agentRating} />
+                              <span className="agent-rating-text">
+                                {listing.agentRating} Stars
+                              </span>
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Card Right - Image + Inquire */}
+                    <div className="glass-card-right">
+                      <div className="glass-card-image">
+                        {listing.image && (
+                          <img src={listing.image} alt={listing.title} />
+                        )}
+                      </div>
+                      <button
+                        className="glass-inquire-btn"
+                        onClick={(e) => { e.stopPropagation(); handleInquire(listing); }}
+                      >
+                        INQUIRE NOW →
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         </section>
       </div>
@@ -1009,7 +1167,7 @@ export default function Profile() {
                 <span className="listing-modal-status">{selectedListing.status}</span>
                 {/* Top-Right: Like + Close */}
                 <div className="listing-modal-top-actions">
-                  <button className="listing-modal-like" onClick={(e) => { e.stopPropagation(); setIsLiked(!isLiked); }}>
+                  <button className="listing-modal-like" onClick={(e) => { e.stopPropagation(); handleToggleLike(); }}>
                     {isLiked ? <FaHeart color="#ef4444" /> : <FaRegHeart />}
                   </button>
                   <button className="listing-modal-close" onClick={(e) => { e.stopPropagation(); closeListingModal(); }}>

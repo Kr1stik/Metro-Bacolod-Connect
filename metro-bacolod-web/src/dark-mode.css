@@ -424,6 +424,30 @@
   color: #f3f4f6;
 }
 
+[data-theme="dark"] .profile-tabs {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] .profile-tab {
+  color: #6b7280;
+}
+
+[data-theme="dark"] .profile-tab:hover {
+  color: #d1d5db;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] .profile-tab-active {
+  color: #f3f4f6;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .profile-tab-active:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f3f4f6;
+}
+
 /* Reviews section dark */
 [data-theme="dark"] .profile-reviews-section {
   background: rgba(255, 255, 255, 0.04);
@@ -802,6 +826,11 @@
 
 [data-theme="dark"] .listing-modal-desc {
   color: #9ca3af;
+  scrollbar-color: #4b5563 transparent;
+}
+
+[data-theme="dark"] .listing-modal-desc::-webkit-scrollbar-thumb {
+  background: #4b5563;
 }
 
 [data-theme="dark"] .listing-amenity-tag {
@@ -1616,4 +1645,144 @@
 /* Ensure rating stars keep their color */
 [data-theme="dark"] .rating-stars {
   color: #f59e0b;
+}
+
+/* =========================================
+   ARCHIVE / TRASH PAGE DARK MODE
+   ========================================= */
+[data-theme="dark"] .archive-header {
+  background: #1a1a2e;
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+  color: #f3f4f6;
+}
+
+[data-theme="dark"] .archive-back-btn {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f3f4f6;
+}
+
+[data-theme="dark"] .archive-back-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+[data-theme="dark"] .archive-title {
+  color: #f3f4f6;
+}
+
+[data-theme="dark"] .archive-filter-bar {
+  background: #1a1a2e;
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] .archive-filter-icon {
+  color: #9ca3af;
+}
+
+[data-theme="dark"] .archive-quick-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #d1d5db;
+}
+
+[data-theme="dark"] .archive-quick-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+[data-theme="dark"] .archive-quick-btn-active {
+  background: #f3f4f6;
+  border-color: #f3f4f6;
+  color: #111827;
+}
+
+[data-theme="dark"] .archive-quick-btn-active:hover {
+  background: #e5e7eb;
+  border-color: #e5e7eb;
+}
+
+[data-theme="dark"] .archive-date-icon {
+  color: #9ca3af;
+}
+
+[data-theme="dark"] .archive-date-label {
+  color: #9ca3af;
+}
+
+[data-theme="dark"] .archive-date-input {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #d1d5db;
+  color-scheme: dark;
+}
+
+[data-theme="dark"] .archive-date-input:focus {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+[data-theme="dark"] .archive-clear-btn {
+  color: #f87171;
+}
+
+[data-theme="dark"] .archive-body {
+  background: #0f0f1a;
+}
+
+[data-theme="dark"] .archive-spinner {
+  border-color: rgba(255, 255, 255, 0.1);
+  border-top-color: #f3f4f6;
+}
+
+[data-theme="dark"] .archive-empty-icon {
+  background: rgba(255, 255, 255, 0.08);
+  color: #6b7280;
+}
+
+[data-theme="dark"] .archive-empty-title {
+  color: #e5e7eb;
+}
+
+[data-theme="dark"] .archive-empty-text {
+  color: #6b7280;
+}
+
+[data-theme="dark"] .archive-post-card {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] .archive-post-card:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] .archive-post-placeholder {
+  background: rgba(255, 255, 255, 0.06);
+  color: #6b7280;
+}
+
+[data-theme="dark"] .archive-post-title {
+  color: #f3f4f6;
+}
+
+[data-theme="dark"] .archive-post-date {
+  color: #6b7280;
+}
+
+[data-theme="dark"] .archive-restore-btn {
+  background: rgba(255, 255, 255, 0.08);
+  color: #d1d5db;
+}
+
+[data-theme="dark"] .archive-restore-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+[data-theme="dark"] .archive-delete-btn {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+[data-theme="dark"] .archive-delete-btn:hover {
+  background: rgba(239, 68, 68, 0.25);
 }
