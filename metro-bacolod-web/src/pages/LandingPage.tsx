@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { signInWithEmailAndPassword, signInWithPopup, signOut } from "firebase/auth";
+import { signInWithEmailAndPassword, signInWithPopup, signOut, sendPasswordResetEmail } from "firebase/auth";
 import { auth, googleProvider, db } from "../firebase-config";
 import { doc, getDoc } from "firebase/firestore";
 import { FcGoogle } from "react-icons/fc";
@@ -314,7 +314,17 @@ export default function LandingPage() {
             
             <form onSubmit={handleLogin}>
                 <input required type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '10px', borderRadius: '8px', border: '1px solid #ddd' }} />
-                <input required type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '20px', borderRadius: '8px', border: '1px solid #ddd' }} />
+                <input required type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '8px', borderRadius: '8px', border: '1px solid #ddd' }} />
+                <div style={{ textAlign: 'right', marginBottom: '15px' }}>
+                  <span
+                    style={{ color: '#2563eb', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '500' }}
+                    onClick={async () => {
+                      if (!email) { glassToast.error('Enter your email first.'); return; }
+                      try { await sendPasswordResetEmail(auth, email); glassToast.success('Password reset email sent! Check your inbox.'); }
+                      catch { glassToast.error('Failed to send reset email. Check the email address.'); }
+                    }}
+                  >Forgot Password?</span>
+                </div>
                 
                 <button type="submit" className="primary-btn" style={{ width: '100%', marginBottom: '15px', background: 'black', color: 'white' }}>
                     Sign In
