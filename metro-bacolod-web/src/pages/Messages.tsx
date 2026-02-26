@@ -121,14 +121,13 @@ export default function Messages() {
               color: '#374151',
               transition: '0.2s'
             }}
-            onMouseOver={(e) => e.currentTarget.style.background = '#e5e7eb'}
-            onMouseOut={(e) => e.currentTarget.style.background = '#f3f4f6'}
+            className="msg-back-btn"
           >
             <FaArrowLeft /> {activeChat ? 'Back to Inbox' : 'Back to Listings'}
           </button>
           
           <img src={logo} alt="MBC Logo" className="dash-logo" onClick={() => navigate("/dashboard")} style={{ cursor: "pointer", marginLeft: '10px' }} />
-          <h2 style={{ color: '#111827', fontSize: '1.2rem', margin: 0, display: 'none' }} className="desktop-title">Messages</h2>
+          <h2 style={{ fontSize: '1.2rem', margin: 0, display: 'none' }} className="desktop-title msg-title">Messages</h2>
         </div>
         <div className="dash-nav-right">
           <div className="dash-user-trigger" onClick={() => navigate("/profile")}>
@@ -144,7 +143,7 @@ export default function Messages() {
         {/* LEFT SIDEBAR: CHAT LIST */}
         <div style={{ width: '350px', background: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(12px)', borderRadius: '20px', border: '1px solid #e5e7eb', display: activeChat ? 'none' : 'flex', flexDirection: 'column' }} className="chat-sidebar-mobile">
           
-          <div style={{ padding: '20px', borderBottom: '1px solid #e5e7eb' }}>
+          <div className="msg-search-area" style={{ padding: '20px', borderBottom: '1px solid #e5e7eb' }}>
             <div className="dash-search-wrapper" style={{ margin: 0 }}>
               <FaSearch className="dash-search-icon" />
               <input type="text" placeholder="Search conversations..." className="dash-search-input" />
@@ -161,15 +160,16 @@ export default function Messages() {
                 <div 
                   key={chat.id} 
                   onClick={() => setActiveChat(chat)}
+                  className={`msg-chat-item ${isActive ? 'msg-chat-item-active' : ''}`}
                   style={{ display: 'flex', alignItems: 'center', gap: '15px', padding: '15px', borderRadius: '12px', cursor: 'pointer', marginBottom: '5px', background: isActive ? '#f3f4f6' : 'transparent' }}
                 >
                   <img src={otherUser.avatar} alt="avatar" style={{ width: '45px', height: '45px', borderRadius: '50%', objectFit: 'cover' }} />
                   <div style={{ flex: 1, overflow: 'hidden' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', color: '#111', fontWeight: isUnread ? '800' : '500' }}>{otherUser.name}</h4>
+                      <h4 className="msg-chat-name" style={{ margin: '0 0 4px 0', fontSize: '0.95rem', fontWeight: isUnread ? '800' : '500' }}>{otherUser.name}</h4>
                       {isUnread && <div style={{ width: '10px', height: '10px', background: '#2563eb', borderRadius: '50%' }}></div>}
                     </div>
-                    <p style={{ margin: 0, fontSize: '0.85rem', color: isUnread ? '#111' : '#6b7280', fontWeight: isUnread ? '600' : 'normal', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                    <p className="msg-chat-preview" style={{ margin: 0, fontSize: '0.85rem', fontWeight: isUnread ? '600' : 'normal', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                       {chat.lastMessage || "Started a conversation"}
                     </p>
                   </div>
@@ -184,11 +184,11 @@ export default function Messages() {
           {activeChat ? (
             <>
               {/* Header */}
-              <div style={{ padding: '20px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: '15px', background: 'white', borderRadius: '20px 20px 0 0' }}>
+              <div className="msg-chat-header" style={{ padding: '20px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: '15px', borderRadius: '20px 20px 0 0' }}>
                 {/* Mobile back to inbox button */}
                 <button className="chat-back-btn" onClick={() => setActiveChat(null)} style={{ background: 'transparent', border: 'none', fontSize: '1.2rem', cursor: 'pointer', display: 'none' }}><FaArrowLeft /></button>
                 <img src={getOtherUser(activeChat).avatar} alt="avatar" style={{ width: '40px', height: '40px', borderRadius: '50%' }} />
-                <h3 style={{ margin: 0, color: '#111' }}>{getOtherUser(activeChat).name}</h3>
+                <h3 className="msg-active-name" style={{ margin: 0 }}>{getOtherUser(activeChat).name}</h3>
               </div>
 
               {/* Messages Area */}
@@ -197,7 +197,7 @@ export default function Messages() {
                   const isMe = msg.senderId === user?.uid;
                   return (
                     <div key={msg.id} style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
-                      <div style={{ maxWidth: '70%', padding: '12px 16px', borderRadius: '16px', background: isMe ? '#111827' : '#f3f4f6', color: isMe ? 'white' : '#111', borderBottomRightRadius: isMe ? '4px' : '16px', borderBottomLeftRadius: isMe ? '16px' : '4px', fontSize: '0.95rem' }}>
+                      <div className={isMe ? 'msg-bubble-sent' : 'msg-bubble-received'} style={{ maxWidth: '70%', padding: '12px 16px', borderRadius: '16px', borderBottomRightRadius: isMe ? '4px' : '16px', borderBottomLeftRadius: isMe ? '16px' : '4px', fontSize: '0.95rem' }}>
                         {msg.text}
                       </div>
                     </div>
@@ -207,15 +207,15 @@ export default function Messages() {
               </div>
 
               {/* Input Area */}
-              <div style={{ padding: '20px', borderTop: '1px solid #e5e7eb', background: 'white', borderRadius: '0 0 20px 20px' }}>
+              <div className="msg-input-area" style={{ padding: '20px', borderTop: '1px solid #e5e7eb', borderRadius: '0 0 20px 20px' }}>
                 <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: '10px' }}>
-                  <input type="text" placeholder="Type a message..." value={newMessage} onChange={(e) => setNewMessage(e.target.value)} style={{ flex: 1, padding: '15px', borderRadius: '50px', border: '1px solid #d1d5db', outline: 'none', background: '#f9fafb' }} />
-                  <button type="submit" disabled={!newMessage.trim()} style={{ background: '#111827', color: 'white', border: 'none', width: '50px', height: '50px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><FaPaperPlane /></button>
+                  <input type="text" placeholder="Type a message..." value={newMessage} onChange={(e) => setNewMessage(e.target.value)} className="msg-input-field" style={{ flex: 1, padding: '15px', borderRadius: '50px', outline: 'none' }} />
+                  <button type="submit" disabled={!newMessage.trim()} className="msg-send-btn" style={{ border: 'none', width: '50px', height: '50px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><FaPaperPlane /></button>
                 </form>
               </div>
             </>
           ) : (
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', flexDirection: 'column' }}><FaEnvelope size={48} style={{ marginBottom: '15px', opacity: 0.5 }} /><p>Select a conversation</p></div>
+            <div className="msg-empty-state" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}><FaEnvelope size={48} style={{ marginBottom: '15px', opacity: 0.5 }} /><p>Select a conversation</p></div>
           )}
         </div>
       </div>
