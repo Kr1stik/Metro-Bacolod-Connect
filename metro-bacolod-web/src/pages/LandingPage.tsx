@@ -123,17 +123,36 @@ export default function LandingPage() {
       const result = await signInWithPopup(auth, googleProvider);
       const gUser = result.user;
 
-      // Check if account is deactivated
-      const userDoc = await getDoc(doc(db, "users", gUser.uid));
-      if (userDoc.exists() && userDoc.data().isDeactivated) {
-        await signOut(auth);
-        glassToast.error("This account has been deactivated. Contact support.");
-        return;
+      // Check if this user exists in our Firestore database
+      const userDocRef = doc(db, "users", gUser.uid);
+      const userDoc = await getDoc(userDocRef);
+
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+        if (data.isDeactivated) {
+          await signOut(auth);
+          glassToast.error("This account has been deactivated. Contact support.");
+          return;
+        }
+        
+        // If they exist but don't have a role assigned, they didn't finish setup!
+        if (!data.role) {
+          closeLogin();
+          navigate("/complete-profile");
+          return;
+        }
+
+        // They exist and have a role, send them to dashboard normally
+        closeLogin();
+        navigate("/dashboard");
+      } else {
+        // Brand new Google user! They need to complete the form.
+        closeLogin();
+        navigate("/complete-profile");
       }
 
-      navigate("/dashboard");
     } catch (error: any) {
-      glassToast.error("Google login failed");
+      glassToast.error("Google sign-in failed.");
     }
   };
 

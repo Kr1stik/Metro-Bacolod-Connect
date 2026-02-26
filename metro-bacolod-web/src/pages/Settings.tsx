@@ -66,7 +66,10 @@ export default function Settings() {
             setEditName(data.firstName ? `${data.firstName} ${data.lastName}` : currentUser.displayName || "");
             setEditUsername(data.username || "");
             setEditEmail(currentUser.email || "");
-            setEditPhone(data.phone || "");
+            
+            // ---> FIX 1: Fetching 'mobile' instead of 'phone'
+            setEditPhone(data.mobile || ""); 
+            
             setEditDescription(data.description || "");
             setRegion(data.address || "");
             // Load saved preferences
@@ -199,15 +202,27 @@ export default function Settings() {
       const firstName = nameParts[0] || "";
       const lastName = nameParts.slice(1).join(" ") || "";
       const userDocRef = doc(db, "users", user.uid);
+      
+      // ---> FIX 2: Updating 'mobile' instead of 'phone'
       await updateDoc(userDocRef, {
         firstName,
         lastName,
         username: editUsername,
-        phone: editPhone,
+        mobile: editPhone, // Make sure this says 'mobile'!
         description: editDescription,
         address: region,
       });
-      setUserData((prev: any) => ({ ...prev, firstName, lastName, username: editUsername, phone: editPhone, description: editDescription, address: region }));
+      
+      setUserData((prev: any) => ({ 
+        ...prev, 
+        firstName, 
+        lastName, 
+        username: editUsername, 
+        mobile: editPhone, // Updated state here too
+        description: editDescription, 
+        address: region 
+      }));
+      
       glassToast.success("Profile updated!");
     } catch (err) {
       console.error(err);

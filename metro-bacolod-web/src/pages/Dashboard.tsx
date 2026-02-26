@@ -382,6 +382,7 @@ export default function Dashboard() {
         userAvatar: user.photoURL,
         userCustomId: userData?.customId || "USER",
         userRole: userData?.role || "Client",
+        userPhone: userData?.mobile || "N/A",
         title: safeTitle,         // <-- Now using the clean, safe title
         content: safeDescription, // <-- Now using the clean, safe description
         location: listingLocation,
@@ -655,7 +656,7 @@ export default function Dashboard() {
     amenities: post.amenities || [],
     agentName: post.userName || 'Unknown Agent',
     agentRating: 4.0,
-    agentPhone: post.phone || 'N/A',
+    agentPhone: post.userPhone || 'N/A',
     agentAvatar: post.userAvatar || 'https://ui-avatars.com/api/?name=U&rounded=true',
     image: post.images?.[0] || post.image || '',
     images: post.images || (post.image ? [post.image] : []),

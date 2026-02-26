@@ -252,7 +252,7 @@ export default function Profile() {
               amenities: p.amenities || [],
               agentName: p.userName || 'Unknown Agent',
               agentRating: 4.0,
-              agentPhone: p.phone || 'N/A',
+              agentPhone: p.userPhone || 'N/A',
               agentAvatar: p.userAvatar || 'https://ui-avatars.com/api/?name=U&rounded=true',
               image: p.images?.[0] || p.image || '',
               images: p.images || (p.image ? [p.image] : []),
@@ -689,7 +689,7 @@ export default function Profile() {
               {profileData?.address || "Bacolod"}
             </p>
             <p className="profile-info-line">
-              <strong>Number:</strong> {profileData?.phone || "—"}
+              <strong>Number:</strong> {profileData?.mobile || "—"}
             </p>
             <p className="profile-info-line">
               <strong>Email:</strong> {profileUser?.email || "—"}

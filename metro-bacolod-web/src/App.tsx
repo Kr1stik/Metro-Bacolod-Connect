@@ -16,6 +16,7 @@ import Resources from "./pages/Resources";
 import Messages from "./pages/Messages";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { ThemeProvider } from "./context/ThemeContext";
+import CompleteProfile from "./pages/CompleteProfile";
 import "./dark-mode.css";
 import { Analytics } from "@vercel/analytics/react";
 
@@ -80,6 +81,10 @@ function App() {
         <Route 
           path="/messages" 
           element={<ProtectedRoute><Messages /></ProtectedRoute>} 
+        />
+        <Route 
+          path="/complete-profile" 
+          element={<ProtectedRoute><CompleteProfile /></ProtectedRoute>} 
         />
       </Routes>
       <Analytics />
