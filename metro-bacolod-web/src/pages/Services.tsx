@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { signInWithEmailAndPassword, signInWithPopup, signOut } from "firebase/auth";
+import { signInWithEmailAndPassword, signInWithPopup, signOut, sendPasswordResetEmail } from "firebase/auth";
 import { auth, googleProvider } from "../firebase-config";
 import { FcGoogle } from "react-icons/fc";
 import { FaTimes } from "react-icons/fa";
@@ -63,7 +63,13 @@ export default function Services() {
   const [showLogin, setShowLogin] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const unsub = auth.onAuthStateChanged((u) => setIsLoggedIn(!!u));
+    return () => unsub();
+  }, []);
 
   const closeLogin = () => { setShowLogin(false); setEmail(""); setPassword(""); };
 
@@ -160,7 +166,7 @@ export default function Services() {
               confident real estate decisions — all in one place.
             </p>
             <div className="info-cta-buttons">
-              <button className="info-cta-btn info-cta-primary" onClick={() => navigate("/dashboard")}>
+              <button className="info-cta-btn info-cta-primary" onClick={() => isLoggedIn ? navigate("/dashboard") : setShowLogin(true)}>
                 Explore Listings
               </button>
               <button className="info-cta-btn info-cta-outline" onClick={() => navigate("/professionals")}>
@@ -181,7 +187,10 @@ export default function Services() {
             </div>
             <form onSubmit={handleLogin}>
               <input required type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '10px', borderRadius: '8px', border: '1px solid #ddd' }} />
-              <input required type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '20px', borderRadius: '8px', border: '1px solid #ddd' }} />
+              <input required type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '8px', borderRadius: '8px', border: '1px solid #ddd' }} />
+              <div style={{ textAlign: 'right', marginBottom: '15px' }}>
+                <span style={{ color: '#2563eb', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '500' }} onClick={async () => { if (!email) { glassToast.error('Enter your email first.'); return; } try { await sendPasswordResetEmail(auth, email); glassToast.success('Password reset email sent! Check your inbox.'); } catch { glassToast.error('Failed to send reset email. Check the email address.'); } }}>Forgot Password?</span>
+              </div>
               <button type="submit" className="primary-btn" style={{ width: '100%', marginBottom: '15px', background: 'black', color: 'white' }}>Sign In</button>
             </form>
             <button type="button" className="primary-btn" style={{ width: '100%', background: 'white', color: 'black', border: '1px solid #ddd', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }} onClick={handleGoogleLogin}>

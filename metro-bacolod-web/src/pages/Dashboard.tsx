@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase-config";
 import { signOut } from "firebase/auth";
@@ -10,12 +10,13 @@ import {
   FaStarHalfAlt, FaRegStar, FaShare, FaChevronDown,
   FaChevronLeft, FaChevronRight, FaBed, FaBath, FaRulerCombined,
   FaCalendarAlt, FaPhoneAlt, FaHeart, FaRegHeart,
-  FaMap, FaCalculator,
+  FaMap, FaCalculator, FaBell, FaCrop,
   FaFacebookF, FaTwitter, FaInstagram
 } from "react-icons/fa";
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import Cropper from 'react-easy-crop';
 import logo from "../assets/MBC Logo.png";
 import "../App.css";
 import Swal from 'sweetalert2';
@@ -82,6 +83,23 @@ const LOCATION_COORDS: Record<string, [number, number]> = {
 // Bacolod City center
 const BACOLOD_CENTER: [number, number] = [10.6840, 122.9510];
 
+// --- Image cropping utility ---
+async function getCroppedImg(imageSrc: string, pixelCrop: any): Promise<File> {
+  const image = new Image();
+  image.src = imageSrc;
+  await new Promise(resolve => { image.onload = resolve; });
+  const canvas = document.createElement('canvas');
+  canvas.width = pixelCrop.width;
+  canvas.height = pixelCrop.height;
+  const ctx = canvas.getContext('2d')!;
+  ctx.drawImage(image, pixelCrop.x, pixelCrop.y, pixelCrop.width, pixelCrop.height, 0, 0, pixelCrop.width, pixelCrop.height);
+  return new Promise(resolve => {
+    canvas.toBlob(blob => {
+      resolve(new File([blob!], 'cropped.jpg', { type: 'image/jpeg' }));
+    }, 'image/jpeg', 0.9);
+  });
+}
+
 // --- Mortgage Calculator ---
 function calculateMortgage(propertyPrice: number, downPaymentPercent: number, annualRate: number, termYears: number) {
   const downPayment = propertyPrice * (downPaymentPercent / 100);
@@ -127,12 +145,15 @@ function formatPriceDisplay(price: string): string {
   return `₱${num.toLocaleString()}`;
 }
 
+const POSTS_PER_PAGE = 12;
+
 export default function Dashboard() {
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [visibleCount, setVisibleCount] = useState(POSTS_PER_PAGE);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
   const [posts, setPosts] = useState<any[]>([]);
@@ -156,6 +177,12 @@ export default function Dashboard() {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // --- IMAGE CROP STATE ---
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [cropZoom, setCropZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
+  const [pendingCropFiles, setPendingCropFiles] = useState<File[]>([]);
 
   // Edit mode states
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
@@ -189,6 +216,13 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+
+  // --- RATING STATE ---
+  const [agentRatings, setAgentRatings] = useState<Record<string, number>>({});
+
+  // --- NOTIFICATION STATE ---
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   const navigate = useNavigate();
 
@@ -255,6 +289,81 @@ export default function Dashboard() {
     }
   };
 
+  // --- FETCH AGENT RATING ---
+  const fetchAgentRating = async (agentId: string) => {
+    try {
+      const reviewsSnap = await getDocs(collection(db, `users/${agentId}/reviews`));
+      if (reviewsSnap.empty) return 0;
+      let total = 0;
+      reviewsSnap.forEach(d => { total += d.data().rating || 0; });
+      const avg = Math.round((total / reviewsSnap.size) * 10) / 10;
+      setAgentRatings(prev => ({ ...prev, [agentId]: avg }));
+      return avg;
+    } catch { return 0; }
+  };
+
+  // --- SUBMIT REVIEW ---
+  const handleRateAgent = async (agentId: string, agentName: string) => {
+    if (!user) return;
+    if (user.uid === agentId) return glassToast.info("You can't rate yourself.");
+
+    const { value: rating } = await Swal.fire({
+      title: `Rate ${agentName}`,
+      html: `
+        <div style="display:flex;gap:8px;justify-content:center;margin:16px 0;">
+          ${[1,2,3,4,5].map(n => `<span class="swal-star" data-val="${n}" style="font-size:2rem;cursor:pointer;color:#d1d5db;transition:color 0.2s;">★</span>`).join('')}
+        </div>
+        <p id="swal-rating-label" style="font-size:0.9rem;color:#6b7280;margin:0;">Select a rating</p>
+      `,
+      showCancelButton: true,
+      confirmButtonText: 'Submit',
+      confirmButtonColor: '#111827',
+      didOpen: () => {
+        let selected = 0;
+        const stars = document.querySelectorAll('.swal-star');
+        const label = document.getElementById('swal-rating-label');
+        const labels = ['', 'Poor', 'Fair', 'Good', 'Very Good', 'Excellent'];
+        stars.forEach((s: any) => {
+          s.addEventListener('click', () => {
+            selected = parseInt(s.dataset.val);
+            stars.forEach((st: any) => { st.style.color = parseInt(st.dataset.val) <= selected ? '#f59e0b' : '#d1d5db'; });
+            if (label) label.textContent = labels[selected] || '';
+            (Swal.getConfirmButton() as any).dataset.rating = selected;
+          });
+        });
+      },
+      preConfirm: () => {
+        const r = parseInt((Swal.getConfirmButton() as any)?.dataset?.rating || '0');
+        if (!r) { Swal.showValidationMessage('Please select a rating'); return false; }
+        return r;
+      }
+    });
+
+    if (!rating) return;
+
+    try {
+      const reviewRef = doc(db, `users/${agentId}/reviews`, user.uid);
+      await setDoc(reviewRef, {
+        rating,
+        reviewerId: user.uid,
+        reviewerName: userData?.firstName ? `${userData.firstName} ${userData.lastName}` : (user.displayName || "User"),
+        createdAt: new Date().toISOString(),
+      });
+      glassToast.success(`Rated ${agentName} ${rating} star${rating > 1 ? 's' : ''}!`);
+      fetchAgentRating(agentId);
+      // Send notification to the rated agent
+      await addDoc(collection(db, "notifications"), {
+        userId: agentId,
+        message: `${userData?.firstName || user.displayName || 'Someone'} rated you ${rating} star${rating > 1 ? 's' : ''}!`,
+        link: '/profile',
+        read: false,
+        createdAt: new Date().toISOString(),
+      });
+    } catch {
+      glassToast.error("Failed to submit rating.");
+    }
+  };
+
   // --- LISTEN FOR UNREAD MESSAGES ---
   useEffect(() => {
     if (!user) return;
@@ -268,6 +377,28 @@ export default function Dashboard() {
     });
     return () => unsub();
   }, [user]);
+
+  // --- LISTEN FOR NOTIFICATIONS ---
+  useEffect(() => {
+    if (!user) return;
+    const q = query(
+      collection(db, "notifications"),
+      where("userId", "==", user.uid),
+      orderBy("createdAt", "desc")
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, [user]);
+
+  const markNotificationRead = async (notifId: string) => {
+    try {
+      await updateDoc(doc(db, "notifications", notifId), { read: true });
+    } catch { /* ignore */ }
+  };
+
+  const unreadNotifCount = notifications.filter((n: any) => !n.read).length;
 
 
 
@@ -299,6 +430,10 @@ export default function Dashboard() {
         activePosts = activePosts.filter((post: any) => post.location === locationFilter);
       }
       setPosts(activePosts);
+
+      // Fetch ratings for unique agents
+      const agentIds = [...new Set(activePosts.map((p: any) => p.userId).filter(Boolean))];
+      agentIds.forEach(id => fetchAgentRating(id));
     } catch (error) {
       console.error("Failed to load posts", error);
     }
@@ -307,6 +442,7 @@ export default function Dashboard() {
   const handleFilterChange = (e: any) => {
     const newLocation = e.target.value;
     setFilterLocation(newLocation);
+    setVisibleCount(POSTS_PER_PAGE);
     fetchPosts(newLocation);
   };
 
@@ -314,7 +450,44 @@ export default function Dashboard() {
     activeDropdown === postId ? setActiveDropdown(null) : setActiveDropdown(postId);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) setImageFiles([...imageFiles, ...Array.from(e.target.files)]);
+    if (!e.target.files || e.target.files.length === 0) return;
+    const files = Array.from(e.target.files);
+    if (files.length === 1) {
+      // Single file → open cropper
+      const reader = new FileReader();
+      reader.onload = () => {
+        setCropImageSrc(reader.result as string);
+        setPendingCropFiles([]);
+      };
+      reader.readAsDataURL(files[0]);
+    } else {
+      // Multiple files → add directly (no crop for batch)
+      setImageFiles(prev => [...prev, ...files]);
+    }
+    e.target.value = '';
+  };
+
+  const onCropComplete = useCallback((_: any, croppedPixels: any) => {
+    setCroppedAreaPixels(croppedPixels);
+  }, []);
+
+  const handleCropConfirm = async () => {
+    if (!cropImageSrc || !croppedAreaPixels) return;
+    try {
+      const croppedFile = await getCroppedImg(cropImageSrc, croppedAreaPixels);
+      setImageFiles(prev => [...prev, croppedFile]);
+      setCropImageSrc(null);
+      setCrop({ x: 0, y: 0 });
+      setCropZoom(1);
+    } catch {
+      glassToast.error("Failed to crop image.");
+    }
+  };
+
+  const handleCropCancel = () => {
+    setCropImageSrc(null);
+    setCrop({ x: 0, y: 0 });
+    setCropZoom(1);
   };
 
   const removeImage = (index: number) => {
@@ -569,7 +742,18 @@ export default function Dashboard() {
           });
       }
 
-      // 4. Teleport the user to the messages page
+      // 4. Send notification to the agent
+      if (agentId !== user.uid) {
+        await addDoc(collection(db, "notifications"), {
+          userId: agentId,
+          message: `${userData?.firstName || user.displayName || 'Someone'} inquired about your listing "${listing.title}"`,
+          link: '/messages',
+          read: false,
+          createdAt: new Date().toISOString(),
+        });
+      }
+
+      // 5. Teleport the user to the messages page
       navigate('/messages');
 
     } catch (error) {
@@ -601,6 +785,17 @@ export default function Dashboard() {
     try {
       if (newLiked) {
         await updateDoc(postRef, { likedBy: arrayUnion(user.uid) });
+        // Send notification to post owner
+        const ownerId = selectedListing.originalPost?.userId;
+        if (ownerId && ownerId !== user.uid) {
+          await addDoc(collection(db, "notifications"), {
+            userId: ownerId,
+            message: `${userData?.firstName || user.displayName || 'Someone'} liked your listing "${selectedListing.title}"`,
+            link: '/dashboard',
+            read: false,
+            createdAt: new Date().toISOString(),
+          });
+        }
       } else {
         await updateDoc(postRef, { likedBy: arrayRemove(user.uid) });
       }
@@ -641,7 +836,7 @@ export default function Dashboard() {
   };
 
   // --- Build display listings: only real posts ---
-  const displayListings = posts.map(post => ({
+  const allListings = posts.map(post => ({
     id: post.id,
     title: post.title || post.content?.split('\n')[0]?.substring(0, 40) || 'New Listing',
     rooms: post.rooms || 0,
@@ -655,7 +850,7 @@ export default function Dashboard() {
     fullDescription: post.content || 'No description provided.',
     amenities: post.amenities || [],
     agentName: post.userName || 'Unknown Agent',
-    agentRating: 4.0,
+    agentRating: agentRatings[post.userId] || 0,
     agentPhone: post.userPhone || 'N/A',
     agentAvatar: post.userAvatar || 'https://ui-avatars.com/api/?name=U&rounded=true',
     image: post.images?.[0] || post.image || '',
@@ -666,6 +861,23 @@ export default function Dashboard() {
     listedDate: post.createdAt ? new Date(post.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently',
     originalPost: post,
   }));
+
+  // --- Apply price, status, and type filters ---
+  const displayListings = allListings.filter(listing => {
+    // Price filter
+    if (filterPrice) {
+      const num = parsePriceToNumber(listing.price);
+      if (filterPrice === "under1m" && num >= 1_000_000) return false;
+      if (filterPrice === "1m-3m" && (num < 1_000_000 || num > 3_000_000)) return false;
+      if (filterPrice === "3m-5m" && (num < 3_000_000 || num > 5_000_000)) return false;
+      if (filterPrice === "over5m" && num <= 5_000_000) return false;
+    }
+    // Status filter
+    if (filterStatus && listing.status !== filterStatus) return false;
+    // Type filter
+    if (filterType && listing.type !== filterType) return false;
+    return true;
+  });
 
   return (
     <div className="dashboard-revamp">
@@ -737,6 +949,42 @@ export default function Dashboard() {
               <span style={{ position: 'absolute', top: '-5px', right: '-8px', background: '#ef4444', color: 'white', fontSize: '0.65rem', fontWeight: 'bold', width: '18px', height: '18px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white' }}>
                 {unreadCount}
               </span>
+            )}
+          </div>
+
+          {/* --- NOTIFICATION BELL --- */}
+          <div
+            onClick={() => setShowNotifications(!showNotifications)}
+            style={{ cursor: 'pointer', color: '#4b5563', display: 'flex', alignItems: 'center', transition: '0.2s', position: 'relative' }}
+            title="Notifications"
+            className="desktop-msg-icon"
+          >
+            <FaBell size={22} />
+            {unreadNotifCount > 0 && (
+              <span style={{ position: 'absolute', top: '-5px', right: '-8px', background: '#ef4444', color: 'white', fontSize: '0.65rem', fontWeight: 'bold', width: '18px', height: '18px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white' }}>
+                {unreadNotifCount}
+              </span>
+            )}
+            {showNotifications && (
+              <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', top: '38px', right: 0, width: '320px', maxHeight: '400px', overflowY: 'auto', background: 'white', borderRadius: '12px', boxShadow: '0 10px 30px rgba(0,0,0,0.15)', zIndex: 200, border: '1px solid #e5e7eb' }}>
+                <div style={{ padding: '14px 16px', borderBottom: '1px solid #f3f4f6', fontWeight: '700', fontSize: '0.95rem', color: '#111' }}>Notifications</div>
+                {notifications.length === 0 ? (
+                  <div style={{ padding: '24px 16px', textAlign: 'center', color: '#9ca3af', fontSize: '0.85rem' }}>No notifications yet</div>
+                ) : (
+                  notifications.slice(0, 20).map((n: any) => (
+                    <div
+                      key={n.id}
+                      onClick={() => { markNotificationRead(n.id); if (n.link) navigate(n.link); setShowNotifications(false); }}
+                      style={{ padding: '12px 16px', borderBottom: '1px solid #f9fafb', cursor: 'pointer', background: n.read ? 'white' : '#f0f9ff', transition: '0.2s' }}
+                      onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+                      onMouseOut={(e) => e.currentTarget.style.backgroundColor = n.read ? 'white' : '#f0f9ff'}
+                    >
+                      <p style={{ margin: 0, fontSize: '0.85rem', color: '#374151', fontWeight: n.read ? '400' : '600' }}>{n.message}</p>
+                      <span style={{ fontSize: '0.7rem', color: '#9ca3af' }}>{n.createdAt ? new Date(n.createdAt).toLocaleString() : ''}</span>
+                    </div>
+                  ))
+                )}
+              </div>
             )}
           </div>
 
@@ -820,7 +1068,7 @@ export default function Dashboard() {
           {displayListings.length === 0 ? (
             <p className="no-listings-msg">No listings found. Try adjusting your filters.</p>
           ) : (
-            displayListings.map((listing: any) => (
+            displayListings.slice(0, visibleCount).map((listing: any) => (
               <div className="glass-listing-card" key={listing.id} onClick={() => openListingModal(listing)} style={{ cursor: 'pointer' }}>
                 {/* Card Info - Left */}
                 <div className="glass-card-content">
@@ -851,7 +1099,7 @@ export default function Dashboard() {
                         </span>
                         <span className="agent-rating-row">
                           <RatingStars rating={listing.agentRating} />
-                          <span className="agent-rating-text">{listing.agentRating} Stars</span>
+                          <span className="agent-rating-text">{listing.agentRating > 0 ? `${listing.agentRating} Stars` : 'No Reviews'}</span>
                         </span>
                       </div>
                     </div>
@@ -885,6 +1133,17 @@ export default function Dashboard() {
             ))
           )}
         </div>
+        {displayListings.length > visibleCount && (
+          <div style={{ display: 'flex', justifyContent: 'center', margin: '24px 0' }}>
+            <button
+              className="dash-search-btn"
+              onClick={() => setVisibleCount(prev => prev + POSTS_PER_PAGE)}
+              style={{ padding: '12px 40px', fontSize: '0.95rem' }}
+            >
+              Load More ({displayListings.length - visibleCount} remaining)
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ========== AGENT FAB ========== */}
@@ -892,6 +1151,38 @@ export default function Dashboard() {
         <button className="agent-fab" onClick={() => setShowCreateModal(true)} title="Create Listing">
           <FaPlus size={20} />
         </button>
+      )}
+
+      {/* ========== IMAGE CROP MODAL ========== */}
+      {cropImageSrc && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 9999, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ position: 'relative', flex: 1 }}>
+            <Cropper
+              image={cropImageSrc}
+              crop={crop}
+              zoom={cropZoom}
+              aspect={16 / 9}
+              onCropChange={setCrop}
+              onZoomChange={setCropZoom}
+              onCropComplete={onCropComplete}
+            />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', padding: '20px', background: 'rgba(0,0,0,0.9)' }}>
+            <input
+              type="range"
+              min={1}
+              max={3}
+              step={0.1}
+              value={cropZoom}
+              onChange={(e) => setCropZoom(Number(e.target.value))}
+              style={{ width: '200px' }}
+            />
+            <button onClick={handleCropCancel} style={{ padding: '10px 28px', borderRadius: '8px', border: '1px solid #6b7280', background: 'transparent', color: 'white', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
+            <button onClick={handleCropConfirm} style={{ padding: '10px 28px', borderRadius: '8px', border: 'none', background: '#2563eb', color: 'white', fontWeight: '600', cursor: 'pointer' }}>
+              <FaCrop size={12} /> Crop & Add
+            </button>
+          </div>
+        </div>
       )}
 
       {/* ========== CREATE LISTING MODAL ========== */}
@@ -1384,8 +1675,17 @@ export default function Dashboard() {
                       <span className="listing-modal-agent-role">Listing Agent</span>
                       <div className="listing-modal-agent-rating">
                         <RatingStars rating={selectedListing.agentRating} />
-                        <span>{selectedListing.agentRating} Stars</span>
+                        <span>{selectedListing.agentRating > 0 ? `${selectedListing.agentRating} Stars` : 'No Reviews'}</span>
                       </div>
+                      {user?.uid !== selectedListing.originalPost?.userId && (
+                        <button
+                          className="listing-modal-share-btn"
+                          style={{ marginTop: '6px', fontSize: '0.8rem' }}
+                          onClick={() => handleRateAgent(selectedListing.originalPost?.userId, selectedListing.agentName)}
+                        >
+                          <FaStar size={11} /> Rate Agent
+                        </button>
+                      )}
                       {selectedListing.agentPhone && selectedListing.agentPhone !== 'N/A' && (
                         <p className="listing-modal-agent-phone">
                           <FaPhoneAlt size={11} /> {selectedListing.agentPhone}

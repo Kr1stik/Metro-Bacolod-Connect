@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { signInWithEmailAndPassword, signInWithPopup, signOut } from "firebase/auth";
-import { auth, googleProvider } from "../firebase-config";
+import { signInWithEmailAndPassword, signInWithPopup, signOut, sendPasswordResetEmail } from "firebase/auth";
+import { auth, googleProvider, db } from "../firebase-config";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import { FcGoogle } from "react-icons/fc";
 import { FaTimes } from "react-icons/fa";
 import {
@@ -116,10 +117,43 @@ export default function Professionals() {
   const [showLogin, setShowLogin] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [agents, setAgents] = useState<any[]>(AGENTS);
   const navigate = useNavigate();
   const carouselRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
+
+  // Fetch real seller agents from Firestore
+  useEffect(() => {
+    const fetchAgents = async () => {
+      try {
+        const q = query(collection(db, "users"), where("role", "==", "Seller"));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const realAgents = snap.docs.map(d => {
+            const data = d.data();
+            const fullName = `${data.firstName || ""} ${data.lastName || ""}`.trim() || "Agent";
+            return {
+              id: d.id,
+              name: fullName,
+              agency: data.agency || "Independent Agent",
+              specialization: data.specialization || "General",
+              experience: data.experience || 0,
+              phone: data.mobile || "N/A",
+              email: data.email || "N/A",
+              avatar: data.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=10b981&color=fff&rounded=true&size=128`,
+              rating: data.rating || 4.0,
+              bio: data.bio || "Licensed real estate professional on MetroBacolodConnect.",
+            };
+          });
+          setAgents(realAgents.length > 0 ? realAgents : AGENTS);
+        }
+      } catch (err) {
+        console.error("Failed to fetch agents:", err);
+      }
+    };
+    fetchAgents();
+  }, []);
 
   const checkScrollButtons = () => {
     const el = carouselRef.current;
@@ -215,7 +249,7 @@ export default function Professionals() {
               </button>
             )}
             <div className="info-agents-carousel" ref={carouselRef}>
-              {AGENTS.map((agent, i) => (
+              {agents.map((agent, i) => (
                 <div className="info-agent-card" key={i}>
                   <img src={agent.avatar} alt={agent.name} className="info-agent-avatar" />
                   <h3 className="info-agent-name">{agent.name}</h3>
@@ -273,7 +307,10 @@ export default function Professionals() {
             </div>
             <form onSubmit={handleLogin}>
               <input required type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '10px', borderRadius: '8px', border: '1px solid #ddd' }} />
-              <input required type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '20px', borderRadius: '8px', border: '1px solid #ddd' }} />
+              <input required type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '8px', borderRadius: '8px', border: '1px solid #ddd' }} />
+              <div style={{ textAlign: 'right', marginBottom: '15px' }}>
+                <span style={{ color: '#2563eb', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '500' }} onClick={async () => { if (!email) { glassToast.error('Enter your email first.'); return; } try { await sendPasswordResetEmail(auth, email); glassToast.success('Password reset email sent! Check your inbox.'); } catch { glassToast.error('Failed to send reset email. Check the email address.'); } }}>Forgot Password?</span>
+              </div>
               <button type="submit" className="primary-btn" style={{ width: '100%', marginBottom: '15px', background: 'black', color: 'white' }}>Sign In</button>
             </form>
             <button type="button" className="primary-btn" style={{ width: '100%', background: 'white', color: 'black', border: '1px solid #ddd', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }} onClick={handleGoogleLogin}>

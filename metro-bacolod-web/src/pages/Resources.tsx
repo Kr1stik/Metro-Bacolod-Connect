@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { signInWithEmailAndPassword, signInWithPopup, signOut } from "firebase/auth";
+import { signInWithEmailAndPassword, signInWithPopup, signOut, sendPasswordResetEmail } from "firebase/auth";
 import { auth, googleProvider } from "../firebase-config";
 import { FcGoogle } from "react-icons/fc";
 import { FaTimes } from "react-icons/fa";
@@ -18,21 +18,25 @@ const GUIDES = [
     icon: <FaHome size={22} />,
     title: "First-Time Homebuyer Guide",
     description: "Everything you need to know about buying your first property in Metro Bacolod — from budgeting and loan options to choosing the right location and closing the deal.",
+    extended: "Start by determining your budget and getting pre-approved for a home loan from banks like BDO, BPI, or Pag-IBIG Fund. Research neighborhoods in Bacolod that fit your lifestyle. Visit multiple properties before deciding. Hire a licensed real estate agent who knows the local market. Ensure all documents — including the title, tax declaration, and deed of sale — are in order before closing. Don't forget to budget for transfer taxes, notarial fees, and registration costs.",
   },
   {
     icon: <FaMapMarkedAlt size={22} />,
     title: "How to Choose the Right Location",
     description: "Location is everything in real estate. Learn what factors to consider — proximity to schools, flood risk, accessibility, future development plans, and community vibe.",
+    extended: "Check flood maps from your local DRRM office. Drive through the area at different times of day to assess traffic. Look for nearby schools, hospitals, and commercial centers. Research upcoming infrastructure projects — new roads or malls can dramatically increase property values. Talk to current residents to get an authentic feel for the neighborhood.",
   },
   {
     icon: <FaLightbulb size={22} />,
     title: "Property Investment Tips",
     description: "Smart strategies for real estate investment in Metro Bacolod. Understand ROI, rental yields, market timing, and the differences between residential and commercial investments.",
+    extended: "Focus on areas with strong rental demand — near universities or business districts. Compute potential rental yield (monthly rent × 12 / property price × 100). Commercial properties typically yield higher returns but require more capital. Consider pre-selling properties for lower entry prices. Always diversify — don't put all your investment in one property type.",
   },
   {
     icon: <FaFileAlt size={22} />,
     title: "Documents Needed for Buying Property",
     description: "A complete checklist of required documents — valid IDs, TIN, proof of income, tax declarations, title verification, and more. Be prepared before your first viewing.",
+    extended: "Buyer checklist: 2 valid government IDs, TIN, latest ITR or Certificate of Employment, bank statements (last 3 months), and marriage certificate (if applicable). For the property: Transfer Certificate of Title (TCT), Tax Declaration, Real Property Tax receipts, Lot/Floor plan, and Certificate of No Improvements (for vacant lots). Have a lawyer review the Deed of Absolute Sale before signing.",
   },
 ];
 
@@ -75,6 +79,7 @@ export default function Resources() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [expandedGuide, setExpandedGuide] = useState<number | null>(null);
   const navigate = useNavigate();
 
   const closeLogin = () => { setShowLogin(false); setEmail(""); setPassword(""); };
@@ -143,7 +148,12 @@ export default function Resources() {
                 <div className="info-guide-icon">{guide.icon}</div>
                 <h3 className="info-guide-heading">{guide.title}</h3>
                 <p className="info-guide-text">{guide.description}</p>
-                <button className="info-guide-btn">Read More →</button>
+                {expandedGuide === i && (
+                  <p className="info-guide-text" style={{ marginTop: '8px', opacity: 0.85 }}>{guide.extended}</p>
+                )}
+                <button className="info-guide-btn" onClick={() => setExpandedGuide(expandedGuide === i ? null : i)}>
+                  {expandedGuide === i ? "Show Less ←" : "Read More →"}
+                </button>
               </div>
             ))}
           </div>
@@ -202,7 +212,10 @@ export default function Resources() {
             </div>
             <form onSubmit={handleLogin}>
               <input required type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '10px', borderRadius: '8px', border: '1px solid #ddd' }} />
-              <input required type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '20px', borderRadius: '8px', border: '1px solid #ddd' }} />
+              <input required type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '8px', borderRadius: '8px', border: '1px solid #ddd' }} />
+              <div style={{ textAlign: 'right', marginBottom: '15px' }}>
+                <span style={{ color: '#2563eb', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '500' }} onClick={async () => { if (!email) { glassToast.error('Enter your email first.'); return; } try { await sendPasswordResetEmail(auth, email); glassToast.success('Password reset email sent! Check your inbox.'); } catch { glassToast.error('Failed to send reset email. Check the email address.'); } }}>Forgot Password?</span>
+              </div>
               <button type="submit" className="primary-btn" style={{ width: '100%', marginBottom: '15px', background: 'black', color: 'white' }}>Sign In</button>
             </form>
             <button type="button" className="primary-btn" style={{ width: '100%', background: 'white', color: 'black', border: '1px solid #ddd', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }} onClick={handleGoogleLogin}>

@@ -15,6 +15,8 @@ import Services from "./pages/Services";
 import Resources from "./pages/Resources";
 import Messages from "./pages/Messages";
 import ProtectedRoute from "./components/ProtectedRoute";
+import ErrorBoundary from "./components/ErrorBoundary";
+import NotFound from "./pages/NotFound";
 import { ThemeProvider } from "./context/ThemeContext";
 import CompleteProfile from "./pages/CompleteProfile";
 import "./dark-mode.css";
@@ -40,6 +42,7 @@ function App() {
   }, []);
 
   return (
+    <ErrorBoundary>
     <ThemeProvider>
       {/* Glassmorphic toast notifications for the whole app */}
       <GlassToastContainer />
@@ -86,9 +89,15 @@ function App() {
           path="/complete-profile" 
           element={<ProtectedRoute><CompleteProfile /></ProtectedRoute>} 
         />
+
+        {/* ========================================== */}
+        {/* CATCH-ALL 404 ROUTE                        */}
+        {/* ========================================== */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
       <Analytics />
     </ThemeProvider>
+    </ErrorBoundary>
   );
 }
 
