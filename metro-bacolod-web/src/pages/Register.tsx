@@ -37,6 +37,7 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false); 
+  const [prcLicenseNo, setPrcLicenseNo] = useState("");
 
   // --- RANDOM ID GENERATOR ---
   // Generates IDs like "SELR-X4F9A2" or "CLNT-M7V1Q8"
@@ -97,6 +98,7 @@ export default function Register() {
         mobile: fullMobile,
         address: city, 
         fullAddress: { street, city, province, zipCode },
+        ...(isSeller && prcLicenseNo.trim() ? { prcLicenseNo: prcLicenseNo.trim() } : {}),
         createdAt: new Date().toISOString()
       });
 
@@ -113,6 +115,20 @@ export default function Register() {
         setIsSubmitting(false);
     }
   };
+
+  // --- PASSWORD STRENGTH (M12) ---
+  const getPasswordStrength = (pwd: string) => {
+    let score = 0;
+    if (pwd.length >= 8) score++;
+    if (pwd.length >= 12) score++;
+    if (/[A-Z]/.test(pwd)) score++;
+    if (/[0-9]/.test(pwd)) score++;
+    if (/[^A-Za-z0-9]/.test(pwd)) score++;
+    return score;
+  };
+  const pwdStrength = getPasswordStrength(password);
+  const strengthLabels = ['', 'Weak', 'Fair', 'Good', 'Strong', 'Very Strong'];
+  const strengthColors = ['', '#ef4444', '#f97316', '#eab308', '#22c55e', '#10b981'];
 
   const isMatch = password && confirmPassword && password === confirmPassword;
   const isMismatch = password && confirmPassword && password !== confirmPassword;
@@ -192,6 +208,16 @@ export default function Register() {
                 </div>
              </div>
              {isMismatch && <p style={{ color: '#EF4444', fontSize: '0.85rem', marginTop: '-15px', textAlign: 'right' }}>Passwords do not match</p>}
+             {password && (
+               <div style={{ marginTop: '-10px' }}>
+                 <div style={{ display: 'flex', gap: '4px', marginBottom: '6px' }}>
+                   {[1,2,3,4,5].map(i => (
+                     <div key={i} style={{ flex: 1, height: '4px', borderRadius: '2px', background: i <= pwdStrength ? strengthColors[pwdStrength] : '#e5e7eb', transition: '0.3s' }} />
+                   ))}
+                 </div>
+                 <p style={{ fontSize: '0.78rem', color: strengthColors[pwdStrength], fontWeight: '600', margin: 0 }}>{strengthLabels[pwdStrength]}</p>
+               </div>
+             )}
           </section>
 
           {/* --- NEW CHECKBOX FOR SELLERS --- */}
@@ -202,6 +228,13 @@ export default function Register() {
                 <span style={{ fontSize: '0.85rem', color: '#6b7280' }}>Check this box if you intend to post listings and connect with buyers.</span>
              </div>
           </div>
+          {isSeller && (
+            <div style={{ marginBottom: '40px', marginTop: '-20px' }}>
+              <label style={labelStyle}>PRC License Number (optional)</label>
+              <input type="text" style={inputStyle} value={prcLicenseNo} onChange={e => setPrcLicenseNo(e.target.value)} placeholder="e.g. 0012345" />
+              <p style={{ fontSize: '0.78rem', color: '#6b7280', marginTop: '6px' }}>Enter your PRC license number for verification badge.</p>
+            </div>
+          )}
 
           <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginBottom: '50px' }}>
              <button type="submit" disabled={isSubmitting} style={{ padding: '15px 60px', borderRadius: '50px', border: 'none', background: 'black', color: 'white', fontWeight: '700', fontSize: '1rem', cursor: 'pointer', opacity: isSubmitting ? 0.7 : 1, boxShadow: '0 4px 15px rgba(0,0,0,0.2)', width: '100%' }}>

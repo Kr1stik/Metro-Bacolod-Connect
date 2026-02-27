@@ -360,6 +360,8 @@ export default function LandingPage() {
               <li style={{ marginBottom: '10px' }}><a href="/properties" style={{ color: '#ccc', textDecoration: 'none', transition: '0.2s' }}>Properties</a></li>
               <li style={{ marginBottom: '10px' }}><a href="/professionals" style={{ color: '#ccc', textDecoration: 'none', transition: '0.2s' }}>Professionals</a></li>
               <li style={{ marginBottom: '10px' }}><a href="/resources" style={{ color: '#ccc', textDecoration: 'none', transition: '0.2s' }}>Resources</a></li>
+              <li style={{ marginBottom: '10px' }}><a href="/terms" style={{ color: '#ccc', textDecoration: 'none', transition: '0.2s' }}>Terms of Service</a></li>
+              <li style={{ marginBottom: '10px' }}><a href="/privacy" style={{ color: '#ccc', textDecoration: 'none', transition: '0.2s' }}>Privacy Policy</a></li>
             </ul>
           </div>
           <div>

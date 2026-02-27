@@ -22,6 +22,7 @@ export default function CompleteProfile() {
   const [mobile, setMobile] = useState("");
   const [street, setStreet] = useState("");
   const [city, setCity] = useState(""); 
+  const [prcLicenseNo, setPrcLicenseNo] = useState("");
   const province = "Negros Occidental";
 
   useEffect(() => {
@@ -84,6 +85,7 @@ export default function CompleteProfile() {
         mobile: fullMobile,
         address: city, 
         fullAddress: { street, city, province, zipCode: "6100" },
+        ...(isSeller && prcLicenseNo.trim() ? { prcLicenseNo: prcLicenseNo.trim() } : {}),
         createdAt: new Date().toISOString()
       }, { merge: true }); // Merge ensures we don't overwrite anything Google created
 
@@ -152,6 +154,13 @@ export default function CompleteProfile() {
                 <span style={{ fontSize: '0.85rem', color: '#6b7280', display: 'block' }}>Check this box if you intend to post listings and connect with buyers.</span>
              </div>
           </div>
+          {isSeller && (
+            <div style={{ marginBottom: '40px', marginTop: '-20px' }}>
+              <label style={labelStyle}>PRC License Number (optional)</label>
+              <input type="text" style={inputStyle} value={prcLicenseNo} onChange={e => setPrcLicenseNo(e.target.value)} placeholder="e.g. 0012345" />
+              <p style={{ fontSize: '0.78rem', color: '#6b7280', marginTop: '6px' }}>Enter your PRC license number for verification badge.</p>
+            </div>
+          )}
 
           <button type="submit" disabled={isSubmitting} style={{ padding: '15px 60px', borderRadius: '50px', border: 'none', background: 'black', color: 'white', fontWeight: '700', fontSize: '1rem', cursor: 'pointer', width: '100%' }}>
             {isSubmitting ? "Saving..." : "Finish Setup"}

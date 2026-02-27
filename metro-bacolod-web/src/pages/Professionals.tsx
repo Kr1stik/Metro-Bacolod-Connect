@@ -143,6 +143,7 @@ export default function Professionals() {
               email: data.email || "N/A",
               avatar: data.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=10b981&color=fff&rounded=true&size=128`,
               rating: data.rating || 4.0,
+              prcLicenseNo: data.prcLicenseNo || "",
               bio: data.bio || "Licensed real estate professional on MetroBacolodConnect.",
             };
           });
@@ -253,6 +254,11 @@ export default function Professionals() {
                 <div className="info-agent-card" key={i}>
                   <img src={agent.avatar} alt={agent.name} className="info-agent-avatar" />
                   <h3 className="info-agent-name">{agent.name}</h3>
+                  {agent.prcLicenseNo && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: '600', color: '#10b981', background: '#ecfdf5', padding: '3px 8px', borderRadius: '6px', marginBottom: '4px' }}>
+                      <FaCheckCircle size={10} /> PRC Verified
+                    </span>
+                  )}
                   <span className="info-agent-agency">{agent.agency}</span>
                   <div className="info-agent-rating">
                     <RatingStars rating={agent.rating} />
