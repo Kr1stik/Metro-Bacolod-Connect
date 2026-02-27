@@ -1,17 +1,13 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { signInWithEmailAndPassword, signInWithPopup, signOut, sendPasswordResetEmail } from "firebase/auth";
-import { auth, googleProvider } from "../firebase-config";
-import { FcGoogle } from "react-icons/fc";
-import { FaTimes } from "react-icons/fa";
+import { auth } from "../firebase-config";
 import {
   FaHome, FaBuilding, FaTree, FaCity, FaWarehouse,
   FaCheckCircle, FaSyncAlt, FaMapMarkerAlt, FaPhoneAlt,
-  FaShieldAlt
 } from "react-icons/fa";
-import logo from "../assets/MBC Logo.png";
 import "../App.css";
-import { glassToast } from '../components/GlassToast';
+import PublicNavbar from '../components/PublicNavbar';
+import LoginModal from '../components/LoginModal';
 
 const PROPERTY_CATEGORIES = [
   {
@@ -71,8 +67,6 @@ const TRUST_POINTS = [
 
 export default function Properties() {
   const [showLogin, setShowLogin] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const navigate = useNavigate();
 
@@ -80,30 +74,6 @@ export default function Properties() {
     const unsub = auth.onAuthStateChanged((u) => setIsLoggedIn(!!u));
     return () => unsub();
   }, []);
-
-  const closeLogin = () => { setShowLogin(false); setEmail(""); setPassword(""); };
-
-  const handleLogin = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      if (!userCredential.user.emailVerified) {
-        await signOut(auth);
-        glassToast.error("Email not verified. Please check your inbox.");
-        return;
-      }
-      closeLogin();
-      navigate("/dashboard");
-    } catch { glassToast.error("Login failed. Check your credentials."); }
-  };
-
-  const handleGoogleLogin = async () => {
-    try {
-      await signInWithPopup(auth, googleProvider);
-      closeLogin();
-      navigate("/dashboard");
-    } catch { glassToast.error("Google sign-in failed."); }
-  };
 
   return (
     <div className="info-page">
@@ -113,20 +83,7 @@ export default function Properties() {
       <div className="info-blob info-blob-3" />
 
       {/* ========== NAVBAR (Landing Page Style) ========== */}
-      <nav className="landing-nav" style={{ position: 'fixed', top: 0, left: 0, width: '100%', padding: '20px 5%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 50, background: 'transparent' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '50px' }}>
-          <img src={logo} alt="Logo" style={{ width: '50px', height: 'auto', cursor: 'pointer' }} onClick={() => navigate('/')} />
-          <div className="nav-links" style={{ display: 'flex', gap: '30px' }}>
-            {['Properties', 'Professionals', 'Services', 'Resources'].map((item) => (
-              <a key={item} href={`/${item.toLowerCase()}`} className="nav-link-item" style={{ color: '#1d1d1f', fontWeight: '600', fontSize: '0.9rem', opacity: 0.7, transition: '0.2s', textDecoration: 'none', position: 'relative' }}>{item}</a>
-            ))}
-          </div>
-        </div>
-        <div className="nav-buttons" style={{ display: 'flex', gap: '15px' }}>
-          <button onClick={() => setShowLogin(true)} className="hero-btn hero-btn-outline" style={{ background: 'transparent', border: '1px solid #1d1d1f', color: '#1d1d1f', padding: '12px 35px', fontSize: '0.9rem', fontWeight: '700', borderRadius: '50px', cursor: 'pointer', transition: 'all 0.3s ease' }}>LOGIN</button>
-          <button onClick={() => navigate('/register')} className="hero-btn hero-btn-filled" style={{ background: '#1d1d1f', color: 'white', padding: '12px 35px', fontSize: '0.9rem', fontWeight: '700', borderRadius: '50px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 14px 0 rgba(0,0,0,0.25)', transition: 'all 0.3s ease' }}>CREATE ACCOUNT</button>
-        </div>
-      </nav>
+      <PublicNavbar onLoginClick={() => setShowLogin(true)} />
 
       {/* ========== CONTENT ========== */}
       <div className="info-content">
@@ -192,31 +149,7 @@ export default function Properties() {
       </div>
 
       {/* LOGIN MODAL */}
-      {showLogin && (
-        <div className="modal-overlay">
-          <div className="modal-card" onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <h2 style={{ margin: 0 }}>Welcome Back</h2>
-              <FaTimes style={{ cursor: 'pointer' }} onClick={closeLogin} />
-            </div>
-            <form onSubmit={handleLogin}>
-              <input required type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '10px', borderRadius: '8px', border: '1px solid #ddd' }} />
-              <input required type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '8px', borderRadius: '8px', border: '1px solid #ddd' }} />
-              <div style={{ textAlign: 'right', marginBottom: '15px' }}>
-                <span style={{ color: '#2563eb', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '500' }} onClick={async () => { if (!email) { glassToast.error('Enter your email first.'); return; } try { await sendPasswordResetEmail(auth, email); glassToast.success('Password reset email sent! Check your inbox.'); } catch { glassToast.error('Failed to send reset email. Check the email address.'); } }}>Forgot Password?</span>
-              </div>
-              <button type="submit" className="primary-btn" style={{ width: '100%', marginBottom: '15px', background: 'black', color: 'white' }}>Sign In</button>
-            </form>
-            <button type="button" className="primary-btn" style={{ width: '100%', background: 'white', color: 'black', border: '1px solid #ddd', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }} onClick={handleGoogleLogin}>
-              <FcGoogle size={20} /> Sign in with Google
-            </button>
-            <p style={{ marginTop: '20px', fontSize: '0.9rem' }}>
-              No account?{' '}
-              <span style={{ color: '#2563eb', cursor: 'pointer', fontWeight: '600' }} onClick={() => { setShowLogin(false); navigate('/register'); }}>Create Account</span>
-            </p>
-          </div>
-        </div>
-      )}
+      {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
     </div>
   );
 }

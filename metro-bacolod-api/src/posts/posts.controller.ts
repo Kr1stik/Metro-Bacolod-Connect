@@ -1,7 +1,9 @@
-import { Controller, Get, Post, Body, UploadedFiles, UseInterceptors, Put, Param, Delete, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, UploadedFiles, UseInterceptors, Put, Param, Delete, Query, UseGuards, Req } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { PostsService } from './posts.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
+import { CreatePostDto, UpdatePostDto } from './dto/create-post.dto';
 
 @Controller('posts')
 export class PostsController {
@@ -11,14 +13,15 @@ export class PostsController {
   ) {}
 
   @Get()
+  @UseGuards(FirebaseAuthGuard)
   findAll(@Query('userLocation') userLocation: string) {
     return this.postsService.findAll(userLocation);
   }
 
-  // UPDATED: Clean version (No logs, standard error handling)
   @Post('create')
+  @UseGuards(FirebaseAuthGuard)
   @UseInterceptors(FilesInterceptor('images', 10)) 
-  async create(@UploadedFiles() files: Array<Express.Multer.File>, @Body() body: any) {
+  async create(@UploadedFiles() files: Array<Express.Multer.File>, @Body() body: CreatePostDto, @Req() req: any) {
     const imageUrls: string[] = [];
 
     // 1. Upload all files to Cloudinary in parallel
@@ -28,35 +31,41 @@ export class PostsController {
       results.forEach(result => imageUrls.push(result.secure_url));
     }
 
-    // 2. Save to DB
+    // 2. Save to DB with authenticated user's UID
     return this.postsService.create({
       ...body,
+      userId: req.user.uid,
       images: imageUrls,
     });
   }
 
   @Put(':id/like')
-  toggleLike(@Param('id') id: string, @Body('userId') userId: string) {
-    return this.postsService.toggleLike(id, userId);
+  @UseGuards(FirebaseAuthGuard)
+  toggleLike(@Param('id') id: string, @Req() req: any) {
+    return this.postsService.toggleLike(id, req.user.uid);
   }
 
   @Delete(':id')
-  delete(@Param('id') id: string, @Body('userId') userId: string) {
-    return this.postsService.delete(id, userId);
+  @UseGuards(FirebaseAuthGuard)
+  delete(@Param('id') id: string, @Req() req: any) {
+    return this.postsService.delete(id, req.user.uid);
   }
 
   @Put(':id')
-  update(@Param('id') id: string, @Body() body: { userId: string; content: string }) {
-    return this.postsService.update(id, body.userId, body.content);
+  @UseGuards(FirebaseAuthGuard)
+  update(@Param('id') id: string, @Body() body: UpdatePostDto, @Req() req: any) {
+    return this.postsService.update(id, req.user.uid, body.content);
   }
 
   @Put(':id/save')
-  toggleSave(@Param('id') id: string, @Body('userId') userId: string) {
-    return this.postsService.toggleSave(id, userId);
+  @UseGuards(FirebaseAuthGuard)
+  toggleSave(@Param('id') id: string, @Req() req: any) {
+    return this.postsService.toggleSave(id, req.user.uid);
   }
 
   @Put(':id/restore')
-  restore(@Param('id') id: string, @Body('userId') userId: string) {
-    return this.postsService.restore(id, userId);
+  @UseGuards(FirebaseAuthGuard)
+  restore(@Param('id') id: string, @Req() req: any) {
+    return this.postsService.restore(id, req.user.uid);
   }
 }

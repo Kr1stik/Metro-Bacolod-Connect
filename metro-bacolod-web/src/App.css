@@ -4854,40 +4854,198 @@ ul { list-style: none; }
   transform: translateY(-1px);
 }
 
-/* Custom Glass Modal Styling */
-.glass-modal-popup {
+/* =========================================
+   SWEETALERT2 GLASSMORPHIC OVERRIDES
+   Matches notfound-card design language
+   ========================================= */
+
+/* Ensure Swal always renders on top of everything */
+.swal2-container {
+  z-index: 999999 !important;
+}
+
+/* Overlay backdrop */
+.swal2-container.swal2-backdrop-show {
+  background: rgba(0, 0, 0, 0.35) !important;
+  backdrop-filter: blur(4px) !important;
+}
+
+/* Main popup — glassmorphic card */
+.swal2-popup.swal2-modal {
+  background: rgba(255, 255, 255, 0.75) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
   border-radius: 24px !important;
-  border: 1px solid rgba(255, 255, 255, 0.4) !important;
-  backdrop-filter: blur(15px) !important;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
-  padding: 30px !important;
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08) !important;
+  padding: 40px 32px !important;
+  font-family: 'Google Sans', 'Inter', sans-serif !important;
 }
 
-.custom-glass-input:focus {
-  border-color: #000 !important;
-  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1) !important;
+/* Title */
+.swal2-title {
+  color: #111827 !important;
+  font-weight: 700 !important;
+  font-size: 1.35rem !important;
+  letter-spacing: -0.3px !important;
+  padding: 0 0 8px 0 !important;
 }
 
-.glass-modal-confirm {
-  background: #000 !important;
-  color: #fff !important;
+/* Text content */
+.swal2-html-container {
+  color: #6b7280 !important;
+  font-size: 0.95rem !important;
+  line-height: 1.6 !important;
+  padding: 0 !important;
+  margin: 8px 0 0 0 !important;
+}
+
+/* Icon styling */
+.swal2-icon {
+  border-color: transparent !important;
+  margin: 0 auto 16px !important;
+}
+
+.swal2-icon.swal2-warning {
+  color: #f59e0b !important;
+  border-color: #f59e0b !important;
+}
+
+.swal2-icon.swal2-error {
+  border-color: #ef4444 !important;
+}
+
+.swal2-icon.swal2-success {
+  border-color: #22c55e !important;
+}
+
+.swal2-icon.swal2-success .swal2-success-line-long,
+.swal2-icon.swal2-success .swal2-success-line-tip {
+  background-color: #22c55e !important;
+}
+
+.swal2-icon.swal2-success .swal2-success-ring {
+  border-color: rgba(34, 197, 94, 0.3) !important;
+}
+
+/* Input fields */
+.swal2-input,
+.swal2-select,
+.swal2-textarea {
+  background: rgba(255, 255, 255, 0.6) !important;
+  border: 1px solid #d1d5db !important;
   border-radius: 12px !important;
-  padding: 12px 30px !important;
+  padding: 12px 16px !important;
+  font-size: 0.9rem !important;
+  color: #111827 !important;
+  font-family: 'Google Sans', 'Inter', sans-serif !important;
+  transition: border-color 0.2s, box-shadow 0.2s !important;
+  box-shadow: none !important;
+}
+
+.swal2-input:focus,
+.swal2-select:focus,
+.swal2-textarea:focus {
+  border-color: #111827 !important;
+  box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.08) !important;
+  outline: none !important;
+}
+
+/* Select dropdown */
+.swal2-select {
+  appearance: auto !important;
+  cursor: pointer !important;
+}
+
+/* Confirm button — solid dark like notfound-btn-primary */
+.swal2-confirm.swal2-styled {
+  background: #111827 !important;
+  color: white !important;
+  border-radius: 50px !important;
+  padding: 14px 30px !important;
   font-weight: 700 !important;
   font-size: 0.9rem !important;
-  transition: all 0.2s ease !important;
+  border: none !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25) !important;
+  transition: all 0.3s ease !important;
+  font-family: 'Google Sans', 'Inter', sans-serif !important;
 }
 
-.glass-modal-confirm:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3) !important;
+.swal2-confirm.swal2-styled:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35) !important;
 }
 
-.glass-modal-cancel {
+.swal2-confirm.swal2-styled:focus {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* Cancel button — outline like notfound-btn-outline */
+.swal2-cancel.swal2-styled {
   background: transparent !important;
-  color: #6b7280 !important;
-  border-radius: 12px !important;
-  padding: 12px 30px !important;
-  font-weight: 600 !important;
+  color: #374151 !important;
+  border: 1px solid #d1d5db !important;
+  border-radius: 50px !important;
+  padding: 14px 30px !important;
+  font-weight: 700 !important;
   font-size: 0.9rem !important;
+  transition: all 0.3s ease !important;
+  font-family: 'Google Sans', 'Inter', sans-serif !important;
+}
+
+.swal2-cancel.swal2-styled:hover {
+  background: #f3f4f6 !important;
+  transform: translateY(-2px) !important;
+}
+
+.swal2-cancel.swal2-styled:focus {
+  box-shadow: none !important;
+}
+
+/* Close button */
+.swal2-close {
+  color: #9ca3af !important;
+  font-size: 1.6rem !important;
+  transition: color 0.2s !important;
+}
+
+.swal2-close:hover {
+  color: #374151 !important;
+}
+
+/* Button spacing */
+.swal2-actions {
+  gap: 12px !important;
+  margin-top: 24px !important;
+}
+
+/* Validation message */
+.swal2-validation-message {
+  background: rgba(239, 68, 68, 0.08) !important;
+  color: #ef4444 !important;
+  border-radius: 10px !important;
+  font-size: 0.85rem !important;
+  border: none !important;
+}
+
+/* Animation */
+.swal2-popup.swal2-show {
+  animation: swalGlassIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+@keyframes swalGlassIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.92) translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Custom glass input class used in Settings */
+.custom-glass-input:focus {
+  border-color: #111827 !important;
+  box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.08) !important;
 }

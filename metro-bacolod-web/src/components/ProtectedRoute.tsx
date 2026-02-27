@@ -1,17 +1,29 @@
 import { Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { auth } from "../firebase-config";
-import { onAuthStateChanged } from "firebase/auth";
+import { auth, db } from "../firebase-config";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
 
-// <-- Changed JSX.Element to ReactNode here
 export default function ProtectedRoute({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
+        // Check if user account is deactivated in Firestore
+        try {
+          const userDoc = await getDoc(doc(db, "users", user.uid));
+          if (userDoc.exists() && userDoc.data().isDeactivated) {
+            await signOut(auth);
+            setIsAuthenticated(false);
+            setLoading(false);
+            return;
+          }
+        } catch {
+          // If Firestore check fails, still allow access (fail-open for auth)
+        }
         setIsAuthenticated(true);
       } else {
         setIsAuthenticated(false);

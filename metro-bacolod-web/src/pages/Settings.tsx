@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase-config";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { signOut, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
+import { signOut, updatePassword, EmailAuthProvider, reauthenticateWithCredential, updateProfile } from "firebase/auth";
 import {
   FaSearch, FaUser, FaCog, FaSignOutAlt,
   FaTrash, FaHome, FaPalette, FaKey,
@@ -37,6 +37,8 @@ export default function Settings() {
   const [editPhone, setEditPhone] = useState("");
   const [editRegion, setEditRegion] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const profilePicInputRef = useRef<HTMLInputElement>(null);
 
   // --- AUTH CHECK ---
   useEffect(() => {
@@ -97,6 +99,56 @@ export default function Settings() {
     } catch (err) {
       console.error(err);
       glassToast.error("Failed to save preferences.");
+    }
+  };
+
+  const handleProfilePicUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      glassToast.error("File too large. Max 5MB.");
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      glassToast.error("Only image files allowed.");
+      return;
+    }
+
+    setUploadingPhoto(true);
+    try {
+      const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+      const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+      if (!CLOUD_NAME || !UPLOAD_PRESET) throw new Error("Missing Cloudinary config");
+
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("upload_preset", UPLOAD_PRESET);
+      formData.append("cloud_name", CLOUD_NAME);
+
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!data.secure_url) throw new Error("Upload failed");
+
+      // Update Firebase Auth profile
+      await updateProfile(user, { photoURL: data.secure_url });
+      // Update Firestore user document
+      await updateDoc(doc(db, "users", user.uid), { photoURL: data.secure_url });
+
+      // Refresh local state
+      setUser({ ...user, photoURL: data.secure_url });
+      setUserData((prev: any) => ({ ...prev, photoURL: data.secure_url }));
+      glassToast.success("Profile picture updated!");
+    } catch (err) {
+      console.error(err);
+      glassToast.error("Failed to upload photo.");
+    } finally {
+      setUploadingPhoto(false);
+      // Clear the file input so the same file can be re-selected
+      if (profilePicInputRef.current) profilePicInputRef.current.value = "";
     }
   };
 
@@ -309,14 +361,22 @@ export default function Settings() {
         </div>
         <div className="settings-card-body">
           <div className="settings-profile-pic-row">
-            <div className="settings-profile-pic">
+            <div className="settings-profile-pic" onClick={() => !uploadingPhoto && profilePicInputRef.current?.click()} style={{ cursor: uploadingPhoto ? 'wait' : 'pointer' }}>
               <img
                 src={user?.photoURL || "https://ui-avatars.com/api/?name=User&background=d1d5db&color=6b7280&rounded=true&size=128"}
                 alt="Profile"
+                style={{ opacity: uploadingPhoto ? 0.5 : 1 }}
               />
               <div className="settings-profile-pic-overlay">
-                <FaCamera size={16} />
+                {uploadingPhoto ? <FaCamera size={16} className="spin" /> : <FaCamera size={16} />}
               </div>
+              <input
+                ref={profilePicInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleProfilePicUpload}
+                style={{ display: 'none' }}
+              />
             </div>
             <div className="settings-profile-pic-text">
               <span className="settings-profile-pic-label">Profile picture</span>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase-config";
+import { onAuthStateChanged } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { glassToast } from '../components/GlassToast';
 import logo from "../assets/MBC Logo.png"; 
@@ -26,24 +27,23 @@ export default function CompleteProfile() {
   const province = "Negros Occidental";
 
   useEffect(() => {
-    // 1. Pull their name from their Google Account automatically!
-    const user = auth.currentUser;
-    if (user && user.displayName) {
-      const nameParts = user.displayName.split(" ");
-      setFirstName(nameParts[0] || "");
-      if (nameParts.length > 1) {
-        setLastName(nameParts.slice(1).join(" "));
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (!user) { navigate("/"); return; }
+      // 1. Pull their name from their Google Account automatically!
+      if (user.displayName) {
+        const nameParts = user.displayName.split(" ");
+        setFirstName(nameParts[0] || "");
+        if (nameParts.length > 1) {
+          setLastName(nameParts.slice(1).join(" "));
+        }
       }
-    }
-
-    // 2. Safety check: if they somehow navigated here but already have a profile, kick them to dashboard
-    if (user) {
-        getDoc(doc(db, "users", user.uid)).then(snap => {
-            if (snap.exists() && snap.data().role) {
-                navigate("/dashboard");
-            }
-        });
-    }
+      // 2. Safety check: if they already have a profile, redirect to dashboard
+      const snap = await getDoc(doc(db, "users", user.uid));
+      if (snap.exists() && snap.data().role) {
+        navigate("/dashboard");
+      }
+    });
+    return () => unsub();
   }, [navigate]);
 
   const generateRandomId = (role: string) => {

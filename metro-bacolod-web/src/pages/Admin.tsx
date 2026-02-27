@@ -24,6 +24,9 @@ export default function Admin() {
   const [reports, setReports] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [usersPage, setUsersPage] = useState(1);
+  const [postsPage, setPostsPage] = useState(1);
+  const ROWS_PER_PAGE = 10;
   const navigate = useNavigate();
 
   // --- AUTH + ADMIN CHECK ---
@@ -167,6 +170,15 @@ export default function Admin() {
     const sq = searchQuery.toLowerCase();
     return (p.title || "").toLowerCase().includes(sq) || (p.content || "").toLowerCase().includes(sq) || (p.userName || "").toLowerCase().includes(sq);
   });
+
+  // Paginated data
+  const totalUserPages = Math.ceil(filteredUsers.length / ROWS_PER_PAGE);
+  const paginatedUsers = filteredUsers.slice((usersPage - 1) * ROWS_PER_PAGE, usersPage * ROWS_PER_PAGE);
+  const totalPostPages = Math.ceil(filteredPosts.length / ROWS_PER_PAGE);
+  const paginatedPosts = filteredPosts.slice((postsPage - 1) * ROWS_PER_PAGE, postsPage * ROWS_PER_PAGE);
+
+  // Reset page when search changes
+  useEffect(() => { setUsersPage(1); setPostsPage(1); }, [searchQuery]);
 
   if (loading) {
     return (
@@ -339,7 +351,7 @@ export default function Admin() {
                 </tr>
               </thead>
               <tbody>
-                {filteredUsers.map(u => (
+                {paginatedUsers.map(u => (
                   <tr key={u.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                     <td style={tdStyle}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -388,6 +400,17 @@ export default function Admin() {
                 ))}
               </tbody>
             </table>
+            {totalUserPages > 1 && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderTop: '1px solid #e5e7eb' }}>
+                <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+                  Showing {(usersPage - 1) * ROWS_PER_PAGE + 1}–{Math.min(usersPage * ROWS_PER_PAGE, filteredUsers.length)} of {filteredUsers.length}
+                </span>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button disabled={usersPage <= 1} onClick={() => setUsersPage(p => p - 1)} style={{ ...actionBtnStyle, opacity: usersPage <= 1 ? 0.4 : 1 }}>Prev</button>
+                  <button disabled={usersPage >= totalUserPages} onClick={() => setUsersPage(p => p + 1)} style={{ ...actionBtnStyle, opacity: usersPage >= totalUserPages ? 0.4 : 1 }}>Next</button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -406,7 +429,7 @@ export default function Admin() {
                 </tr>
               </thead>
               <tbody>
-                {filteredPosts.map(p => (
+                {paginatedPosts.map(p => (
                   <tr key={p.id} style={{ borderBottom: '1px solid #f3f4f6', opacity: p.isArchived ? 0.5 : 1 }}>
                     <td style={tdStyle}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -437,6 +460,17 @@ export default function Admin() {
                 ))}
               </tbody>
             </table>
+            {totalPostPages > 1 && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderTop: '1px solid #e5e7eb' }}>
+                <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+                  Showing {(postsPage - 1) * ROWS_PER_PAGE + 1}–{Math.min(postsPage * ROWS_PER_PAGE, filteredPosts.length)} of {filteredPosts.length}
+                </span>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button disabled={postsPage <= 1} onClick={() => setPostsPage(p => p - 1)} style={{ ...actionBtnStyle, opacity: postsPage <= 1 ? 0.4 : 1 }}>Prev</button>
+                  <button disabled={postsPage >= totalPostPages} onClick={() => setPostsPage(p => p + 1)} style={{ ...actionBtnStyle, opacity: postsPage >= totalPostPages ? 0.4 : 1 }}>Next</button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
