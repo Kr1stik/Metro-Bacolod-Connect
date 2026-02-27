@@ -54,7 +54,7 @@ export class PostsController {
   @Put(':id')
   @UseGuards(FirebaseAuthGuard)
   update(@Param('id') id: string, @Body() body: UpdatePostDto, @Req() req: any) {
-    return this.postsService.update(id, req.user.uid, body.content);
+    return this.postsService.update(id, req.user.uid, body);
   }
 
   @Put(':id/save')

@@ -68,6 +68,59 @@ export class CreatePostDto {
 }
 
 export class UpdatePostDto {
+  @IsOptional()
   @IsString()
-  content: string;
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  content?: string;
+
+  @IsOptional()
+  @IsString()
+  location?: string;
+
+  @IsOptional()
+  @IsString()
+  price?: string;
+
+  @IsOptional()
+  @IsIn(['For Sale', 'For Rent', 'Sold', 'Reserved'])
+  status?: string;
+
+  @IsOptional()
+  @IsIn(['Property', 'House & Lot', 'Condo', 'Lot Only', 'Commercial', 'Apartment'])
+  type?: string;
+
+  @IsOptional()
+  @IsString()
+  rooms?: string;
+
+  @IsOptional()
+  @IsString()
+  bathrooms?: string;
+
+  @IsOptional()
+  @IsString()
+  lotArea?: string;
+
+  @IsOptional()
+  @IsString()
+  floorArea?: string;
+
+  @IsOptional()
+  @IsString()
+  yearBuilt?: string;
+
+  @IsOptional()
+  @IsString()
+  amenities?: string;
+
+  @IsOptional()
+  @IsArray()
+  images?: string[];
+
+  @IsOptional()
+  @IsString()
+  pinCoords?: string;
 }

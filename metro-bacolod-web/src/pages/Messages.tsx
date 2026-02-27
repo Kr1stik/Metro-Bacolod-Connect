@@ -1,11 +1,12 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase-config";
-import { collection, query, where, onSnapshot, addDoc, orderBy, serverTimestamp, doc, updateDoc, deleteDoc, getDoc } from "firebase/firestore";
-import { FaSearch, FaEnvelope, FaPaperPlane, FaArrowLeft, FaImage, FaSpinner, FaTrash } from "react-icons/fa";
+import { collection, query, where, onSnapshot, addDoc, orderBy, serverTimestamp, doc, updateDoc, deleteDoc, getDoc, setDoc, getDocs } from "firebase/firestore";
+import { FaSearch, FaEnvelope, FaPaperPlane, FaArrowLeft, FaImage, FaSpinner, FaTrash, FaStar } from "react-icons/fa";
 import { SkeletonList } from "../components/SkeletonLoader";
 import logo from "../assets/MBC Logo.png";
 import { glassToast } from "../components/GlassToast";
+import Swal from "sweetalert2";
 
 export default function Messages() {
   const navigate = useNavigate();
@@ -244,6 +245,132 @@ export default function Messages() {
     return chat.users[otherUid] || { name: "Unknown User", avatar: "https://ui-avatars.com/api/?name=U" };
   };
 
+  // --- Rate Agent ---
+  const RATING_CATEGORIES = ['Responsiveness', 'Negotiation Skills', 'Market Knowledge', 'Professionalism', 'Process Guidance', 'Closing Support'];
+
+  const handleRateAgent = async () => {
+    if (!activeChat || !user) return;
+    const otherUid = activeChat.participants.find((uid: string) => uid !== user.uid);
+    if (!otherUid) return;
+    const otherUser = getOtherUser(activeChat);
+
+    // Check if the other user is a seller/agent
+    try {
+      const otherUserDoc = await getDoc(doc(db, "users", otherUid));
+      const otherRole = otherUserDoc.data()?.role;
+      if (!otherRole || otherRole === 'Client') {
+        glassToast.info("You can only rate sellers/agents.");
+        return;
+      }
+    } catch { /* proceed */ }
+
+    // Check for existing review
+    let existingRating: Record<string, number> = {};
+    try {
+      const existingReview = await getDoc(doc(db, `users/${otherUid}/reviews`, user.uid));
+      if (existingReview.exists()) {
+        const data = existingReview.data();
+        existingRating = data?.categories || {};
+      }
+    } catch { /* no existing */ }
+
+    const categoriesHtml = RATING_CATEGORIES.map((cat, idx) => {
+      const existing = existingRating[cat] || 0;
+      return `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(0,0,0,0.06);">
+          <span style="font-size:0.85rem;font-weight:500;color:#374151;">${cat}</span>
+          <div style="display:flex;gap:4px;" data-category="${idx}">
+            ${[1,2,3,4,5].map(n => `<span class="rate-star" data-cat="${idx}" data-val="${n}" style="font-size:1.3rem;cursor:pointer;color:${n <= existing ? '#f59e0b' : '#d1d5db'};transition:color 0.15s;">★</span>`).join('')}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    const { value: ratings } = await Swal.fire({
+      title: `Rate ${otherUser.name}`,
+      html: `<div style="text-align:left;margin-top:8px;">${categoriesHtml}</div><p id="rate-avg" style="font-size:0.8rem;color:#6b7280;margin-top:12px;">Overall: Select ratings above</p>`,
+      showCancelButton: true, confirmButtonText: 'Submit Rating', confirmButtonColor: '#111827',
+      width: '420px',
+      didOpen: () => {
+        const selected: Record<number, number> = {};
+        // Init existing
+        RATING_CATEGORIES.forEach((_, idx) => { if (existingRating[RATING_CATEGORIES[idx]]) selected[idx] = existingRating[RATING_CATEGORIES[idx]]; });
+        const allStars = document.querySelectorAll('.rate-star');
+        const avgLabel = document.getElementById('rate-avg');
+        const updateAvg = () => {
+          const vals = Object.values(selected);
+          if (vals.length === 0) { if (avgLabel) avgLabel.textContent = 'Overall: Select ratings above'; return; }
+          const avg = (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1);
+          if (avgLabel) avgLabel.textContent = `Overall: ${avg} / 5.0 (${vals.length}/${RATING_CATEGORIES.length} rated)`;
+        };
+        updateAvg();
+        allStars.forEach((s: any) => {
+          s.addEventListener('click', () => {
+            const cat = parseInt(s.dataset.cat);
+            const val = parseInt(s.dataset.val);
+            selected[cat] = val;
+            // Update star colors for this category
+            allStars.forEach((st: any) => {
+              if (parseInt(st.dataset.cat) === cat) {
+                st.style.color = parseInt(st.dataset.val) <= val ? '#f59e0b' : '#d1d5db';
+              }
+            });
+            updateAvg();
+            (Swal.getConfirmButton() as any).dataset.ratings = JSON.stringify(selected);
+          });
+        });
+        if (Object.keys(selected).length > 0) {
+          (Swal.getConfirmButton() as any).dataset.ratings = JSON.stringify(selected);
+        }
+      },
+      preConfirm: () => {
+        const raw = (Swal.getConfirmButton() as any)?.dataset?.ratings;
+        if (!raw) { Swal.showValidationMessage('Please rate at least one category'); return false; }
+        const parsed = JSON.parse(raw);
+        if (Object.keys(parsed).length === 0) { Swal.showValidationMessage('Please rate at least one category'); return false; }
+        return parsed;
+      }
+    });
+
+    if (!ratings) return;
+
+    try {
+      // Convert index-based ratings to category-name-based
+      const categories: Record<string, number> = {};
+      Object.entries(ratings).forEach(([idx, val]) => {
+        categories[RATING_CATEGORIES[parseInt(idx)]] = val as number;
+      });
+      const values = Object.values(categories);
+      const overallRating = Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10;
+
+      await setDoc(doc(db, `users/${otherUid}/reviews`, user.uid), {
+        rating: overallRating,
+        categories,
+        reviewerId: user.uid,
+        reviewerName: user.displayName || 'User',
+        createdAt: new Date().toISOString()
+      });
+
+      // Update cached agentRating on user doc
+      const allReviews = await getDocs(collection(db, `users/${otherUid}/reviews`));
+      let total = 0;
+      allReviews.forEach(d => { total += d.data().rating || 0; });
+      const newAvg = Math.round((total / allReviews.size) * 10) / 10;
+      await updateDoc(doc(db, "users", otherUid), { agentRating: newAvg });
+
+      glassToast.success(`Rated ${otherUser.name} ${overallRating} stars!`);
+
+      // Send notification
+      await addDoc(collection(db, "notifications"), {
+        userId: otherUid,
+        message: `${user.displayName || 'Someone'} rated you ${overallRating} stars!`,
+        link: '/profile',
+        read: false,
+        createdAt: new Date().toISOString()
+      });
+    } catch { glassToast.error("Failed to submit rating."); }
+  };
+
   // --- Search Logic ---
   const filteredChats = chats.filter(chat => {
     if (!searchQuery.trim()) return true;
@@ -332,13 +459,14 @@ export default function Messages() {
               <div className="msg-chat-header" style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: '12px', borderRadius: '20px 20px 0 0' }}>
                 <button className="chat-back-btn" onClick={() => setActiveChat(null)} style={{ background: 'transparent', border: 'none', fontSize: '1.2rem', cursor: 'pointer', display: 'none' }}><FaArrowLeft /></button>
                 <img src={getOtherUser(activeChat).avatar} alt="avatar" style={{ width: '40px', height: '40px', borderRadius: '50%' }} />
-                <div>
+                <div style={{ flex: 1 }}>
                     <h3 style={{ margin: 0, fontSize: '1rem' }}>{getOtherUser(activeChat).name}</h3>
                     <span style={{ fontSize: '0.75rem', color: isUserOnline(otherUserLastSeen) ? '#22c55e' : '#9ca3af' }}>
                       {isUserOnline(otherUserLastSeen) && <span style={{ display: 'inline-block', width: '7px', height: '7px', background: '#22c55e', borderRadius: '50%', marginRight: '5px' }} />}
                       {formatLastSeen(otherUserLastSeen)}
                     </span>
                 </div>
+                <button onClick={handleRateAgent} className="msg-rate-agent-btn" style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', padding: '6px 14px', borderRadius: '50px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', fontWeight: 600, color: '#d97706', transition: '0.2s', flexShrink: 0 }} title="Rate this agent"><FaStar size={12} /> Rate</button>
               </div>
 
               <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -365,7 +493,7 @@ export default function Messages() {
                               <FaTrash size={11} />
                             </button>
                           )}
-                          <div className={isMe ? 'msg-bubble-sent' : 'msg-bubble-received'} style={{ maxWidth: '70%', padding: msg.imageUrl ? '8px' : '12px 16px', borderRadius: '16px', borderBottomRightRadius: isMe ? '4px' : '16px', borderBottomLeftRadius: isMe ? '16px' : '4px' }}>
+                          <div className={isMe ? 'msg-bubble-sent' : 'msg-bubble-received'} style={{ maxWidth: '100%', padding: msg.imageUrl ? '8px' : '12px 16px', borderRadius: '16px', borderBottomRightRadius: isMe ? '4px' : '16px', borderBottomLeftRadius: isMe ? '16px' : '4px' }}>
                           {msg.imageUrl ? (
                             <img src={msg.imageUrl} alt="Sent" style={{ width: '100%', borderRadius: '12px', display: 'block', cursor: 'pointer' }} onClick={() => window.open(msg.imageUrl, '_blank')} />
                           ) : (

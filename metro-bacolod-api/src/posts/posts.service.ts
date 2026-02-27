@@ -1,9 +1,13 @@
 import { Injectable, Inject } from '@nestjs/common';
 import * as admin from 'firebase-admin';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 
 @Injectable()
 export class PostsService {
-  constructor(@Inject('FIREBASE_CONNECTION') private readonly firestore: admin.app.App) {}
+  constructor(
+    @Inject('FIREBASE_CONNECTION') private readonly firestore: admin.app.App,
+    private readonly cloudinaryService: CloudinaryService,
+  ) {}
 
   // 1. CREATE POST
   async create(createPostDto: any) {
@@ -75,7 +79,7 @@ export class PostsService {
     return { likes };
   }
 
-  // UPDATED: DELETE POST (Soft Delete)
+  // UPDATED: DELETE POST (Soft Delete + Cloudinary cleanup)
   async delete(postId: string, userId: string) {
     const postRef = this.firestore.firestore().collection('posts').doc(postId);
     const post = await postRef.get();
@@ -83,7 +87,15 @@ export class PostsService {
     if (!post.exists) throw new Error('Post not found');
     if (post.data()?.userId !== userId) throw new Error('Unauthorized');
 
-    // Instead of .delete(), we update a flag
+    // Clean up Cloudinary images
+    const images: string[] = post.data()?.images || [];
+    if (images.length > 0) {
+      await this.cloudinaryService.deleteImagesByUrls(images).catch((err) => {
+        console.error('Cloudinary cleanup failed:', err);
+      });
+    }
+
+    // Soft delete
     await postRef.update({ isArchived: true, deletedAt: new Date().toISOString() });
     return { message: 'Post moved to trash' };
   }
@@ -100,18 +112,30 @@ export class PostsService {
     return { message: 'Post restored' };
   }
 
-  // 5. UPDATE POST (The new function)
-  async update(postId: string, userId: string, content: string) {
+  // 5. UPDATE POST (handles all editable fields)
+  async update(postId: string, userId: string, updateData: any) {
     const postRef = this.firestore.firestore().collection('posts').doc(postId);
     const post = await postRef.get();
 
     if (!post.exists) throw new Error('Post not found');
-    
-    if (post.data()?.userId !== userId) {
-        throw new Error('Unauthorized');
+    if (post.data()?.userId !== userId) throw new Error('Unauthorized');
+
+    // Only pick allowed fields to prevent overwriting system fields
+    const allowedFields = [
+      'title', 'content', 'location', 'price', 'status', 'type',
+      'rooms', 'bathrooms', 'lotArea', 'floorArea', 'yearBuilt',
+      'amenities', 'images', 'pinCoords',
+    ];
+
+    const sanitized: Record<string, any> = {};
+    for (const field of allowedFields) {
+      if (updateData[field] !== undefined) {
+        sanitized[field] = updateData[field];
+      }
     }
 
-    await postRef.update({ content });
+    sanitized.updatedAt = new Date().toISOString();
+    await postRef.update(sanitized);
     return { message: 'Post updated' };
   }
 
