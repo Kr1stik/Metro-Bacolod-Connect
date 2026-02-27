@@ -23,6 +23,7 @@ import Admin from "./pages/Admin";
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import "./dark-mode.css";
+import ResetPassword from "./pages/ResetPassword";
 import { Analytics } from "@vercel/analytics/react";
 
 function App() {
@@ -98,6 +99,7 @@ function App() {
           path="/admin" 
           element={<ProtectedRoute><Admin /></ProtectedRoute>} 
         />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* ========================================== */}
         {/* CATCH-ALL 404 ROUTE                        */}

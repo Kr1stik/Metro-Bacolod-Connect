@@ -1,15 +1,13 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase-config";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { signOut, updatePassword, EmailAuthProvider, reauthenticateWithCredential, updateProfile } from "firebase/auth";
+import { signOut, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import {
-  FaSearch, FaUser, FaCog, FaSignOutAlt, FaCaretDown,
-  FaTrash, FaHome, FaEnvelope, FaGlobe, FaBell,
-  FaShieldAlt, FaUndo, FaPalette, FaEye, FaKey,
-  FaGoogle, FaFacebook, FaApple, FaDesktop, FaMobile,
-  FaCamera, FaChevronRight, FaCheck, FaExclamationTriangle,
-  FaLock, FaUserSlash, FaTrashAlt, FaLink, FaSun
+  FaSearch, FaUser, FaCog, FaSignOutAlt,
+  FaTrash, FaHome, FaPalette, FaKey,
+  FaDesktop, FaCamera, FaChevronRight, FaCheck, FaExclamationTriangle,
+  FaLock, FaUserSlash, FaTrashAlt, FaSun, FaMoon
 } from "react-icons/fa";
 import logo from "../assets/MBC Logo.png";
 import "../App.css";
@@ -18,37 +16,27 @@ import { glassToast } from "../components/GlassToast";
 import { BACOLOD_LOCATIONS } from "../constants/locations";
 import { canAccessTrash } from "../constants/roles";
 import { useTheme } from "../context/ThemeContext";
-import { FaMoon } from "react-icons/fa";
 
-type SettingsTab = "general" | "appearance" | "account";
+// Removed "general" tab since those were all mocked features
+type SettingsTab = "account" | "appearance";
 
 export default function Settings() {
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<SettingsTab>("general");
+  const [activeTab, setActiveTab] = useState<SettingsTab>("account");
   const navigate = useNavigate();
-  const profilePicRef = useRef<HTMLInputElement>(null);
 
-  // General settings state
-  const [language, setLanguage] = useState("en");
-  const [region, setRegion] = useState("");
-  const [emailNotifs, setEmailNotifs] = useState(true);
-  const [pushNotifs, setPushNotifs] = useState(true);
-  const [smsAlerts, setSmsAlerts] = useState(false);
-  const [dataSharing, setDataSharing] = useState(true);
-
-  // Appearance settings state — use global theme context
+  // Appearance settings state
   const { theme, setTheme } = useTheme();
-  const [reducedMotion, setReducedMotion] = useState(false);
 
   // Account settings state
   const [editName, setEditName] = useState("");
   const [editUsername, setEditUsername] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editPhone, setEditPhone] = useState("");
+  const [editRegion, setEditRegion] = useState("");
   const [editDescription, setEditDescription] = useState("");
-  const [twoFAEnabled, setTwoFAEnabled] = useState(false);
 
   // --- AUTH CHECK ---
   useEffect(() => {
@@ -63,25 +51,14 @@ export default function Settings() {
           if (userSnap.exists()) {
             const data = userSnap.data();
             setUserData(data);
+            
             // Pre-fill account fields
             setEditName(data.firstName ? `${data.firstName} ${data.lastName}` : currentUser.displayName || "");
             setEditUsername(data.username || "");
             setEditEmail(currentUser.email || "");
-            
-            // ---> FIX 1: Fetching 'mobile' instead of 'phone'
             setEditPhone(data.mobile || ""); 
-            
+            setEditRegion(data.address || "");
             setEditDescription(data.description || "");
-            setRegion(data.address || "");
-            // Load saved preferences
-            if (data.preferences) {
-              setLanguage(data.preferences.language || "en");
-              setEmailNotifs(data.preferences.emailNotifs ?? true);
-              setPushNotifs(data.preferences.pushNotifs ?? true);
-              setSmsAlerts(data.preferences.smsAlerts ?? false);
-              setDataSharing(data.preferences.dataSharing ?? true);
-              setReducedMotion(data.preferences.reducedMotion ?? false);
-            }
           }
         } catch (err) {
           console.error("Error fetching user data:", err);
@@ -107,91 +84,52 @@ export default function Settings() {
     }
   };
 
-  // --- PROFILE PICTURE UPLOAD (M4) ---
-  const handleProfilePicUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || !e.target.files[0] || !user) return;
-    const file = e.target.files[0];
-    if (file.size > 5 * 1024 * 1024) return glassToast.error("Image must be under 5MB.");
-    if (!file.type.startsWith('image/')) return glassToast.error("Please select an image file.");
-    try {
-      glassToast.info("Uploading...");
-      const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || "dg6kzqq5n";
-      const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || "jdj7tsar";
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("upload_preset", UPLOAD_PRESET);
-      formData.append("cloud_name", CLOUD_NAME);
-      const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, { method: "POST", body: formData });
-      const data = await res.json();
-      if (!data.secure_url) throw new Error("Upload failed");
-      await updateProfile(user, { photoURL: data.secure_url });
-      await updateDoc(doc(db, "users", user.uid), { photoURL: data.secure_url });
-      setUser({ ...user, photoURL: data.secure_url });
-      glassToast.success("Profile picture updated!");
-    } catch (err) {
-      console.error(err);
-      glassToast.error("Failed to upload picture.");
-    }
-    e.target.value = '';
-  };
-
   const savePreferences = async () => {
     if (!user) return;
     try {
       const userDocRef = doc(db, "users", user.uid);
       await updateDoc(userDocRef, {
         preferences: {
-          language,
-          emailNotifs,
-          pushNotifs,
-          smsAlerts,
-          dataSharing,
-          reducedMotion,
           theme,
         },
       });
-      glassToast.success("Preferences saved!");
+      glassToast.success("Appearance saved!");
     } catch (err) {
       console.error(err);
       glassToast.error("Failed to save preferences.");
     }
   };
 
-  const handleResetSettings = async () => {
-    const result = await Swal.fire({
-      title: "Reset Settings?",
-      text: "This will restore all settings to their defaults.",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#111827",
-      cancelButtonColor: "#6b7280",
-      confirmButtonText: "Yes, reset",
-    });
-    if (result.isConfirmed) {
-      setLanguage("en");
-      setRegion("");
-      setEmailNotifs(true);
-      setPushNotifs(true);
-      setSmsAlerts(false);
-      setDataSharing(true);
-      setTheme("light");
-      setReducedMotion(false);
-      glassToast.success("Settings reset to defaults.");
-    }
-  };
-
   const handleChangePassword = async () => {
     const { value: formValues } = await Swal.fire({
-      title: "Change Password",
-      html:
-        '<input id="swal-current" type="password" class="swal2-input" placeholder="Current password">' +
-        '<input id="swal-new" type="password" class="swal2-input" placeholder="New password">' +
-        '<input id="swal-confirm" type="password" class="swal2-input" placeholder="Confirm new password">',
-      focusConfirm: false,
+      title: '<span style="font-weight:800; font-size:1.5rem; color:#111;">Change Password</span>',
+      html: `
+        <div style="margin-top: 15px; text-align: left;">
+          <label style="display:block; font-size:0.8rem; font-weight:700; color:#6b7280; margin-bottom:5px; margin-left:5px;">CURRENT PASSWORD</label>
+          <input id="swal-current" type="password" class="swal2-input custom-glass-input" placeholder="••••••••" style="margin:0; width:100%; border-radius:12px; border:1px solid #d1d5db; padding:12px 15px; box-sizing:border-box;">
+          
+          <div style="height: 20px;"></div>
+          
+          <label style="display:block; font-size:0.8rem; font-weight:700; color:#6b7280; margin-bottom:5px; margin-left:5px;">NEW PASSWORD</label>
+          <input id="swal-new" type="password" class="swal2-input custom-glass-input" placeholder="••••••••" style="margin:0; width:100%; border-radius:12px; border:1px solid #d1d5db; padding:12px 15px; box-sizing:border-box;">
+          
+          <div style="height: 20px;"></div>
+
+          <label style="display:block; font-size:0.8rem; font-weight:700; color:#6b7280; margin-bottom:5px; margin-left:5px;">CONFIRM NEW PASSWORD</label>
+          <input id="swal-confirm" type="password" class="swal2-input custom-glass-input" placeholder="••••••••" style="margin:0; width:100%; border-radius:12px; border:1px solid #d1d5db; padding:12px 15px; box-sizing:border-box;">
+        </div>
+      `,
+      customClass: {
+        popup: 'glass-modal-popup',
+        confirmButton: 'glass-modal-confirm',
+        cancelButton: 'glass-modal-cancel'
+      },
+      background: 'rgba(255, 255, 255, 0.8)',
+      backdrop: `rgba(0,0,0,0.4) blur(10px)`,
       showCancelButton: true,
-      confirmButtonColor: "#111827",
-      cancelButtonColor: "#6b7280",
-      confirmButtonText: "Update Password",
+      confirmButtonText: 'Update Password',
+      cancelButtonText: 'Cancel',
+      focusConfirm: false,
       preConfirm: () => {
         const current = (document.getElementById("swal-current") as HTMLInputElement)?.value;
         const newPw = (document.getElementById("swal-new") as HTMLInputElement)?.value;
@@ -205,7 +143,7 @@ export default function Settings() {
           return false;
         }
         if (newPw !== confirm) {
-          Swal.showValidationMessage("Passwords do not match.");
+          Swal.showValidationMessage("New passwords do not match.");
           return false;
         }
         return { current, newPw };
@@ -219,7 +157,11 @@ export default function Settings() {
         await updatePassword(user, formValues.newPw);
         glassToast.success("Password updated successfully!");
       } catch (err: any) {
-        glassToast.error(err.message || "Failed to update password.");
+        if (err.code === 'auth/wrong-password') {
+          glassToast.error("Current password is incorrect.");
+        } else {
+          glassToast.error(err.message || "Failed to update password.");
+        }
       }
     }
   };
@@ -232,14 +174,13 @@ export default function Settings() {
       const lastName = nameParts.slice(1).join(" ") || "";
       const userDocRef = doc(db, "users", user.uid);
       
-      // ---> FIX 2: Updating 'mobile' instead of 'phone'
       await updateDoc(userDocRef, {
         firstName,
         lastName,
         username: editUsername,
-        mobile: editPhone, // Make sure this says 'mobile'!
+        mobile: editPhone,
+        address: editRegion,
         description: editDescription,
-        address: region,
       });
       
       setUserData((prev: any) => ({ 
@@ -247,9 +188,9 @@ export default function Settings() {
         firstName, 
         lastName, 
         username: editUsername, 
-        mobile: editPhone, // Updated state here too
+        mobile: editPhone,
+        address: editRegion,
         description: editDescription, 
-        address: region 
       }));
       
       glassToast.success("Profile updated!");
@@ -308,112 +249,10 @@ export default function Settings() {
     }
   };
 
-  const handleLogoutAllDevices = async () => {
-    const result = await Swal.fire({
-      title: "Log Out Everywhere?",
-      text: "You will be signed out from all devices, including this one.",
-      icon: "question",
-      showCancelButton: true,
-      confirmButtonColor: "#111827",
-      cancelButtonColor: "#6b7280",
-      confirmButtonText: "Log Out All",
-    });
-    if (result.isConfirmed) {
-      try {
-        await signOut(auth);
-        glassToast.success("Logged out from all devices.");
-        navigate("/");
-      } catch (err) {
-        glassToast.error("Failed to log out.");
-      }
-    }
-  };
-
   const displayName = userData?.firstName
     ? `${userData.firstName} ${userData.lastName}`
     : user?.displayName || "User";
   const userRole = userData?.role || "Client";
-
-  // --- Toggle Component ---
-  const Toggle = ({ enabled, onToggle, label }: { enabled: boolean; onToggle: () => void; label: string }) => (
-    <div className="settings-toggle-row">
-      <span className="settings-toggle-label">{label}</span>
-      <button
-        className={`settings-toggle ${enabled ? "settings-toggle-on" : ""}`}
-        onClick={onToggle}
-        type="button"
-        aria-label={label}
-      >
-        <span className="settings-toggle-knob" />
-      </button>
-    </div>
-  );
-
-  // --- Tab Content ---
-  const renderGeneralSettings = () => (
-    <div className="settings-section-group">
-      {/* Language */}
-      <div className="settings-card">
-        <div className="settings-card-header">
-          <FaGlobe className="settings-card-icon" />
-          <h3>Language & Region</h3>
-        </div>
-        <div className="settings-card-body">
-          <div className="settings-field">
-            <label>Language</label>
-            <select value={language} onChange={(e) => setLanguage(e.target.value)} className="settings-select">
-              <option value="en">English</option>
-              <option value="fil">Filipino</option>
-              <option value="ceb">Cebuano</option>
-              <option value="hil">Hiligaynon</option>
-            </select>
-          </div>
-          <div className="settings-field">
-            <label>Region / Location</label>
-            <select value={region} onChange={(e) => setRegion(e.target.value)} className="settings-select">
-              <option value="">Select location</option>
-              {BACOLOD_LOCATIONS.map((loc) => (
-                <option key={loc} value={loc}>{loc}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Notifications */}
-      <div className="settings-card">
-        <div className="settings-card-header">
-          <FaBell className="settings-card-icon" />
-          <h3>Notifications</h3>
-        </div>
-        <div className="settings-card-body">
-          <Toggle enabled={emailNotifs} onToggle={() => setEmailNotifs(!emailNotifs)} label="Email notifications" />
-          <Toggle enabled={pushNotifs} onToggle={() => setPushNotifs(!pushNotifs)} label="Push notifications" />
-          <Toggle enabled={smsAlerts} onToggle={() => setSmsAlerts(!smsAlerts)} label="SMS alerts" />
-        </div>
-      </div>
-
-      {/* Privacy */}
-      <div className="settings-card">
-        <div className="settings-card-header">
-          <FaShieldAlt className="settings-card-icon" />
-          <h3>Privacy Controls</h3>
-        </div>
-        <div className="settings-card-body">
-          <Toggle enabled={dataSharing} onToggle={() => setDataSharing(!dataSharing)} label="Data sharing preferences" />
-          <p className="settings-field-hint">Allow Metro Bacolod Connect to share usage data to improve the platform.</p>
-        </div>
-      </div>
-
-      {/* Actions */}
-      <div className="settings-action-row">
-        <button className="settings-btn-primary" onClick={savePreferences}>Save Preferences</button>
-        <button className="settings-btn-outline" onClick={handleResetSettings}>
-          <FaUndo size={12} /> Reset to Defaults
-        </button>
-      </div>
-    </div>
-  );
 
   const renderAppearanceSettings = () => (
     <div className="settings-section-group">
@@ -453,21 +292,9 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* Accessibility */}
-      <div className="settings-card">
-        <div className="settings-card-header">
-          <FaEye className="settings-card-icon" />
-          <h3>Accessibility</h3>
-        </div>
-        <div className="settings-card-body">
-          <Toggle enabled={reducedMotion} onToggle={() => setReducedMotion(!reducedMotion)} label="Reduced motion / animations" />
-          <p className="settings-field-hint">Minimize animations and transitions throughout the app.</p>
-        </div>
-      </div>
-
       {/* Actions */}
       <div className="settings-action-row">
-        <button className="settings-btn-primary" onClick={savePreferences}>Save Preferences</button>
+        <button className="settings-btn-primary" onClick={savePreferences}>Save Appearance</button>
       </div>
     </div>
   );
@@ -482,8 +309,7 @@ export default function Settings() {
         </div>
         <div className="settings-card-body">
           <div className="settings-profile-pic-row">
-            <input type="file" ref={profilePicRef} hidden accept="image/*" onChange={handleProfilePicUpload} />
-            <div className="settings-profile-pic" onClick={() => profilePicRef.current?.click()} style={{ cursor: 'pointer' }}>
+            <div className="settings-profile-pic">
               <img
                 src={user?.photoURL || "https://ui-avatars.com/api/?name=User&background=d1d5db&color=6b7280&rounded=true&size=128"}
                 alt="Profile"
@@ -514,6 +340,17 @@ export default function Settings() {
             <label>Phone Number</label>
             <input type="tel" value={editPhone} onChange={(e) => setEditPhone(e.target.value)} className="settings-input" placeholder="+63 900 000 0000" />
           </div>
+          
+          <div className="settings-field">
+            <label>Location / Branch</label>
+            <select value={editRegion} onChange={(e) => setEditRegion(e.target.value)} className="settings-select">
+              <option value="">Select location</option>
+              {BACOLOD_LOCATIONS.map((loc) => (
+                <option key={loc} value={loc}>{loc}</option>
+              ))}
+            </select>
+          </div>
+
           <div className="settings-field">
             <label>Profile Description</label>
             <textarea
@@ -545,89 +382,6 @@ export default function Settings() {
               <div>
                 <span className="settings-action-title">Change Password</span>
                 <span className="settings-action-desc">Update your account password</span>
-              </div>
-            </div>
-            <FaChevronRight className="settings-chevron" />
-          </div>
-          <div className="settings-divider" />
-          <Toggle enabled={twoFAEnabled} onToggle={() => {
-            setTwoFAEnabled(!twoFAEnabled);
-            glassToast.info(twoFAEnabled ? "2FA disabled (mock)" : "2FA enabled (mock)");
-          }} label="Two-Factor Authentication (2FA)" />
-          <p className="settings-field-hint">Add an extra layer of security with 2FA.</p>
-        </div>
-      </div>
-
-      {/* Connected Accounts */}
-      <div className="settings-card">
-        <div className="settings-card-header">
-          <FaLink className="settings-card-icon" />
-          <h3>Connected Accounts</h3>
-        </div>
-        <div className="settings-card-body">
-          <div className="settings-connected-row">
-            <div className="settings-connected-info">
-              <FaGoogle className="settings-connected-icon settings-icon-google" />
-              <div>
-                <span className="settings-connected-name">Google</span>
-                <span className="settings-connected-status">
-                  {user?.providerData?.some((p: any) => p.providerId === "google.com") ? "Connected" : "Not connected"}
-                </span>
-              </div>
-            </div>
-            <button className="settings-btn-small">
-              {user?.providerData?.some((p: any) => p.providerId === "google.com") ? "Disconnect" : "Connect"}
-            </button>
-          </div>
-          <div className="settings-divider" />
-          <div className="settings-connected-row">
-            <div className="settings-connected-info">
-              <FaFacebook className="settings-connected-icon settings-icon-facebook" />
-              <div>
-                <span className="settings-connected-name">Facebook</span>
-                <span className="settings-connected-status">Not connected</span>
-              </div>
-            </div>
-            <button className="settings-btn-small">Connect</button>
-          </div>
-          <div className="settings-divider" />
-          <div className="settings-connected-row">
-            <div className="settings-connected-info">
-              <FaApple className="settings-connected-icon settings-icon-apple" />
-              <div>
-                <span className="settings-connected-name">Apple</span>
-                <span className="settings-connected-status">Not connected</span>
-              </div>
-            </div>
-            <button className="settings-btn-small">Connect</button>
-          </div>
-        </div>
-      </div>
-
-      {/* Session Management */}
-      <div className="settings-card">
-        <div className="settings-card-header">
-          <FaDesktop className="settings-card-icon" />
-          <h3>Session Management</h3>
-        </div>
-        <div className="settings-card-body">
-          <div className="settings-session-item">
-            <div className="settings-session-info">
-              <FaDesktop className="settings-session-icon" />
-              <div>
-                <span className="settings-session-name">This device</span>
-                <span className="settings-session-detail">Active now</span>
-              </div>
-            </div>
-            <span className="settings-badge-active">Active</span>
-          </div>
-          <div className="settings-divider" />
-          <div className="settings-action-item" onClick={handleLogoutAllDevices}>
-            <div className="settings-action-item-left">
-              <FaSignOutAlt className="settings-action-icon" style={{ color: "#ef4444" }} />
-              <div>
-                <span className="settings-action-title" style={{ color: "#ef4444" }}>Log out from all devices</span>
-                <span className="settings-action-desc">End all active sessions</span>
               </div>
             </div>
             <FaChevronRight className="settings-chevron" />
@@ -675,10 +429,6 @@ export default function Settings() {
       <nav className="dash-nav">
         <div className="dash-nav-left">
           <img src={logo} alt="MBC Logo" className="dash-logo" onClick={() => navigate("/dashboard")} style={{ cursor: "pointer" }} />
-          <div className="dash-search-wrapper">
-            <FaSearch className="dash-search-icon" />
-            <input type="text" className="dash-search-input" placeholder="Look for agents..." />
-          </div>
         </div>
         <div className="dash-nav-right">
           <div className="dash-user-trigger" onClick={() => setIsDropdownOpen(!isDropdownOpen)}>
@@ -713,11 +463,11 @@ export default function Settings() {
           <h2 className="settings-sidebar-title">Settings</h2>
           <nav className="settings-sidebar-nav">
             <button
-              className={`settings-sidebar-item ${activeTab === "general" ? "settings-sidebar-active" : ""}`}
-              onClick={() => setActiveTab("general")}
+              className={`settings-sidebar-item ${activeTab === "account" ? "settings-sidebar-active" : ""}`}
+              onClick={() => setActiveTab("account")}
             >
-              <FaCog size={15} />
-              <span>General</span>
+              <FaUser size={15} />
+              <span>Account</span>
             </button>
             <button
               className={`settings-sidebar-item ${activeTab === "appearance" ? "settings-sidebar-active" : ""}`}
@@ -726,13 +476,6 @@ export default function Settings() {
               <FaPalette size={15} />
               <span>Appearance</span>
             </button>
-            <button
-              className={`settings-sidebar-item ${activeTab === "account" ? "settings-sidebar-active" : ""}`}
-              onClick={() => setActiveTab("account")}
-            >
-              <FaUser size={15} />
-              <span>Account</span>
-            </button>
           </nav>
         </aside>
 
@@ -740,15 +483,13 @@ export default function Settings() {
         <main className="settings-main">
           {/* Mobile Tab Bar */}
           <div className="settings-mobile-tabs">
-            <button className={`settings-mobile-tab ${activeTab === "general" ? "settings-mobile-tab-active" : ""}`} onClick={() => setActiveTab("general")}>General</button>
-            <button className={`settings-mobile-tab ${activeTab === "appearance" ? "settings-mobile-tab-active" : ""}`} onClick={() => setActiveTab("appearance")}>Appearance</button>
             <button className={`settings-mobile-tab ${activeTab === "account" ? "settings-mobile-tab-active" : ""}`} onClick={() => setActiveTab("account")}>Account</button>
+            <button className={`settings-mobile-tab ${activeTab === "appearance" ? "settings-mobile-tab-active" : ""}`} onClick={() => setActiveTab("appearance")}>Appearance</button>
           </div>
 
           <div className="settings-panel">
-            {activeTab === "general" && renderGeneralSettings()}
-            {activeTab === "appearance" && renderAppearanceSettings()}
             {activeTab === "account" && renderAccountSettings()}
+            {activeTab === "appearance" && renderAppearanceSettings()}
           </div>
         </main>
       </div>
@@ -768,9 +509,6 @@ export default function Settings() {
         )}
         <div className="dash-mobile-nav-item active">
           <FaCog size={22} /><span>Settings</span>
-        </div>
-        <div className="dash-mobile-nav-item" onClick={handleLogout}>
-          <FaSignOutAlt size={22} /><span>Logout</span>
         </div>
       </div>
     </div>

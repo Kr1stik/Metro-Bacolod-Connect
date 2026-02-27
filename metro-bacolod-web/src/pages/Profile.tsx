@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { auth, db } from "../firebase-config";
-import { doc, getDoc, collection, addDoc, query, where, orderBy, getDocs, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
+import { doc, getDoc, collection, addDoc, query, where, orderBy, getDocs, updateDoc, arrayUnion, arrayRemove, setDoc } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import {
   FaSearch, FaUser, FaCog, FaSignOutAlt, FaCaretDown,
@@ -386,13 +386,60 @@ export default function Profile() {
     }
   };
 
-  const handleInquire = (listing?: any) => {
-    Swal.fire({
-      title: "Inquiry Sent!",
-      text: "The agent will contact you shortly.",
-      icon: "success",
-      confirmButtonColor: "#111827",
-    });
+  // --- NEW: Real Firebase Chat Inquiry ---
+  const handleInquire = async (listing?: any) => {
+    if (!listing) return;
+
+    const agentId = listing.originalPost?.userId;
+    
+    // Prevent messaging yourself
+    if (user?.uid === agentId) {
+      return glassToast.info("You cannot inquire about your own listing.");
+    }
+
+    try {
+      // 1. Create a unique, deterministic ID so a Client and Agent only ever share ONE chat room
+      const ids = [user.uid, agentId].sort();
+      const chatId = `${ids[0]}_${ids[1]}`;
+      const chatRef = doc(db, "chats", chatId);
+      const chatSnap = await getDoc(chatRef);
+
+      // 2. If they have never chatted before, create the chat document
+      if (!chatSnap.exists()) {
+          await setDoc(chatRef, {
+              participants: [user.uid, agentId],
+              users: {
+                  [user.uid]: {
+                      name: userData?.firstName ? `${userData.firstName} ${userData.lastName}` : (user.displayName || "User"),
+                      avatar: user.photoURL || "https://ui-avatars.com/api/?name=U"
+                  },
+                  [agentId]: {
+                      name: listing.agentName,
+                      avatar: listing.agentAvatar
+                  }
+              },
+              lastMessage: `Interested in: ${listing.title}`,
+              updatedAt: new Date(),
+              hasUnread: {
+                  [user.uid]: false, 
+                  [agentId]: true 
+              }
+          });
+          // 3. Send an automatic first message on behalf of the client
+          await addDoc(collection(db, `chats/${chatId}/messages`), {
+              text: `Hi ${listing.agentName}, I am interested in your listing: "${listing.title}" located in ${listing.location}. Is it still available?`,
+              senderId: user.uid,
+              createdAt: new Date()
+          });
+      }
+
+      // 4. Teleport the user to the messages page
+      navigate('/messages');
+
+    } catch (error) {
+      console.error(error);
+      glassToast.error("Failed to start chat.");
+    }
   };
 
   const handleShare = async (listing: any) => {
@@ -1412,7 +1459,7 @@ export default function Profile() {
                       <span className="listing-modal-agent-role">Listing Agent</span>
                       <div className="listing-modal-agent-rating">
                         <RatingStars rating={selectedListing.agentRating} />
-                        <span>{selectedListing.agentRating} Stars</span>
+                        <span>{selectedListing.agentRating > 0 ? `${selectedListing.agentRating} Stars` : 'No Reviews'}</span>
                       </div>
                       {selectedListing.agentPhone && selectedListing.agentPhone !== 'N/A' && (
                         <p className="listing-modal-agent-phone">
@@ -1432,7 +1479,7 @@ export default function Profile() {
                             title="Share to Facebook"
                             onClick={() => {
                               const url = window.location.href;
-                              window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}&quote=${encodeURIComponent(`${selectedListing.title} - ${selectedListing.price} in ${selectedListing.location}`)}`, '_blank', 'width=600,height=400');
+                              window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}&quote=${encodeURIComponent(`${selectedListing.title} - ${formatPriceDisplay(selectedListing.price)} in ${selectedListing.location}`)}`, '_blank', 'width=600,height=400');
                             }}
                           >
                             <FaFacebookF size={14} />
@@ -1442,7 +1489,7 @@ export default function Profile() {
                             title="Share to X (Twitter)"
                             onClick={() => {
                               const url = window.location.href;
-                              const text = `Check out this listing: ${selectedListing.title} - ${selectedListing.price} in ${selectedListing.location}`;
+                              const text = `Check out this listing: ${selectedListing.title} - ${formatPriceDisplay(selectedListing.price)} in ${selectedListing.location}`;
                               window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank', 'width=600,height=400');
                             }}
                           >
@@ -1452,7 +1499,7 @@ export default function Profile() {
                             className="modal-social-btn modal-social-ig"
                             title="Share to Instagram"
                             onClick={() => {
-                              navigator.clipboard.writeText(`${selectedListing.title} - ${selectedListing.price} in ${selectedListing.location}\n${window.location.href}`);
+                              navigator.clipboard.writeText(`${selectedListing.title} - ${formatPriceDisplay(selectedListing.price)} in ${selectedListing.location}\n${window.location.href}`);
                               glassToast.success('Link copied! Paste it on Instagram.');
                             }}
                           >
@@ -1486,7 +1533,7 @@ export default function Profile() {
                           <TileLayer attribution='&copy; <a href="https://www.esri.com/">Esri</a>' url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" />
                         )}
                         <Marker position={listingCoords}>
-                          <Popup><strong>{selectedListing.title}</strong><br />{selectedListing.location}, Bacolod City<br />{selectedListing.price}</Popup>
+                          <Popup><strong>{selectedListing.title}</strong><br />{selectedListing.location}, Bacolod City<br />{formatPriceDisplay(selectedListing.price)}</Popup>
                         </Marker>
                       </MapContainer>
                     </div>
@@ -1502,7 +1549,7 @@ export default function Profile() {
                     <div className="listing-modal-calc-body">
                       <div className="listing-modal-calc-inputs">
                         <div className="calc-input-group">
-                          <label className="calc-label">Property Price</label>
+                          <label className="calc-label">Property Price (₱)</label>
                           <div className="calc-value-display">₱{propertyPrice.toLocaleString()}</div>
                         </div>
                         <div className="calc-input-group">

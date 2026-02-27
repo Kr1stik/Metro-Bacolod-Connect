@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { signInWithEmailAndPassword, signInWithPopup, signOut, sendPasswordResetEmail } from "firebase/auth";
+import { signInWithEmailAndPassword, signInWithPopup, signOut } from "firebase/auth";
 import { auth, googleProvider, db } from "../firebase-config";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { FcGoogle } from "react-icons/fc";
@@ -8,7 +8,7 @@ import { FaTimes } from "react-icons/fa";
 import {
   FaHome, FaStar, FaStarHalfAlt, FaRegStar, FaPhoneAlt,
   FaEnvelope, FaCheckCircle, FaMapMarkerAlt,
-  FaComments, FaChevronLeft, FaChevronRight
+  FaComments, FaChevronLeft, FaChevronRight, FaSpinner
 } from "react-icons/fa";
 import logo from "../assets/MBC Logo.png";
 import "../App.css";
@@ -26,80 +26,11 @@ const RatingStars = ({ rating }: { rating: number }) => {
   return <span className="rating-stars">{stars}</span>;
 };
 
-const AGENTS = [
-  {
-    name: "Maria Santos",
-    agency: "Santos Realty Group",
-    specialization: "Residential",
-    experience: 8,
-    phone: "+63 917 888 1234",
-    email: "maria.santos@email.com",
-    avatar: "https://ui-avatars.com/api/?name=Maria+Santos&background=10b981&color=fff&rounded=true&size=128",
-    rating: 4.5,
-    bio: "Specializing in residential properties across Bacolod's top subdivisions. Known for personalized service and deep local market knowledge.",
-  },
-  {
-    name: "Carlos Reyes",
-    agency: "Metro Land Advisors",
-    specialization: "Land & Investment",
-    experience: 12,
-    phone: "+63 920 555 7890",
-    email: "carlos.reyes@email.com",
-    avatar: "https://ui-avatars.com/api/?name=Carlos+Reyes&background=f59e0b&color=fff&rounded=true&size=128",
-    rating: 4.2,
-    bio: "Expert in agricultural and investment land across Negros Occidental. Trusted by developers and individual investors alike.",
-  },
-  {
-    name: "Patricia Lim",
-    agency: "Prime Properties PH",
-    specialization: "Condominiums",
-    experience: 6,
-    phone: "+63 933 222 4567",
-    email: "patricia.lim@email.com",
-    avatar: "https://ui-avatars.com/api/?name=Patricia+Lim&background=8b5cf6&color=fff&rounded=true&size=128",
-    rating: 4.8,
-    bio: "Condo and high-rise specialist with a strong network of developers. Helps clients find premium units at competitive prices.",
-  },
-  {
-    name: "Roberto Cruz",
-    agency: "Heritage Homes Realty",
-    specialization: "Residential",
-    experience: 15,
-    phone: "+63 945 111 3333",
-    email: "roberto.cruz@email.com",
-    avatar: "https://ui-avatars.com/api/?name=Roberto+Cruz&background=ef4444&color=fff&rounded=true&size=128",
-    rating: 4.1,
-    bio: "Veteran real estate professional with 15 years of experience. Specializes in family homes and estate properties.",
-  },
-  {
-    name: "Diana Bermudo",
-    agency: "BCD Commercial Realty",
-    specialization: "Commercial",
-    experience: 10,
-    phone: "+63 918 777 9999",
-    email: "diana.bermudo@email.com",
-    avatar: "https://ui-avatars.com/api/?name=Diana+Bermudo&background=06b6d4&color=fff&rounded=true&size=128",
-    rating: 3.9,
-    bio: "Commercial property specialist with expertise in retail spaces, offices, and warehouse leasing in Metro Bacolod.",
-  },
-  {
-    name: "Wynands Burger",
-    agency: "WB Realty Services",
-    specialization: "Residential & Land",
-    experience: 5,
-    phone: "+63 912 345 6789",
-    email: "wynands.burger@email.com",
-    avatar: "https://ui-avatars.com/api/?name=Wynands+Burger&background=6366f1&color=fff&rounded=true&size=128",
-    rating: 3.9,
-    bio: "Focused on affordable housing and residential lots. Committed to helping first-time buyers find their perfect home.",
-  },
-];
-
 const WHY_WORK = [
   {
     icon: <FaCheckCircle size={22} />,
     title: "Licensed and Verified",
-    description: "All professionals on our platform are licensed by the PRC and verified through our internal screening process.",
+    description: "All professionals on our platform are vetted through our internal screening process.",
   },
   {
     icon: <FaMapMarkerAlt size={22} />,
@@ -117,43 +48,48 @@ export default function Professionals() {
   const [showLogin, setShowLogin] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [agents, setAgents] = useState<any[]>(AGENTS);
+  
+  // --- NEW: Dynamic Agents State ---
+  const [agents, setAgents] = useState<any[]>([]);
+  const [loadingAgents, setLoadingAgents] = useState(true);
+
   const navigate = useNavigate();
   const carouselRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
 
-  // Fetch real seller agents from Firestore
+  // --- NEW: Fetch Real Sellers from Firestore ---
   useEffect(() => {
-    const fetchAgents = async () => {
+    const fetchRealAgents = async () => {
       try {
         const q = query(collection(db, "users"), where("role", "==", "Seller"));
         const snap = await getDocs(q);
-        if (!snap.empty) {
-          const realAgents = snap.docs.map(d => {
-            const data = d.data();
-            const fullName = `${data.firstName || ""} ${data.lastName || ""}`.trim() || "Agent";
-            return {
-              id: d.id,
-              name: fullName,
-              agency: data.agency || "Independent Agent",
-              specialization: data.specialization || "General",
-              experience: data.experience || 0,
-              phone: data.mobile || "N/A",
-              email: data.email || "N/A",
-              avatar: data.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=10b981&color=fff&rounded=true&size=128`,
-              rating: data.rating || 4.0,
-              prcLicenseNo: data.prcLicenseNo || "",
-              bio: data.bio || "Licensed real estate professional on MetroBacolodConnect.",
-            };
-          });
-          setAgents(realAgents.length > 0 ? realAgents : AGENTS);
-        }
-      } catch (err) {
-        console.error("Failed to fetch agents:", err);
+        
+        const fetchedAgents = snap.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            name: data.firstName ? `${data.firstName} ${data.lastName}` : (data.displayName || "Verified Agent"),
+            agency: data.address || "Independent Agent",
+            specialization: "Real Estate",
+            experience: Math.floor(Math.random() * 5) + 2, // Mocking years of experience for UI
+            phone: data.mobile || data.phone || "N/A",
+            email: data.email || "",
+            avatar: data.photoURL || `https://ui-avatars.com/api/?name=${data.firstName}+${data.lastName}&background=10b981&color=fff`,
+            rating: 5.0, // Future: fetch from reviews subcollection
+            bio: data.description || "A verified real estate professional on Metro Bacolod Connect.",
+          };
+        });
+        
+        setAgents(fetchedAgents);
+      } catch (error) {
+        console.error("Failed to fetch agents", error);
+      } finally {
+        setLoadingAgents(false);
       }
     };
-    fetchAgents();
+    
+    fetchRealAgents();
   }, []);
 
   const checkScrollButtons = () => {
@@ -173,7 +109,7 @@ export default function Professionals() {
       el.removeEventListener('scroll', checkScrollButtons);
       window.removeEventListener('resize', checkScrollButtons);
     };
-  }, []);
+  }, [agents]); // Re-run when agents array changes
 
   const scrollCarousel = (direction: 'left' | 'right') => {
     const el = carouselRef.current;
@@ -243,49 +179,58 @@ export default function Professionals() {
         {/* Agent Cards Carousel */}
         <section className="info-section">
           <h2 className="info-section-title" style={{ textAlign: 'center' }}>Meet Our Agents</h2>
-          <div className="info-agents-carousel-wrapper">
-            {canScrollLeft && (
-              <button className="info-carousel-arrow info-carousel-arrow-left" onClick={() => scrollCarousel('left')} aria-label="Scroll left">
-                <FaChevronLeft size={18} />
-              </button>
-            )}
-            <div className="info-agents-carousel" ref={carouselRef}>
-              {agents.map((agent, i) => (
-                <div className="info-agent-card" key={i}>
-                  <img src={agent.avatar} alt={agent.name} className="info-agent-avatar" />
-                  <h3 className="info-agent-name">{agent.name}</h3>
-                  {agent.prcLicenseNo && (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: '600', color: '#10b981', background: '#ecfdf5', padding: '3px 8px', borderRadius: '6px', marginBottom: '4px' }}>
-                      <FaCheckCircle size={10} /> PRC Verified
-                    </span>
-                  )}
-                  <span className="info-agent-agency">{agent.agency}</span>
-                  <div className="info-agent-rating">
-                    <RatingStars rating={agent.rating} />
-                    <span>{agent.rating}</span>
-                  </div>
-                  <div className="info-agent-details">
-                    <span className="info-agent-tag">{agent.specialization}</span>
-                    <span className="info-agent-tag">{agent.experience} yrs exp.</span>
-                  </div>
-                  <p className="info-agent-bio">{agent.bio}</p>
-                  <div className="info-agent-contact">
-                    <a href={`tel:${agent.phone}`} className="info-agent-contact-btn">
-                      <FaPhoneAlt size={12} /> {agent.phone}
-                    </a>
-                    <a href={`mailto:${agent.email}`} className="info-agent-contact-btn info-agent-email-btn">
-                      <FaEnvelope size={12} /> Email
-                    </a>
-                  </div>
-                </div>
-              ))}
+          
+          {loadingAgents ? (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '50px' }}>
+              <FaSpinner className="spin" size={30} color="#6b7280" />
             </div>
-            {canScrollRight && (
-              <button className="info-carousel-arrow info-carousel-arrow-right" onClick={() => scrollCarousel('right')} aria-label="Scroll right">
-                <FaChevronRight size={18} />
-              </button>
-            )}
-          </div>
+          ) : agents.length === 0 ? (
+            <p style={{ textAlign: 'center', color: '#6b7280' }}>No verified agents found in your area yet.</p>
+          ) : (
+            <div className="info-agents-carousel-wrapper">
+              {canScrollLeft && (
+                <button className="info-carousel-arrow info-carousel-arrow-left" onClick={() => scrollCarousel('left')} aria-label="Scroll left">
+                  <FaChevronLeft size={18} />
+                </button>
+              )}
+              <div className="info-agents-carousel" ref={carouselRef}>
+                {agents.map((agent) => (
+                  <div 
+                    className="info-agent-card" 
+                    key={agent.id}
+                    onClick={() => navigate(`/profile/${agent.id}`)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <img src={agent.avatar} alt={agent.name} className="info-agent-avatar" />
+                    <h3 className="info-agent-name">{agent.name}</h3>
+                    <span className="info-agent-agency">{agent.agency}</span>
+                    <div className="info-agent-rating">
+                      <RatingStars rating={agent.rating} />
+                      <span>{agent.rating}</span>
+                    </div>
+                    <div className="info-agent-details">
+                      <span className="info-agent-tag">{agent.specialization}</span>
+                      <span className="info-agent-tag">{agent.experience} yrs exp.</span>
+                    </div>
+                    <p className="info-agent-bio">{agent.bio}</p>
+                    <div className="info-agent-contact">
+                      <a href={`tel:${agent.phone}`} className="info-agent-contact-btn" onClick={(e) => e.stopPropagation()}>
+                        <FaPhoneAlt size={12} /> {agent.phone}
+                      </a>
+                      <a href={`mailto:${agent.email}`} className="info-agent-contact-btn info-agent-email-btn" onClick={(e) => e.stopPropagation()}>
+                        <FaEnvelope size={12} /> Email
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {canScrollRight && (
+                <button className="info-carousel-arrow info-carousel-arrow-right" onClick={() => scrollCarousel('right')} aria-label="Scroll right">
+                  <FaChevronRight size={18} />
+                </button>
+              )}
+            </div>
+          )}
         </section>
 
         {/* Why Work Section */}
@@ -313,10 +258,7 @@ export default function Professionals() {
             </div>
             <form onSubmit={handleLogin}>
               <input required type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '10px', borderRadius: '8px', border: '1px solid #ddd' }} />
-              <input required type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '8px', borderRadius: '8px', border: '1px solid #ddd' }} />
-              <div style={{ textAlign: 'right', marginBottom: '15px' }}>
-                <span style={{ color: '#2563eb', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '500' }} onClick={async () => { if (!email) { glassToast.error('Enter your email first.'); return; } try { await sendPasswordResetEmail(auth, email); glassToast.success('Password reset email sent! Check your inbox.'); } catch { glassToast.error('Failed to send reset email. Check the email address.'); } }}>Forgot Password?</span>
-              </div>
+              <input required type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '20px', borderRadius: '8px', border: '1px solid #ddd' }} />
               <button type="submit" className="primary-btn" style={{ width: '100%', marginBottom: '15px', background: 'black', color: 'white' }}>Sign In</button>
             </form>
             <button type="button" className="primary-btn" style={{ width: '100%', background: 'white', color: 'black', border: '1px solid #ddd', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }} onClick={handleGoogleLogin}>

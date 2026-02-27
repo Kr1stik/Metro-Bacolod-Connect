@@ -21,6 +21,10 @@ export default function LandingPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showTags, setShowTags] = useState(false);
+  
+  // --- NEW: Forgot Password State ---
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  
   const navigate = useNavigate();
 
   const timelineRef = useRef<HTMLDivElement>(null);
@@ -85,6 +89,7 @@ export default function LandingPage() {
     setShowLogin(false);
     setEmail("");
     setPassword("");
+    setIsForgotPassword(false); // Reset to default view when closed
   };
 
   const handleLogin = async (e?: React.FormEvent) => {
@@ -123,36 +128,35 @@ export default function LandingPage() {
       const result = await signInWithPopup(auth, googleProvider);
       const gUser = result.user;
 
-      // Check if this user exists in our Firestore database
-      const userDocRef = doc(db, "users", gUser.uid);
-      const userDoc = await getDoc(userDocRef);
-
-      if (userDoc.exists()) {
-        const data = userDoc.data();
-        if (data.isDeactivated) {
-          await signOut(auth);
-          glassToast.error("This account has been deactivated. Contact support.");
-          return;
-        }
-        
-        // If they exist but don't have a role assigned, they didn't finish setup!
-        if (!data.role) {
-          closeLogin();
-          navigate("/complete-profile");
-          return;
-        }
-
-        // They exist and have a role, send them to dashboard normally
-        closeLogin();
-        navigate("/dashboard");
-      } else {
-        // Brand new Google user! They need to complete the form.
-        closeLogin();
-        navigate("/complete-profile");
+      // Check if account is deactivated
+      const userDoc = await getDoc(doc(db, "users", gUser.uid));
+      if (userDoc.exists() && userDoc.data().isDeactivated) {
+        await signOut(auth);
+        glassToast.error("This account has been deactivated. Contact support.");
+        return;
       }
 
+      navigate("/dashboard");
     } catch (error: any) {
-      glassToast.error("Google sign-in failed.");
+      glassToast.error("Google login failed");
+    }
+  };
+
+  // --- NEW: Handle Password Reset ---
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return glassToast.error("Please enter your email address first.");
+    
+    try {
+      await sendPasswordResetEmail(auth, email);
+      glassToast.success("Password reset link sent to your email!");
+      setIsForgotPassword(false); // Send them back to the login screen
+    } catch (error: any) {
+      if (error.code === 'auth/user-not-found') {
+        glassToast.error("No account found with this email.");
+      } else {
+        glassToast.error("Failed to send reset email. Check your address.");
+      }
     }
   };
 
@@ -183,7 +187,6 @@ export default function LandingPage() {
       {/* HERO */}
       <section className="landing-hero" style={{ minHeight: '100vh', width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', padding: '80px 20px 0', position: 'relative' }}>
         <Antigravity count={300} color="#1d1d1f" particleSize={0.6} />
-        {/* Adjusted clamp() lower bound to 2.5rem for mobile safety */}
         <h1 style={{ fontSize: 'clamp(2.5rem, 6vw, 6rem)', fontWeight: '700', color: '#1d1d1f', lineHeight: '1.1', marginBottom: '30px', letterSpacing: '-2px', zIndex: 2 }}>
            <TextType 
              text={["Metro Bacolod \n Connect."]} 
@@ -308,39 +311,66 @@ export default function LandingPage() {
         <div className="modal-overlay">
           <div className="modal-card" onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <h2 style={{ margin: 0 }}>Welcome Back</h2>
+              <h2 style={{ margin: 0 }}>{isForgotPassword ? "Reset Password" : "Welcome Back"}</h2>
               <FaTimes style={{ cursor: 'pointer' }} onClick={closeLogin} />
             </div>
             
-            <form onSubmit={handleLogin}>
-                <input required type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '10px', borderRadius: '8px', border: '1px solid #ddd' }} />
-                <input required type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '8px', borderRadius: '8px', border: '1px solid #ddd' }} />
-                <div style={{ textAlign: 'right', marginBottom: '15px' }}>
-                  <span
-                    style={{ color: '#2563eb', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '500' }}
-                    onClick={async () => {
-                      if (!email) { glassToast.error('Enter your email first.'); return; }
-                      try { await sendPasswordResetEmail(auth, email); glassToast.success('Password reset email sent! Check your inbox.'); }
-                      catch { glassToast.error('Failed to send reset email. Check the email address.'); }
-                    }}
-                  >Forgot Password?</span>
-                </div>
-                
+            {/* Conditional Rendering: Password Reset Form vs Normal Login Form */}
+            {isForgotPassword ? (
+              <form onSubmit={handleForgotPassword}>
+                <p style={{ fontSize: '0.9rem', color: '#6b7280', marginBottom: '15px' }}>
+                  Enter your email address and we will send you a link to reset your password.
+                </p>
+                <input 
+                  required 
+                  type="email" 
+                  placeholder="Email Address" 
+                  value={email} 
+                  onChange={e => setEmail(e.target.value)} 
+                  style={{ width: '100%', padding: '12px', marginBottom: '20px', borderRadius: '8px', border: '1px solid #ddd' }} 
+                />
                 <button type="submit" className="primary-btn" style={{ width: '100%', marginBottom: '15px', background: 'black', color: 'white' }}>
-                    Sign In
+                  Send Reset Link
                 </button>
-            </form>
+                <p style={{ textAlign: 'center', marginTop: '10px', fontSize: '0.9rem' }}>
+                  <span style={{ color: '#2563eb', cursor: 'pointer', fontWeight: '600' }} onClick={() => setIsForgotPassword(false)}>
+                    Back to Login
+                  </span>
+                </p>
+              </form>
+            ) : (
+              <>
+                <form onSubmit={handleLogin}>
+                    <input required type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '10px', borderRadius: '8px', border: '1px solid #ddd' }} />
+                    <input required type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '10px', borderRadius: '8px', border: '1px solid #ddd' }} />
+                    
+                    {/* Forgot Password Link */}
+                    <div style={{ textAlign: 'right', marginBottom: '20px' }}>
+                      <span 
+                        style={{ color: '#2563eb', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' }} 
+                        onClick={() => setIsForgotPassword(true)}
+                      >
+                        Forgot Password?
+                      </span>
+                    </div>
 
-            <button type="button" className="primary-btn" style={{ width: '100%', background: 'white', color: 'black', border: '1px solid #ddd', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }} onClick={handleGoogleLogin}>
-                <FcGoogle size={20} /> Sign in with Google
-            </button>
-            
-            <p style={{ marginTop: '20px', fontSize: '0.9rem' }}>
-                No account? 
-                <span style={{ color: '#2563eb', cursor: 'pointer', fontWeight: '600' }} onClick={() => { setShowLogin(false); navigate('/register'); }}>
-                  Create Account
-                </span>
-            </p>
+                    <button type="submit" className="primary-btn" style={{ width: '100%', marginBottom: '15px', background: 'black', color: 'white' }}>
+                        Sign In
+                    </button>
+                </form>
+
+                <button type="button" className="primary-btn" style={{ width: '100%', background: 'white', color: 'black', border: '1px solid #ddd', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }} onClick={handleGoogleLogin}>
+                    <FcGoogle size={20} /> Sign in with Google
+                </button>
+                
+                <p style={{ marginTop: '20px', fontSize: '0.9rem', textAlign: 'center' }}>
+                    No account? 
+                    <span style={{ color: '#2563eb', cursor: 'pointer', fontWeight: '600', marginLeft: '5px' }} onClick={() => { setShowLogin(false); navigate('/register'); }}>
+                      Create Account
+                    </span>
+                </p>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -360,8 +390,6 @@ export default function LandingPage() {
               <li style={{ marginBottom: '10px' }}><a href="/properties" style={{ color: '#ccc', textDecoration: 'none', transition: '0.2s' }}>Properties</a></li>
               <li style={{ marginBottom: '10px' }}><a href="/professionals" style={{ color: '#ccc', textDecoration: 'none', transition: '0.2s' }}>Professionals</a></li>
               <li style={{ marginBottom: '10px' }}><a href="/resources" style={{ color: '#ccc', textDecoration: 'none', transition: '0.2s' }}>Resources</a></li>
-              <li style={{ marginBottom: '10px' }}><a href="/terms" style={{ color: '#ccc', textDecoration: 'none', transition: '0.2s' }}>Terms of Service</a></li>
-              <li style={{ marginBottom: '10px' }}><a href="/privacy" style={{ color: '#ccc', textDecoration: 'none', transition: '0.2s' }}>Privacy Policy</a></li>
             </ul>
           </div>
           <div>
