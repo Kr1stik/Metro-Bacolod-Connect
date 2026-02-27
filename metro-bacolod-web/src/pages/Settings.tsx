@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase-config";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { signOut, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
+import { signOut, updatePassword, EmailAuthProvider, reauthenticateWithCredential, updateProfile } from "firebase/auth";
 import {
   FaSearch, FaUser, FaCog, FaSignOutAlt, FaCaretDown,
   FaTrash, FaHome, FaEnvelope, FaGlobe, FaBell,
@@ -28,6 +28,7 @@ export default function Settings() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
   const navigate = useNavigate();
+  const profilePicRef = useRef<HTMLInputElement>(null);
 
   // General settings state
   const [language, setLanguage] = useState("en");
@@ -104,6 +105,34 @@ export default function Settings() {
       await signOut(auth);
       navigate("/");
     }
+  };
+
+  // --- PROFILE PICTURE UPLOAD (M4) ---
+  const handleProfilePicUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !e.target.files[0] || !user) return;
+    const file = e.target.files[0];
+    if (file.size > 5 * 1024 * 1024) return glassToast.error("Image must be under 5MB.");
+    if (!file.type.startsWith('image/')) return glassToast.error("Please select an image file.");
+    try {
+      glassToast.info("Uploading...");
+      const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || "dg6kzqq5n";
+      const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || "jdj7tsar";
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("upload_preset", UPLOAD_PRESET);
+      formData.append("cloud_name", CLOUD_NAME);
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, { method: "POST", body: formData });
+      const data = await res.json();
+      if (!data.secure_url) throw new Error("Upload failed");
+      await updateProfile(user, { photoURL: data.secure_url });
+      await updateDoc(doc(db, "users", user.uid), { photoURL: data.secure_url });
+      setUser({ ...user, photoURL: data.secure_url });
+      glassToast.success("Profile picture updated!");
+    } catch (err) {
+      console.error(err);
+      glassToast.error("Failed to upload picture.");
+    }
+    e.target.value = '';
   };
 
   const savePreferences = async () => {
@@ -453,7 +482,8 @@ export default function Settings() {
         </div>
         <div className="settings-card-body">
           <div className="settings-profile-pic-row">
-            <div className="settings-profile-pic">
+            <input type="file" ref={profilePicRef} hidden accept="image/*" onChange={handleProfilePicUpload} />
+            <div className="settings-profile-pic" onClick={() => profilePicRef.current?.click()} style={{ cursor: 'pointer' }}>
               <img
                 src={user?.photoURL || "https://ui-avatars.com/api/?name=User&background=d1d5db&color=6b7280&rounded=true&size=128"}
                 alt="Profile"

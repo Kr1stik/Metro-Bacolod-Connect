@@ -19,6 +19,9 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import NotFound from "./pages/NotFound";
 import { ThemeProvider } from "./context/ThemeContext";
 import CompleteProfile from "./pages/CompleteProfile";
+import Admin from "./pages/Admin";
+import TermsOfService from "./pages/TermsOfService";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 import "./dark-mode.css";
 import { Analytics } from "@vercel/analytics/react";
 
@@ -57,6 +60,8 @@ function App() {
         <Route path="/professionals" element={<Professionals />} />
         <Route path="/services" element={<Services />} />
         <Route path="/resources" element={<Resources />} />
+        <Route path="/terms" element={<TermsOfService />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
 
         {/* ========================================== */}
         {/* PROTECTED ROUTES (Must be logged in)       */}
@@ -88,6 +93,10 @@ function App() {
         <Route 
           path="/complete-profile" 
           element={<ProtectedRoute><CompleteProfile /></ProtectedRoute>} 
+        />
+        <Route 
+          path="/admin" 
+          element={<ProtectedRoute><Admin /></ProtectedRoute>} 
         />
 
         {/* ========================================== */}

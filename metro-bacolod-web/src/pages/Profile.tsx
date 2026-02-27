@@ -9,7 +9,7 @@ import {
   FaEnvelope, FaTimes, FaImage, FaSpinner, FaPlus,
   FaMapMarkerAlt, FaShare, FaChevronLeft, FaChevronRight,
   FaBed, FaBath, FaRulerCombined, FaCalendarAlt, FaPhoneAlt,
-  FaHeart, FaRegHeart, FaMap, FaCalculator,
+  FaHeart, FaRegHeart, FaMap, FaCalculator, FaBookmark, FaPen,
   FaFacebookF, FaTwitter, FaInstagram
 } from "react-icons/fa";
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
@@ -20,7 +20,7 @@ import "../App.css";
 import Swal from "sweetalert2";
 import { glassToast } from "../components/GlassToast";
 import { BACOLOD_LOCATIONS } from "../constants/locations";
-import { canCreateListings, canAccessTrash } from "../constants/roles";
+import { canCreateListings, canAccessTrash, canManagePost } from "../constants/roles";
 
 // --- Fix Leaflet default marker icons ---
 // @ts-ignore
@@ -148,7 +148,9 @@ export default function Profile() {
   const [userData, setUserData] = useState<any>(null);
   const [myPosts, setMyPosts] = useState<any[]>([]); // User's own dynamic posts
   const [likedPosts, setLikedPosts] = useState<any[]>([]); // Posts the user has liked
-  const [profileTab, setProfileTab] = useState<'recent' | 'liked'>('recent');
+  const [savedPosts, setSavedPosts] = useState<any[]>([]); // Posts the user has saved
+  const [profileTab, setProfileTab] = useState<'recent' | 'liked' | 'saved'>('recent');
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
   const [viewedUser, setViewedUser] = useState<any>(null);
   const [viewedUserData, setViewedUserData] = useState<any>(null);
@@ -327,6 +329,46 @@ export default function Profile() {
     };
     fetchLikedPosts();
   }, [user?.uid, routeUserId, isViewingOther]);
+
+  // Fetch saved posts (M3)
+  useEffect(() => {
+    const targetUid = isViewingOther ? routeUserId : user?.uid;
+    if (!targetUid) return;
+    const fetchSavedPosts = async () => {
+      try {
+        const postsQuery = query(
+          collection(db, "posts"),
+          where("savedBy", "array-contains", targetUid)
+        );
+        const postsSnap = await getDocs(postsQuery);
+        setSavedPosts(
+          postsSnap.docs
+            .filter(d => !d.data().isArchived && !d.data().isDeleted)
+            .map(formatPostData)
+        );
+      } catch (err) {
+        console.error("Error fetching saved posts:", err);
+      }
+    };
+    fetchSavedPosts();
+  }, [user?.uid, routeUserId, isViewingOther]);
+
+  // --- DELETE LISTING FROM PROFILE (M11) ---
+  const handleDeletePost = async (postId: string) => {
+    setActiveDropdown(null);
+    const result = await Swal.fire({
+      title: 'Move to Trash?', text: "Items in trash will be deleted after 30 days.",
+      icon: 'warning', showCancelButton: true, confirmButtonColor: '#111827', cancelButtonColor: '#9ca3af',
+      confirmButtonText: 'Yes, move to trash'
+    });
+    if (result.isConfirmed) {
+      try {
+        await updateDoc(doc(db, "posts", postId), { deletedAt: new Date().toISOString(), isArchived: true });
+        setMyPosts(prev => prev.filter(p => p.id !== postId));
+        glassToast.success("Listing moved to Trash");
+      } catch { glassToast.error("Failed to move to trash"); }
+    }
+  };
 
   const handleLogout = async () => {
     const result = await Swal.fire({
@@ -724,6 +766,14 @@ export default function Profile() {
             >
               <FaHeart size={12} /> Liked Posts
             </button>
+            {!isViewingOther && (
+              <button
+                className={`profile-tab ${profileTab === 'saved' ? 'profile-tab-active' : ''}`}
+                onClick={() => setProfileTab('saved')}
+              >
+                <FaBookmark size={12} /> Saved
+              </button>
+            )}
           </div>
 
           <div className="profile-posts-grid">
@@ -789,6 +839,18 @@ export default function Profile() {
                         INQUIRE NOW →
                       </button>
                     </div>
+
+                    {/* Owner Actions (M11) */}
+                    {!isViewingOther && canManagePost(user?.uid, listing.originalPost?.userId, user?.email, userData?.role) && (
+                      <div className="glass-card-actions">
+                        <button onClick={(e) => { e.stopPropagation(); setActiveDropdown(activeDropdown === listing.id ? null : listing.id); }} className="glass-dots-btn">&#8942;</button>
+                        {activeDropdown === listing.id && (
+                          <div className="glass-action-dropdown">
+                            <button onClick={(e) => { e.stopPropagation(); handleDeletePost(listing.id); }} className="glass-delete-btn"><FaTrash size={11} /> Delete</button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </>
@@ -855,6 +917,49 @@ export default function Profile() {
                       >
                         INQUIRE NOW →
                       </button>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+
+            {profileTab === 'saved' && (
+              <>
+                {savedPosts.length === 0 && (
+                  <p style={{ color: '#9ca3af', fontStyle: 'italic', fontSize: '0.85rem' }}>No saved listings yet.</p>
+                )}
+                {savedPosts.map((listing) => (
+                  <div className="glass-listing-card profile-card" key={listing.id} onClick={() => openListingModal(listing)} style={{ cursor: 'pointer' }}>
+                    <div className="glass-card-content">
+                      <div>
+                        <h3 className="glass-card-title">
+                          {listing.title}
+                          {listing.rooms > 0 && (<><br /><span className="glass-card-rooms">{listing.rooms} rooms</span></>)}
+                        </h3>
+                        <ul className="glass-card-bullets">
+                          <li>→ {listing.location} Location</li>
+                          <li>→ {formatPriceDisplay(listing.price)}</li>
+                        </ul>
+                        <p className="glass-card-desc">{listing.description}</p>
+                      </div>
+                      <div className="glass-card-footer">
+                        <div className="glass-card-agent">
+                          <img src={listing.agentAvatar} alt={listing.agentName} />
+                          <div className="agent-meta">
+                            <span className="agent-name">{listing.agentName}</span>
+                            <span className="agent-rating-row">
+                              <RatingStars rating={listing.agentRating} />
+                              <span className="agent-rating-text">{listing.agentRating > 0 ? `${listing.agentRating} Stars` : 'No Reviews'}</span>
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="glass-card-right">
+                      <div className="glass-card-image">
+                        {listing.image && <img src={listing.image} alt={listing.title} />}
+                      </div>
+                      <button className="glass-inquire-btn" onClick={(e) => { e.stopPropagation(); handleInquire(listing); }}>INQUIRE NOW →</button>
                     </div>
                   </div>
                 ))}

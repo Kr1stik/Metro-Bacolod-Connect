@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase-config";
 import { signOut } from "firebase/auth";
@@ -10,19 +10,18 @@ import {
   FaStarHalfAlt, FaRegStar, FaShare, FaChevronDown,
   FaChevronLeft, FaChevronRight, FaBed, FaBath, FaRulerCombined,
   FaCalendarAlt, FaPhoneAlt, FaHeart, FaRegHeart,
-  FaMap, FaCalculator, FaBell, FaCrop,
+  FaMap, FaCalculator, FaBell, FaBookmark, FaRegBookmark, FaFlag,
   FaFacebookF, FaTwitter, FaInstagram
 } from "react-icons/fa";
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import Cropper from 'react-easy-crop';
 import logo from "../assets/MBC Logo.png";
 import "../App.css";
 import Swal from 'sweetalert2';
 import { glassToast } from '../components/GlassToast';
 import { BACOLOD_LOCATIONS } from "../constants/locations";
-import { canCreateListings, canAccessTrash, canManagePost } from "../constants/roles";
+import { canCreateListings, canAccessTrash, canManagePost, isAdmin } from "../constants/roles";
 import DOMPurify from 'dompurify';
 
 // --- Rating Stars Component ---
@@ -83,20 +82,26 @@ const LOCATION_COORDS: Record<string, [number, number]> = {
 // Bacolod City center
 const BACOLOD_CENTER: [number, number] = [10.6840, 122.9510];
 
-// --- Image cropping utility ---
-async function getCroppedImg(imageSrc: string, pixelCrop: any): Promise<File> {
-  const image = new Image();
-  image.src = imageSrc;
-  await new Promise(resolve => { image.onload = resolve; });
-  const canvas = document.createElement('canvas');
-  canvas.width = pixelCrop.width;
-  canvas.height = pixelCrop.height;
-  const ctx = canvas.getContext('2d')!;
-  ctx.drawImage(image, pixelCrop.x, pixelCrop.y, pixelCrop.width, pixelCrop.height, 0, 0, pixelCrop.width, pixelCrop.height);
-  return new Promise(resolve => {
-    canvas.toBlob(blob => {
-      resolve(new File([blob!], 'cropped.jpg', { type: 'image/jpeg' }));
-    }, 'image/jpeg', 0.9);
+// --- Image compression utility (M9) ---
+async function compressImage(file: File, maxWidth = 1920, quality = 0.8): Promise<File> {
+  if (!file.type.startsWith('image/')) return file;
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let { width, height } = img;
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext('2d')!.drawImage(img, 0, 0, width, height);
+      canvas.toBlob((blob) => {
+        resolve(new File([blob!], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' }));
+      }, 'image/jpeg', quality);
+    };
+    img.src = URL.createObjectURL(file);
   });
 }
 
@@ -177,12 +182,8 @@ export default function Dashboard() {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // --- IMAGE CROP STATE ---
-  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
-  const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [cropZoom, setCropZoom] = useState(1);
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
-  const [pendingCropFiles, setPendingCropFiles] = useState<File[]>([]);
+  // --- LISTING SEARCH STATE ---
+  const [listingSearchQuery, setListingSearchQuery] = useState("");
 
   // Edit mode states
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
@@ -237,20 +238,10 @@ export default function Dashboard() {
           const userDocRef = doc(db, "users", currentUser.uid);
           const userSnap = await getDoc(userDocRef);
           if (userSnap.exists()) {
-            const data = userSnap.data();
-            setUserData(data);
-            if (data.address) {
-              setFilterLocation(data.address);
-              fetchPosts(data.address);
-            } else {
-              fetchPosts("");
-            }
-          } else {
-            fetchPosts("");
+            setUserData(userSnap.data());
           }
         } catch (err) {
           console.error("Error fetching user data:", err);
-          fetchPosts("");
         }
       }
     });
@@ -417,33 +408,26 @@ export default function Dashboard() {
     return date.toLocaleDateString();
   };
 
-  const fetchPosts = async (locationFilter: string = "") => {
-    try {
-      const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
-      const querySnapshot = await getDocs(q);
-      const fetchedPosts = querySnapshot.docs.map(d => {
+  // --- REAL-TIME POSTS LISTENER (M1) ---
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const fetchedPosts = snapshot.docs.map(d => {
         const data = d.data();
         return { id: d.id, ...data, timeAgo: formatTimeAgo(data.createdAt) };
       });
-      let activePosts = fetchedPosts.filter((post: any) => !post.isArchived);
-      if (locationFilter && locationFilter !== "All") {
-        activePosts = activePosts.filter((post: any) => post.location === locationFilter);
-      }
+      const activePosts = fetchedPosts.filter((post: any) => !post.isArchived);
       setPosts(activePosts);
-
-      // Fetch ratings for unique agents
       const agentIds = [...new Set(activePosts.map((p: any) => p.userId).filter(Boolean))];
       agentIds.forEach(id => fetchAgentRating(id));
-    } catch (error) {
-      console.error("Failed to load posts", error);
-    }
-  };
+    });
+    return () => unsub();
+  }, [user]);
 
   const handleFilterChange = (e: any) => {
-    const newLocation = e.target.value;
-    setFilterLocation(newLocation);
+    setFilterLocation(e.target.value);
     setVisibleCount(POSTS_PER_PAGE);
-    fetchPosts(newLocation);
   };
 
   const toggleDropdown = (postId: string) =>
@@ -451,43 +435,8 @@ export default function Dashboard() {
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
-    const files = Array.from(e.target.files);
-    if (files.length === 1) {
-      // Single file → open cropper
-      const reader = new FileReader();
-      reader.onload = () => {
-        setCropImageSrc(reader.result as string);
-        setPendingCropFiles([]);
-      };
-      reader.readAsDataURL(files[0]);
-    } else {
-      // Multiple files → add directly (no crop for batch)
-      setImageFiles(prev => [...prev, ...files]);
-    }
+    setImageFiles(prev => [...prev, ...Array.from(e.target.files!)]);
     e.target.value = '';
-  };
-
-  const onCropComplete = useCallback((_: any, croppedPixels: any) => {
-    setCroppedAreaPixels(croppedPixels);
-  }, []);
-
-  const handleCropConfirm = async () => {
-    if (!cropImageSrc || !croppedAreaPixels) return;
-    try {
-      const croppedFile = await getCroppedImg(cropImageSrc, croppedAreaPixels);
-      setImageFiles(prev => [...prev, croppedFile]);
-      setCropImageSrc(null);
-      setCrop({ x: 0, y: 0 });
-      setCropZoom(1);
-    } catch {
-      glassToast.error("Failed to crop image.");
-    }
-  };
-
-  const handleCropCancel = () => {
-    setCropImageSrc(null);
-    setCrop({ x: 0, y: 0 });
-    setCropZoom(1);
   };
 
   const removeImage = (index: number) => {
@@ -529,8 +478,9 @@ export default function Dashboard() {
       const imageUrls: string[] = [];
 
       for (const file of imageFiles) {
+        const compressed = await compressImage(file);
         const formData = new FormData();
-        formData.append("file", file);
+        formData.append("file", compressed);
         formData.append("upload_preset", UPLOAD_PRESET);
         formData.append("cloud_name", CLOUD_NAME);
         const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, { method: "POST", body: formData });
@@ -581,7 +531,6 @@ export default function Dashboard() {
       glassToast.success("Listing published!");
       resetCreateForm();
       setShowCreateModal(false);
-      fetchPosts(filterLocation);
     } catch (error: any) {
       console.error(error);
       glassToast.error("Failed to publish: " + error.message);
@@ -639,7 +588,6 @@ export default function Dashboard() {
       await updateDoc(postRef, { content: editCaption, images: finalImages, image: finalImages[0] });
       glassToast.success("Listing updated!");
       setEditingPostId(null);
-      fetchPosts(filterLocation);
     } catch (error) {
       glassToast.error("Failed to update listing");
     } finally {
@@ -823,6 +771,50 @@ export default function Dashboard() {
     setShowShareSocials(false);
   };
 
+  // --- SAVE/BOOKMARK TOGGLE (M3) ---
+  const handleToggleSave = async (postId: string) => {
+    if (!user?.uid) return;
+    const postRef = doc(db, "posts", postId);
+    try {
+      const postSnap = await getDoc(postRef);
+      const savedBy = postSnap.data()?.savedBy || [];
+      if (savedBy.includes(user.uid)) {
+        await updateDoc(postRef, { savedBy: arrayRemove(user.uid) });
+        glassToast.info("Removed from saved.");
+      } else {
+        await updateDoc(postRef, { savedBy: arrayUnion(user.uid) });
+        glassToast.success("Listing saved!");
+      }
+    } catch { glassToast.error("Failed to save listing."); }
+  };
+
+  // --- REPORT LISTING (M7) ---
+  const handleReport = async (listing: any) => {
+    const { value: reason } = await Swal.fire({
+      title: 'Report Listing',
+      input: 'select',
+      inputOptions: { 'misleading': 'Misleading Information', 'inappropriate': 'Inappropriate Content', 'scam': 'Suspected Scam', 'duplicate': 'Duplicate Listing', 'other': 'Other' },
+      inputPlaceholder: 'Select a reason',
+      showCancelButton: true,
+      confirmButtonColor: '#111827',
+      confirmButtonText: 'Submit Report',
+      inputValidator: (value) => { if (!value) return 'Please select a reason.'; },
+    });
+    if (!reason) return;
+    try {
+      await addDoc(collection(db, "reports"), {
+        postId: listing.id,
+        postTitle: listing.title,
+        reportedBy: user.uid,
+        reporterName: userData?.firstName ? `${userData.firstName} ${userData.lastName}` : user.displayName,
+        reason,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+      });
+      glassToast.success("Report submitted. We'll review it shortly.");
+    } catch { glassToast.error("Failed to submit report."); }
+  };
+
   const nextImage = (e: React.MouseEvent) => {
     e.stopPropagation();
     const imgs = selectedListing?.images || [selectedListing?.image];
@@ -862,8 +854,15 @@ export default function Dashboard() {
     originalPost: post,
   }));
 
-  // --- Apply price, status, and type filters ---
+  // --- Apply location, search, price, status, and type filters ---
   const displayListings = allListings.filter(listing => {
+    // Location filter (M1 — moved from fetchPosts to client-side)
+    if (filterLocation && filterLocation !== "All" && listing.location !== filterLocation) return false;
+    // Listing keyword search (M2)
+    if (listingSearchQuery.trim()) {
+      const sq = listingSearchQuery.toLowerCase();
+      if (!listing.title.toLowerCase().includes(sq) && !listing.description.toLowerCase().includes(sq) && !listing.location.toLowerCase().includes(sq) && !listing.agentName.toLowerCase().includes(sq)) return false;
+    }
     // Price filter
     if (filterPrice) {
       const num = parsePriceToNumber(listing.price);
@@ -1008,6 +1007,9 @@ export default function Dashboard() {
               {canAccessTrash(userData?.role, user?.email) && (
                 <div className="dash-dropdown-item" onClick={() => { navigate('/archive'); setIsDropdownOpen(false); }}><FaTrash /> Trash</div>
               )}
+              {isAdmin(user?.email) && (
+                <div className="dash-dropdown-item" onClick={() => { navigate('/admin'); setIsDropdownOpen(false); }}><FaCog /> Admin Panel</div>
+              )}
               <div className="dash-dropdown-divider" />
               <div className="dash-dropdown-item dash-dropdown-logout" onClick={handleLogout}><FaSignOutAlt /> Logout</div>
             </div>
@@ -1021,6 +1023,16 @@ export default function Dashboard() {
         {/* FILTER BAR */}
         <div className="dash-filters-bar">
           <div className="dash-filters-group">
+            <div className="dash-filter-pill" style={{ flex: '1 1 200px' }}>
+              <FaSearch style={{ marginLeft: '10px', color: '#9ca3af', flexShrink: 0 }} />
+              <input
+                type="text"
+                placeholder="Search listings..."
+                value={listingSearchQuery}
+                onChange={(e) => { setListingSearchQuery(e.target.value); setVisibleCount(POSTS_PER_PAGE); }}
+                style={{ border: 'none', outline: 'none', width: '100%', background: 'transparent', fontSize: '0.85rem', padding: '0 8px' }}
+              />
+            </div>
             <div className="dash-filter-pill">
               <select value={filterLocation} onChange={handleFilterChange}>
                 <option value="">Location</option>
@@ -1060,7 +1072,7 @@ export default function Dashboard() {
               <FaChevronDown className="pill-arrow" />
             </div>
           </div>
-          <button className="dash-search-btn" onClick={() => fetchPosts(filterLocation)}>Search</button>
+          <button className="dash-search-btn" onClick={() => { setFilterLocation(''); setFilterPrice(''); setFilterStatus(''); setFilterType(''); setListingSearchQuery(''); setVisibleCount(POSTS_PER_PAGE); }}>Clear Filters</button>
         </div>
 
         {/* ========== LISTINGS GRID ========== */}
@@ -1151,38 +1163,6 @@ export default function Dashboard() {
         <button className="agent-fab" onClick={() => setShowCreateModal(true)} title="Create Listing">
           <FaPlus size={20} />
         </button>
-      )}
-
-      {/* ========== IMAGE CROP MODAL ========== */}
-      {cropImageSrc && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 9999, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ position: 'relative', flex: 1 }}>
-            <Cropper
-              image={cropImageSrc}
-              crop={crop}
-              zoom={cropZoom}
-              aspect={16 / 9}
-              onCropChange={setCrop}
-              onZoomChange={setCropZoom}
-              onCropComplete={onCropComplete}
-            />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', padding: '20px', background: 'rgba(0,0,0,0.9)' }}>
-            <input
-              type="range"
-              min={1}
-              max={3}
-              step={0.1}
-              value={cropZoom}
-              onChange={(e) => setCropZoom(Number(e.target.value))}
-              style={{ width: '200px' }}
-            />
-            <button onClick={handleCropCancel} style={{ padding: '10px 28px', borderRadius: '8px', border: '1px solid #6b7280', background: 'transparent', color: 'white', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
-            <button onClick={handleCropConfirm} style={{ padding: '10px 28px', borderRadius: '8px', border: 'none', background: '#2563eb', color: 'white', fontWeight: '600', cursor: 'pointer' }}>
-              <FaCrop size={12} /> Crop & Add
-            </button>
-          </div>
-        </div>
       )}
 
       {/* ========== CREATE LISTING MODAL ========== */}
@@ -1531,6 +1511,12 @@ export default function Dashboard() {
                 <div className="listing-modal-top-actions">
                   <button className="listing-modal-like" onClick={(e) => { e.stopPropagation(); handleToggleLike(); }}>
                     {isLiked ? <FaHeart color="#ef4444" /> : <FaRegHeart />}
+                  </button>
+                  <button className="listing-modal-like" onClick={(e) => { e.stopPropagation(); handleToggleSave(selectedListing.id); }} title="Save">
+                    {selectedListing.originalPost?.savedBy?.includes(user?.uid) ? <FaBookmark color="#f59e0b" /> : <FaRegBookmark />}
+                  </button>
+                  <button className="listing-modal-like" onClick={(e) => { e.stopPropagation(); handleReport(selectedListing); }} title="Report">
+                    <FaFlag size={14} />
                   </button>
                   <button className="listing-modal-close" onClick={(e) => { e.stopPropagation(); closeListingModal(); }}>
                     <FaTimes />
