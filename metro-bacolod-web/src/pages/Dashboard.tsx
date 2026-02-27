@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { auth, db } from "../firebase-config";
+import { SkeletonCard } from "../components/SkeletonLoader";
 import { signOut } from "firebase/auth";
 import { doc, getDoc, collection, query, orderBy, getDocs, addDoc, updateDoc, setDoc, onSnapshot, where, arrayUnion, arrayRemove } from "firebase/firestore";
 import {
@@ -143,6 +144,7 @@ export default function Dashboard() {
   const [visibleCount, setVisibleCount] = useState(POSTS_PER_PAGE);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [posts, setPosts] = useState<any[]>([]);
+  const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [filterLocation, setFilterLocation] = useState("");
   const [listingTitle, setListingTitle] = useState("");
   const [listingDescription, setListingDescription] = useState("");
@@ -162,6 +164,17 @@ export default function Dashboard() {
   const [listingSearchQuery, setListingSearchQuery] = useState("");
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [editCaption, setEditCaption] = useState("");
+  const [editTitle, setEditTitle] = useState("");
+  const [editPrice, setEditPrice] = useState("");
+  const [editLocation, setEditLocation] = useState("");
+  const [editStatus, setEditStatus] = useState("For Sale");
+  const [editType, setEditType] = useState("House & Lot");
+  const [editRooms, setEditRooms] = useState("");
+  const [editBathrooms, setEditBathrooms] = useState("");
+  const [editLotArea, setEditLotArea] = useState("");
+  const [editFloorArea, setEditFloorArea] = useState("");
+  const [editYearBuilt, setEditYearBuilt] = useState("");
+  const [editAmenities, setEditAmenities] = useState("");
   const [editImages, setEditImages] = useState<string[]>([]);
   const [newEditFiles, setNewEditFiles] = useState<File[]>([]);
   const editFileRef = useRef<HTMLInputElement>(null);
@@ -187,6 +200,16 @@ export default function Dashboard() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Auto-open listing from shared URL
+  useEffect(() => {
+    const listingId = searchParams.get('listing');
+    if (listingId && posts.length > 0) {
+      const listing = posts.find((p: any) => p.id === listingId);
+      if (listing) { setSelectedListing(listing); setCarouselIndex(0); setSearchParams({}, { replace: true }); }
+    }
+  }, [searchParams, posts]);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
@@ -291,6 +314,7 @@ export default function Dashboard() {
       const fetchedPosts = snapshot.docs.map(d => { const data = d.data(); return { id: d.id, ...data, timeAgo: formatTimeAgo(data.createdAt) }; });
       const activePosts = fetchedPosts.filter((post: any) => !post.isArchived);
       setPosts(activePosts);
+      setIsLoadingPosts(false);
       const agentIds = [...new Set(activePosts.map((p: any) => p.userId).filter(Boolean))];
       agentIds.forEach(id => fetchAgentRating(id));
     });
@@ -401,7 +425,7 @@ export default function Dashboard() {
     finally { setIsUploading(false); }
   };
 
-  const startEdit = (post: any) => { setEditingPostId(post.id); setEditCaption(post.content); setEditImages(post.images || [post.image]); setNewEditFiles([]); setActiveDropdown(null); };
+  const startEdit = (post: any) => { setEditingPostId(post.id); setEditTitle(post.title || ''); setEditCaption(post.content || ''); setEditPrice(post.price?.toString() || ''); setEditLocation(post.location || ''); setEditStatus(post.status || 'For Sale'); setEditType(post.type || 'House & Lot'); setEditRooms(post.rooms?.toString() || ''); setEditBathrooms(post.bathrooms?.toString() || ''); setEditLotArea(post.lotArea || ''); setEditFloorArea(post.floorArea || ''); setEditYearBuilt(post.yearBuilt?.toString() || ''); setEditAmenities(post.amenities || ''); setEditImages(post.images || [post.image]); setNewEditFiles([]); setActiveDropdown(null); };
   const handleEditFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => { if (e.target.files) setNewEditFiles([...newEditFiles, ...Array.from(e.target.files)]); };
   const removeEditImage = (index: number) => { setEditImages(prev => prev.filter((_, i) => i !== index)); };
   const removeNewEditFile = (index: number) => { setNewEditFiles(prev => prev.filter((_, i) => i !== index)); };
@@ -425,7 +449,7 @@ export default function Dashboard() {
         const data = await response.json(); if (data.secure_url) newUrls.push(data.secure_url);
       }
       const finalImages = [...editImages, ...newUrls];
-      await updateDoc(postRef, { content: editCaption, images: finalImages, image: finalImages[0] });
+      await updateDoc(postRef, { title: editTitle, content: editCaption, price: editPrice, location: editLocation, status: editStatus, type: editType, rooms: editRooms, bathrooms: editBathrooms, lotArea: editLotArea, floorArea: editFloorArea, yearBuilt: editYearBuilt, amenities: editAmenities, images: finalImages, image: finalImages[0] });
       glassToast.success("Listing updated!"); setEditingPostId(null);
     } catch (error) { glassToast.error("Failed to update listing"); } 
     finally { setIsUploading(false); }
@@ -451,7 +475,7 @@ export default function Dashboard() {
   };
 
   const handleShare = async (post: any) => {
-    const shareUrl = window.location.href; const shareText = `Check out this listing by ${post.agentName || post.userName}: ${post.title || post.content}`;
+    const shareUrl = `${window.location.origin}/dashboard?listing=${post.id}`; const shareText = `Check out this listing by ${post.agentName || post.userName}: ${post.title || post.content}`;
     await Swal.fire({
       title: '<span style="font-weight:600;font-size:1.1rem;">Share Listing</span>',
       html: `
@@ -525,6 +549,11 @@ export default function Dashboard() {
   };
 
   const handleReport = async (listing: any) => {
+    // Check if user already reported this listing
+    try {
+      const existingReports = await getDocs(query(collection(db, "reports"), where("postId", "==", listing.id), where("reportedBy", "==", user.uid)));
+      if (!existingReports.empty) { glassToast.info("You've already reported this listing."); return; }
+    } catch { /* proceed if check fails */ }
     const { value: reason } = await Swal.fire({
       title: 'Report Listing', input: 'select', inputOptions: { 'misleading': 'Misleading Information', 'inappropriate': 'Inappropriate Content', 'scam': 'Suspected Scam', 'duplicate': 'Duplicate Listing', 'other': 'Other' },
       inputPlaceholder: 'Select a reason', showCancelButton: true, confirmButtonColor: '#111827', confirmButtonText: 'Submit Report',
@@ -664,7 +693,7 @@ export default function Dashboard() {
         </div>
 
         <div className="dash-listings-grid">
-          {displayListings.length === 0 ? ( <p className="no-listings-msg">No listings found. Try adjusting your filters.</p> ) : (
+          {isLoadingPosts ? ( <SkeletonCard count={8} /> ) : displayListings.length === 0 ? ( <p className="no-listings-msg">No listings found. Try adjusting your filters.</p> ) : (
             displayListings.slice(0, visibleCount).map((listing: any) => (
               <div className="glass-listing-card" key={listing.id} onClick={() => openListingModal(listing)} style={{ cursor: 'pointer' }}>
                 <div className="glass-card-content">
@@ -751,16 +780,29 @@ export default function Dashboard() {
 
       {/* ========== EDIT POST MODAL ========== */}
       {editingPostId && (
-        <div className="dash-modal-overlay" onClick={() => setEditingPostId(null)}>
-          <div className="dash-modal-card" onClick={e => e.stopPropagation()}>
-            <div className="dash-modal-header"><h2>Edit Listing</h2><FaTimes className="dash-modal-close" onClick={() => setEditingPostId(null)} /></div>
-            <textarea className="dash-modal-textarea" value={editCaption} onChange={(e) => setEditCaption(e.target.value)} />
-            <div className="dash-modal-previews">
-              {editImages.map((img, i) => (<div key={i} className="dash-modal-preview-item"><img src={img} alt="" /><button onClick={() => removeEditImage(i)} className="dash-preview-remove">&#215;</button></div>))}
-              {newEditFiles.map((file, i) => (<div key={`new-${i}`} className="dash-modal-preview-item new-file"><img src={URL.createObjectURL(file)} alt="" /><button onClick={() => removeNewEditFile(i)} className="dash-preview-remove">&#215;</button></div>))}
+        <div className="create-listing-overlay" onClick={() => setEditingPostId(null)}>
+          <div className="create-listing-modal" onClick={e => e.stopPropagation()}>
+            <div className="create-listing-header"><h2>Edit Listing</h2><FaTimes className="create-listing-close" onClick={() => setEditingPostId(null)} /></div>
+            <div className="create-listing-body">
+              <div className="create-listing-field"><label>Listing Title *</label><input type="text" className="create-listing-input" placeholder="e.g. Greenfield Residences" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} /></div>
+              <div className="create-listing-row">
+                <div className="create-listing-field"><label>Price (₱) *</label><input type="number" className="create-listing-input" placeholder="e.g. 1000000" value={editPrice} onChange={(e) => { const v = e.target.value; if (v === '' || Number(v) >= 0) setEditPrice(v); }} min="0" />{editPrice && <span style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '4px' }}>Display: {formatPriceDisplay(editPrice)}</span>}</div>
+                <div className="create-listing-field"><label>Location *</label><select className="create-listing-select" value={editLocation} onChange={(e) => setEditLocation(e.target.value)}><option value="" disabled>Select location</option>{BACOLOD_LOCATIONS.map((loc) => (<option key={loc} value={loc}>{loc}</option>))}</select></div>
+              </div>
+              <div className="create-listing-row"><div className="create-listing-field"><label>Status</label><select className="create-listing-select" value={editStatus} onChange={(e) => setEditStatus(e.target.value)}><option value="For Sale">For Sale</option><option value="Pre-Selling">Pre-Selling</option><option value="Ready for Occupancy">Ready for Occupancy</option><option value="For Lease">For Lease</option></select></div><div className="create-listing-field"><label>Type</label><select className="create-listing-select" value={editType} onChange={(e) => setEditType(e.target.value)}><option value="House & Lot">House & Lot</option><option value="Lot Only">Lot Only</option><option value="Condo">Condo</option><option value="Commercial">Commercial</option></select></div></div>
+              <div className="create-listing-section-title">Property Details</div>
+              <div className="create-listing-row create-listing-row-4"><div className="create-listing-field"><label>Bedrooms</label><input type="number" className="create-listing-input" placeholder="0" min="0" value={editRooms} onChange={(e) => setEditRooms(e.target.value)} /></div><div className="create-listing-field"><label>Bathrooms</label><input type="number" className="create-listing-input" placeholder="0" min="0" value={editBathrooms} onChange={(e) => setEditBathrooms(e.target.value)} /></div><div className="create-listing-field"><label>Lot Area</label><input type="text" className="create-listing-input" placeholder="e.g. 200 sqm" value={editLotArea} onChange={(e) => setEditLotArea(e.target.value)} /></div><div className="create-listing-field"><label>Floor Area</label><input type="text" className="create-listing-input" placeholder="e.g. 140 sqm" value={editFloorArea} onChange={(e) => setEditFloorArea(e.target.value)} /></div></div>
+              <div className="create-listing-row"><div className="create-listing-field"><label>Year Built</label><input type="number" className="create-listing-input" placeholder="e.g. 2024" min="1900" max="2030" value={editYearBuilt} onChange={(e) => setEditYearBuilt(e.target.value)} /></div><div className="create-listing-field"><label>Amenities</label><input type="text" className="create-listing-input" placeholder="Separate by commas" value={editAmenities} onChange={(e) => setEditAmenities(e.target.value)} /></div></div>
+              <div className="create-listing-field"><label>Description</label><textarea className="create-listing-textarea" placeholder="Describe the property..." value={editCaption} onChange={(e) => setEditCaption(e.target.value)} /></div>
+              <div className="create-listing-section-title">Photos *</div>
+              <div className="create-listing-photos">
+                {editImages.map((img, i) => (<div key={i} className="create-listing-photo-item"><img src={img} alt="" /><button onClick={() => removeEditImage(i)} className="create-listing-photo-remove">&#215;</button></div>))}
+                {newEditFiles.map((file, i) => (<div key={`new-${i}`} className="create-listing-photo-item"><img src={URL.createObjectURL(file)} alt="" /><button onClick={() => removeNewEditFile(i)} className="create-listing-photo-remove">&#215;</button></div>))}
+                <button className="create-listing-photo-add" onClick={() => editFileRef.current?.click()}><FaImage size={20} /><span>Add Photos</span></button>
+                <input type="file" ref={editFileRef} hidden accept="image/*" multiple onChange={handleEditFileSelect} />
+              </div>
             </div>
-            <div className="dash-modal-actions"><button onClick={() => editFileRef.current?.click()} className="dash-modal-action-btn"><FaImage /> Add Photos</button><input type="file" ref={editFileRef} hidden accept="image/*" multiple onChange={handleEditFileSelect} /></div>
-            <div className="dash-modal-footer-btns"><button onClick={() => setEditingPostId(null)} className="dash-modal-cancel">Cancel</button><button onClick={saveEdit} disabled={isUploading} className="dash-modal-publish" style={{ flex: 1 }}>{isUploading ? 'Saving...' : 'Save Changes'}</button></div>
+            <div className="create-listing-footer"><button className="create-listing-cancel" onClick={() => setEditingPostId(null)}>Cancel</button><button className="create-listing-publish" onClick={saveEdit} disabled={isUploading}>{isUploading ? <><FaSpinner className="spin" /> Saving...</> : 'Save Changes'}</button></div>
           </div>
         </div>
       )}
@@ -829,9 +871,9 @@ export default function Dashboard() {
                       <div className="listing-modal-share-wrapper">
                         <button className="listing-modal-share-btn" onClick={() => setShowShareSocials(!showShareSocials)}><FaShare size={12} /> Share Listing</button>
                         <div className={`listing-modal-share-socials ${showShareSocials ? 'show' : ''}`}>
-                          <button className="modal-social-btn modal-social-fb" title="Share to Facebook" onClick={() => { const url = window.location.href; window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}&quote=${encodeURIComponent(`${selectedListing.title} - ${formatPriceDisplay(selectedListing.price)} in ${selectedListing.location}`)}`, '_blank', 'width=600,height=400'); }}><FaFacebookF size={14} /></button>
-                          <button className="modal-social-btn modal-social-tw" title="Share to X (Twitter)" onClick={() => { const url = window.location.href; const text = `Check out this listing: ${selectedListing.title} - ${formatPriceDisplay(selectedListing.price)} in ${selectedListing.location}`; window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank', 'width=600,height=400'); }}><FaTwitter size={14} /></button>
-                          <button className="modal-social-btn modal-social-ig" title="Share to Instagram" onClick={() => { navigator.clipboard.writeText(`${selectedListing.title} - ${formatPriceDisplay(selectedListing.price)} in ${selectedListing.location}\n${window.location.href}`); glassToast.success('Link copied! Paste it on Instagram.'); }}><FaInstagram size={14} /></button>
+                          <button className="modal-social-btn modal-social-fb" title="Share to Facebook" onClick={() => { const url = `${window.location.origin}/dashboard?listing=${selectedListing.id}`; window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}&quote=${encodeURIComponent(`${selectedListing.title} - ${formatPriceDisplay(selectedListing.price)} in ${selectedListing.location}`)}`, '_blank', 'width=600,height=400'); }}><FaFacebookF size={14} /></button>
+                          <button className="modal-social-btn modal-social-tw" title="Share to X (Twitter)" onClick={() => { const url = `${window.location.origin}/dashboard?listing=${selectedListing.id}`; const text = `Check out this listing: ${selectedListing.title} - ${formatPriceDisplay(selectedListing.price)} in ${selectedListing.location}`; window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank', 'width=600,height=400'); }}><FaTwitter size={14} /></button>
+                          <button className="modal-social-btn modal-social-ig" title="Share to Instagram" onClick={() => { const url = `${window.location.origin}/dashboard?listing=${selectedListing.id}`; navigator.clipboard.writeText(`${selectedListing.title} - ${formatPriceDisplay(selectedListing.price)} in ${selectedListing.location}\n${url}`); glassToast.success('Link copied! Paste it on Instagram.'); }}><FaInstagram size={14} /></button>
                         </div>
                       </div>
                     </div>

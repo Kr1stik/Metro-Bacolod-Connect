@@ -1,16 +1,27 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth } from "../firebase-config";
-import { sendEmailVerification, signOut } from "firebase/auth";
+import { sendEmailVerification, signOut, onAuthStateChanged } from "firebase/auth";
 import { glassToast } from '../components/GlassToast';
 import logo from "../assets/MBC Logo.png"; 
 // Removed FaEnvelopeOpenText import as it's no longer needed
 
 export default function VerifyEmail() {
   const [isSending, setIsSending] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
   const navigate = useNavigate();
 
+  // Wait for Firebase auth to initialize before polling
   useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      setAuthReady(true);
+      if (!user) navigate("/");
+    });
+    return () => unsub();
+  }, [navigate]);
+
+  useEffect(() => {
+    if (!authReady) return;
     const interval = setInterval(async () => {
       const user = auth.currentUser;
       if (user) {
@@ -20,12 +31,10 @@ export default function VerifyEmail() {
           glassToast.success("Email Verified! Redirecting...");
           setTimeout(() => navigate("/dashboard"), 2000);
         }
-      } else {
-        navigate("/");
       }
     }, 3000);
     return () => clearInterval(interval);
-  }, [navigate]);
+  }, [authReady, navigate]);
 
   const handleResend = async () => {
     setIsSending(true);

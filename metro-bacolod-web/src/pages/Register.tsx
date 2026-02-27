@@ -38,6 +38,7 @@ export default function Register() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false); 
   const [prcLicenseNo, setPrcLicenseNo] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   // --- RANDOM ID GENERATOR ---
   // Generates IDs like "SELR-X4F9A2" or "CLNT-M7V1Q8"
@@ -69,6 +70,7 @@ export default function Register() {
     if (password !== confirmPassword) return glassToast.error("Passwords do not match!");
     if (!city) return glassToast.error("Please select a City/Barangay.");
     if (mobile.length !== 10) return glassToast.error("Mobile number must be 10 digits (excluding +63).");
+    if (!acceptedTerms) return glassToast.error("You must accept the Terms of Service and Privacy Policy.");
 
     setIsSubmitting(true);
 
@@ -99,6 +101,7 @@ export default function Register() {
         address: city, 
         fullAddress: { street, city, province, zipCode },
         ...(isSeller && prcLicenseNo.trim() ? { prcLicenseNo: prcLicenseNo.trim() } : {}),
+        termsAcceptedAt: new Date().toISOString(),
         createdAt: new Date().toISOString()
       });
 
@@ -236,8 +239,26 @@ export default function Register() {
             </div>
           )}
 
+          {/* Terms and Privacy Acceptance */}
+          <div style={{ marginBottom: '25px' }}>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={acceptedTerms}
+                onChange={(e) => setAcceptedTerms(e.target.checked)}
+                style={{ marginTop: '4px', width: '16px', height: '16px', cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: '0.85rem', color: '#374151', lineHeight: '1.4' }}>
+                I agree to the{' '}
+                <span style={{ color: '#2563eb', cursor: 'pointer', fontWeight: '600' }} onClick={(e) => { e.preventDefault(); navigate('/terms-of-service'); }}>Terms of Service</span>
+                {' '}and{' '}
+                <span style={{ color: '#2563eb', cursor: 'pointer', fontWeight: '600' }} onClick={(e) => { e.preventDefault(); navigate('/privacy-policy'); }}>Privacy Policy</span>
+              </span>
+            </label>
+          </div>
+
           <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginBottom: '50px' }}>
-             <button type="submit" disabled={isSubmitting} style={{ padding: '15px 60px', borderRadius: '50px', border: 'none', background: 'black', color: 'white', fontWeight: '700', fontSize: '1rem', cursor: 'pointer', opacity: isSubmitting ? 0.7 : 1, boxShadow: '0 4px 15px rgba(0,0,0,0.2)', width: '100%' }}>
+             <button type="submit" disabled={isSubmitting || !acceptedTerms} style={{ padding: '15px 60px', borderRadius: '50px', border: 'none', background: 'black', color: 'white', fontWeight: '700', fontSize: '1rem', cursor: 'pointer', opacity: (isSubmitting || !acceptedTerms) ? 0.7 : 1, boxShadow: '0 4px 15px rgba(0,0,0,0.2)', width: '100%' }}>
                {isSubmitting ? "Creating Account..." : "Complete Registration"}
              </button>
           </div>

@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { auth, db } from "../firebase-config";
+import { SkeletonCard, SkeletonProfile } from "../components/SkeletonLoader";
 import { doc, getDoc, collection, addDoc, query, where, orderBy, getDocs, updateDoc, arrayUnion, arrayRemove, setDoc } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import {
@@ -21,6 +22,8 @@ import Swal from "sweetalert2";
 import { glassToast } from "../components/GlassToast";
 import { BACOLOD_LOCATIONS } from "../constants/locations";
 import { canCreateListings, canAccessTrash, canManagePost } from "../constants/roles";
+import DOMPurify from 'dompurify';
+import { compressImage } from '../utils';
 
 // --- Fix Leaflet default marker icons ---
 // @ts-ignore
@@ -130,7 +133,7 @@ const formatPostData = (d: any) => {
     fullDescription: p.content || 'No description provided.',
     amenities: p.amenities || [],
     agentName: p.userName || 'Unknown Agent',
-    agentRating: 4.0,
+    agentRating: p.agentRating || 0,
     agentPhone: p.phone || 'N/A',
     agentAvatar: p.userAvatar || 'https://ui-avatars.com/api/?name=U&rounded=true',
     image: p.images?.[0] || p.image || '',
@@ -147,6 +150,7 @@ export default function Profile() {
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
   const [myPosts, setMyPosts] = useState<any[]>([]); // User's own dynamic posts
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [likedPosts, setLikedPosts] = useState<any[]>([]); // Posts the user has liked
   const [savedPosts, setSavedPosts] = useState<any[]>([]); // Posts the user has saved
   const [profileTab, setProfileTab] = useState<'recent' | 'liked' | 'saved'>('recent');
@@ -215,6 +219,7 @@ export default function Profile() {
               .filter(d => !d.data().isArchived && !d.data().isDeleted)
               .map(formatPostData)
           );
+          setIsLoadingProfile(false);
 
         } catch (err) {
           console.error("Error fetching user data:", err);
@@ -253,7 +258,7 @@ export default function Profile() {
               fullDescription: p.content || 'No description provided.',
               amenities: p.amenities || [],
               agentName: p.userName || 'Unknown Agent',
-              agentRating: 4.0,
+              agentRating: p.agentRating || 0,
               agentPhone: p.userPhone || 'N/A',
               agentAvatar: p.userAvatar || 'https://ui-avatars.com/api/?name=U&rounded=true',
               image: p.images?.[0] || p.image || '',
@@ -577,13 +582,18 @@ export default function Profile() {
 
     setIsUploading(true);
     try {
-      const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || "dg6kzqq5n";
-      const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || "jdj7tsar";
+      const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+      const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+
+      if (!CLOUD_NAME || !UPLOAD_PRESET) {
+        throw new Error("Missing Cloudinary configuration in .env");
+      }
       const imageUrls: string[] = [];
 
       for (const file of imageFiles) {
+        const compressed = await compressImage(file);
         const formData = new FormData();
-        formData.append("file", file);
+        formData.append("file", compressed);
         formData.append("upload_preset", UPLOAD_PRESET);
         formData.append("cloud_name", CLOUD_NAME);
         const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, { method: "POST", body: formData });
@@ -603,8 +613,8 @@ export default function Profile() {
         userAvatar: user.photoURL,
         userCustomId: userData?.customId || "USER",
         userRole: userData?.role || "Client",
-        title: listingTitle,
-        content: listingDescription,
+        title: DOMPurify.sanitize(listingTitle),
+        content: DOMPurify.sanitize(listingDescription),
         location: listingLocation,
         price: listingPrice,
         status: listingStatus,
@@ -656,6 +666,19 @@ export default function Profile() {
   
   // This completely removes the mock data dependency!
   const profileListings = isViewingOther ? viewedPosts : myPosts;
+
+  // Search/filter state for listings
+  const [listingSearchQuery, setListingSearchQuery] = useState("");
+  const [listingFilterStatus, setListingFilterStatus] = useState("all");
+
+  const filteredListings = profileListings.filter(listing => {
+    const matchesSearch = listingSearchQuery.trim() === "" ||
+      (listing.title || "").toLowerCase().includes(listingSearchQuery.toLowerCase()) ||
+      (listing.location || "").toLowerCase().includes(listingSearchQuery.toLowerCase()) ||
+      (listing.description || "").toLowerCase().includes(listingSearchQuery.toLowerCase());
+    const matchesFilter = listingFilterStatus === "all" || listing.status === listingFilterStatus;
+    return matchesSearch && matchesFilter;
+  });
 
   return (
     <div className="profile-page">
@@ -756,6 +779,12 @@ export default function Profile() {
       </nav>
 
       {/* ========== MAIN CONTENT ========== */}
+      {isLoadingProfile && !userData ? (
+        <div className="profile-content">
+          <aside className="profile-sidebar"><SkeletonProfile /></aside>
+          <section className="profile-main"><SkeletonCard count={4} /></section>
+        </div>
+      ) : (
       <div className="profile-content">
         {/* --- LEFT: Profile Info --- */}
         <aside className="profile-sidebar">
@@ -799,37 +828,66 @@ export default function Profile() {
 
         {/* --- RIGHT: Posts with Tabs --- */}
         <section className="profile-posts-section">
-          {/* Tab Switcher */}
-          <div className="profile-tabs">
-            <button
-              className={`profile-tab ${profileTab === 'recent' ? 'profile-tab-active' : ''}`}
-              onClick={() => setProfileTab('recent')}
-            >
-              {isViewingOther ? 'Listings' : 'Recent Posts'}
-            </button>
-            <button
-              className={`profile-tab ${profileTab === 'liked' ? 'profile-tab-active' : ''}`}
-              onClick={() => setProfileTab('liked')}
-            >
-              <FaHeart size={12} /> Liked Posts
-            </button>
-            {!isViewingOther && (
+          {/* Tab Switcher + Search/Filter */}
+          <div className="profile-tabs" style={{ flexWrap: 'wrap', gap: '10px' }}>
+            <div style={{ display: 'flex', gap: '0', flex: 'none' }}>
               <button
-                className={`profile-tab ${profileTab === 'saved' ? 'profile-tab-active' : ''}`}
-                onClick={() => setProfileTab('saved')}
+                className={`profile-tab ${profileTab === 'recent' ? 'profile-tab-active' : ''}`}
+                onClick={() => setProfileTab('recent')}
               >
-                <FaBookmark size={12} /> Saved
+                {isViewingOther ? 'Listings' : 'Recent Posts'}
               </button>
+              <button
+                className={`profile-tab ${profileTab === 'liked' ? 'profile-tab-active' : ''}`}
+                onClick={() => setProfileTab('liked')}
+              >
+                <FaHeart size={12} /> Liked Posts
+              </button>
+              {!isViewingOther && (
+                <button
+                  className={`profile-tab ${profileTab === 'saved' ? 'profile-tab-active' : ''}`}
+                  onClick={() => setProfileTab('saved')}
+                >
+                  <FaBookmark size={12} /> Saved
+                </button>
+              )}
+            </div>
+            {profileTab === 'recent' && (
+              <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', padding: '0 10px', minWidth: '160px' }}>
+                  <FaSearch style={{ color: '#9ca3af', flexShrink: 0 }} size={12} />
+                  <input
+                    type="text"
+                    placeholder="Search..."
+                    value={listingSearchQuery}
+                    onChange={(e) => setListingSearchQuery(e.target.value)}
+                    style={{ border: 'none', outline: 'none', background: 'transparent', padding: '8px 0', fontSize: '0.82rem', color: 'inherit', width: '100%' }}
+                  />
+                </div>
+                <select
+                  value={listingFilterStatus}
+                  onChange={(e) => setListingFilterStatus(e.target.value)}
+                  style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.08)', color: 'inherit', fontSize: '0.82rem', cursor: 'pointer' }}
+                >
+                  <option value="all">All Status</option>
+                  <option value="For Sale">For Sale</option>
+                  <option value="For Rent">For Rent</option>
+                  <option value="Sold">Sold</option>
+                  <option value="Reserved">Reserved</option>
+                </select>
+              </div>
             )}
           </div>
 
           <div className="profile-posts-grid">
             {profileTab === 'recent' && (
               <>
-                {profileListings.length === 0 && (
-                  <p style={{ color: '#9ca3af', fontStyle: 'italic', fontSize: '0.85rem' }}>No listings yet.</p>
+                {filteredListings.length === 0 && (
+                  <p style={{ color: '#9ca3af', fontStyle: 'italic', fontSize: '0.85rem' }}>
+                    {profileListings.length === 0 ? 'No listings yet.' : 'No listings match your search.'}
+                  </p>
                 )}
-                {profileListings.map((listing) => (
+                {filteredListings.map((listing) => (
                   <div className="glass-listing-card profile-card" key={listing.id} onClick={() => openListingModal(listing)} style={{ cursor: 'pointer' }}>
                     {/* Card Info - Left */}
                     <div className="glass-card-content">
@@ -1015,6 +1073,7 @@ export default function Profile() {
           </div>
         </section>
       </div>
+      )}
 
       {/* ========== CREATE LISTING MODAL ========== */}
       {showCreateModal && (

@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase-config";
-import { collection, query, where, onSnapshot, addDoc, orderBy, serverTimestamp, doc, updateDoc } from "firebase/firestore";
-import { FaSearch, FaEnvelope, FaPaperPlane, FaArrowLeft, FaImage, FaSpinner } from "react-icons/fa";
+import { collection, query, where, onSnapshot, addDoc, orderBy, serverTimestamp, doc, updateDoc, deleteDoc, getDoc } from "firebase/firestore";
+import { FaSearch, FaEnvelope, FaPaperPlane, FaArrowLeft, FaImage, FaSpinner, FaTrash } from "react-icons/fa";
+import { SkeletonList } from "../components/SkeletonLoader";
 import logo from "../assets/MBC Logo.png";
 import { glassToast } from "../components/GlassToast";
 
@@ -10,6 +11,7 @@ export default function Messages() {
   const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
   const [chats, setChats] = useState<any[]>([]);
+  const [isLoadingChats, setIsLoadingChats] = useState(true);
   const [activeChat, setActiveChat] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState("");
@@ -22,6 +24,26 @@ export default function Messages() {
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+
+  // Online presence state
+  const [otherUserLastSeen, setOtherUserLastSeen] = useState<Date | null>(null);
+  const [onlineStatuses, setOnlineStatuses] = useState<Record<string, Date>>({});
+
+  const isUserOnline = (lastSeen: Date | null) => {
+    if (!lastSeen) return false;
+    return (Date.now() - lastSeen.getTime()) < 5 * 60 * 1000; // 5 minutes
+  };
+
+  const formatLastSeen = (lastSeen: Date | null) => {
+    if (!lastSeen) return "Offline";
+    if (isUserOnline(lastSeen)) return "Online";
+    const diff = Date.now() - lastSeen.getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `Last seen ${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `Last seen ${hours}h ago`;
+    return `Last seen ${lastSeen.toLocaleDateString()}`;
+  };
 
   // Time formatters
   const formatTime = (date: any) => {
@@ -49,6 +71,7 @@ export default function Messages() {
           const fetchedChats = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
           fetchedChats.sort((a: any, b: any) => (b.updatedAt?.toMillis?.() || 0) - (a.updatedAt?.toMillis?.() || 0));
           setChats(fetchedChats);
+          setIsLoadingChats(false);
         });
 
         return () => unsubChats();
@@ -68,6 +91,61 @@ export default function Messages() {
     return () => unsubMessages();
   }, [activeChat]);
 
+  // 2b. Update own lastSeen periodically
+  useEffect(() => {
+    if (!user) return;
+    const updateLastSeen = () => {
+      updateDoc(doc(db, "users", user.uid), { lastSeen: serverTimestamp() }).catch(() => {});
+    };
+    updateLastSeen();
+    const interval = setInterval(updateLastSeen, 2 * 60 * 1000); // every 2 minutes
+    return () => clearInterval(interval);
+  }, [user]);
+
+  // 2b2. Fetch all chat participants' online status
+  useEffect(() => {
+    if (!user || chats.length === 0) return;
+    const fetchStatuses = async () => {
+      const statuses: Record<string, Date> = {};
+      const otherUids = [...new Set(chats.map(c => c.participants.find((uid: string) => uid !== user.uid)).filter(Boolean))];
+      await Promise.all(otherUids.map(async (uid: string) => {
+        try {
+          const snap = await getDoc(doc(db, "users", uid));
+          const data = snap.data();
+          if (data?.lastSeen) {
+            statuses[uid] = data.lastSeen.toDate ? data.lastSeen.toDate() : new Date(data.lastSeen);
+          }
+        } catch { /* ignore */ }
+      }));
+      setOnlineStatuses(statuses);
+    };
+    fetchStatuses();
+    const interval = setInterval(fetchStatuses, 60 * 1000); // every minute
+    return () => clearInterval(interval);
+  }, [user, chats]);
+
+  // 2c. Fetch other user's lastSeen when activeChat changes
+  useEffect(() => {
+    if (!activeChat || !user) { setOtherUserLastSeen(null); return; }
+    const otherUid = activeChat.participants.find((uid: string) => uid !== user.uid);
+    if (!otherUid) return;
+
+    // Poll the other user's lastSeen every 30 seconds
+    const fetchLastSeen = async () => {
+      try {
+        const snap = await getDoc(doc(db, "users", otherUid));
+        const data = snap.data();
+        if (data?.lastSeen) {
+          const d = data.lastSeen.toDate ? data.lastSeen.toDate() : new Date(data.lastSeen);
+          setOtherUserLastSeen(d);
+        }
+      } catch { /* ignore */ }
+    };
+    fetchLastSeen();
+    const interval = setInterval(fetchLastSeen, 30 * 1000);
+    return () => clearInterval(interval);
+  }, [activeChat, user]);
+
   // 3. Mark as read
   useEffect(() => {
     if (!activeChat || !user) return;
@@ -86,8 +164,12 @@ export default function Messages() {
 
     setIsUploading(true);
     try {
-      const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || "dg6kzqq5n";
-      const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || "jdj7tsar";
+      const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+      const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+
+      if (!CLOUD_NAME || !UPLOAD_PRESET) {
+        throw new Error("Missing Cloudinary configuration in .env");
+      }
 
       const formData = new FormData();
       formData.append("file", file);
@@ -147,6 +229,16 @@ export default function Messages() {
     }
   };
 
+  const handleDeleteMessage = async (messageId: string) => {
+    if (!activeChat) return;
+    try {
+      await deleteDoc(doc(db, `chats/${activeChat.id}/messages`, messageId));
+      glassToast.success("Message deleted");
+    } catch {
+      glassToast.error("Failed to delete message");
+    }
+  };
+
   const getOtherUser = (chat: any) => {
     const otherUid = chat.participants.find((uid: string) => uid !== user?.uid);
     return chat.users[otherUid] || { name: "Unknown User", avatar: "https://ui-avatars.com/api/?name=U" };
@@ -181,11 +273,11 @@ export default function Messages() {
         </div>
       </nav>
 
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', padding: '100px 20px 20px 20px', gap: '20px', maxWidth: '1400px', margin: '0 auto', width: '100%' }}>
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', padding: '80px 20px 20px 20px', gap: '16px', maxWidth: '1400px', margin: '0 auto', width: '100%' }}>
         
         {/* LEFT SIDEBAR */}
         <div style={{ width: '350px', background: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(12px)', borderRadius: '20px', border: '1px solid #e5e7eb', display: activeChat ? 'none' : 'flex', flexDirection: 'column' }} className="chat-sidebar-mobile">
-          <div className="msg-search-area" style={{ padding: '20px', borderBottom: '1px solid #e5e7eb' }}>
+          <div className="msg-search-area" style={{ padding: '16px', borderBottom: '1px solid #e5e7eb' }}>
             <div className="dash-search-wrapper" style={{ margin: 0 }}>
               <FaSearch className="dash-search-icon" />
               <input 
@@ -200,16 +292,23 @@ export default function Messages() {
           
           <div style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>
             {/* --- FIX: Rendering filteredChats instead of chats --- */}
-            {filteredChats.length === 0 ? (
+            {isLoadingChats ? (
+              <div style={{ padding: '10px' }}><SkeletonList rows={5} /></div>
+            ) : filteredChats.length === 0 ? (
                <div style={{ padding: '20px', textAlign: 'center', color: '#9ca3af', fontSize: '0.9rem' }}>No conversations found.</div>
             ) : (
               filteredChats.map(chat => {
                 const otherUser = getOtherUser(chat);
                 const isActive = activeChat?.id === chat.id;
-                const isUnread = chat.hasUnread?.[user?.uid]; 
+                const isUnread = chat.hasUnread?.[user?.uid];
+                const otherUid = chat.participants.find((uid: string) => uid !== user?.uid);
+                const isOnline = otherUid && isUserOnline(onlineStatuses[otherUid] || null);
                 return (
                   <div key={chat.id} onClick={() => setActiveChat(chat)} className={`msg-chat-item ${isActive ? 'msg-chat-item-active' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: '15px', padding: '15px', borderRadius: '12px', cursor: 'pointer', marginBottom: '5px', background: isActive ? '#f3f4f6' : 'transparent' }}>
-                    <img src={otherUser.avatar} alt="avatar" style={{ width: '45px', height: '45px', borderRadius: '50%', objectFit: 'cover' }} />
+                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                      <img src={otherUser.avatar} alt="avatar" style={{ width: '45px', height: '45px', borderRadius: '50%', objectFit: 'cover' }} />
+                      {isOnline && <div style={{ position: 'absolute', bottom: '1px', right: '1px', width: '12px', height: '12px', background: '#22c55e', borderRadius: '50%', border: '2px solid white' }} />}
+                    </div>
                     <div style={{ flex: 1, overflow: 'hidden' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', fontWeight: isUnread ? '800' : '500' }}>{otherUser.name}</h4>
@@ -230,16 +329,19 @@ export default function Messages() {
         <div style={{ flex: 1, background: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(12px)', borderRadius: '20px', border: '1px solid #e5e7eb', display: !activeChat ? 'none' : 'flex', flexDirection: 'column' }} className="chat-window-mobile">
           {activeChat ? (
             <>
-              <div className="msg-chat-header" style={{ padding: '20px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: '15px', borderRadius: '20px 20px 0 0' }}>
+              <div className="msg-chat-header" style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: '12px', borderRadius: '20px 20px 0 0' }}>
                 <button className="chat-back-btn" onClick={() => setActiveChat(null)} style={{ background: 'transparent', border: 'none', fontSize: '1.2rem', cursor: 'pointer', display: 'none' }}><FaArrowLeft /></button>
                 <img src={getOtherUser(activeChat).avatar} alt="avatar" style={{ width: '40px', height: '40px', borderRadius: '50%' }} />
                 <div>
                     <h3 style={{ margin: 0, fontSize: '1rem' }}>{getOtherUser(activeChat).name}</h3>
-                    <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Offline</span>
+                    <span style={{ fontSize: '0.75rem', color: isUserOnline(otherUserLastSeen) ? '#22c55e' : '#9ca3af' }}>
+                      {isUserOnline(otherUserLastSeen) && <span style={{ display: 'inline-block', width: '7px', height: '7px', background: '#22c55e', borderRadius: '50%', marginRight: '5px' }} />}
+                      {formatLastSeen(otherUserLastSeen)}
+                    </span>
                 </div>
               </div>
 
-              <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {messages.map((msg, index) => {
                   const isMe = msg.senderId === user?.uid;
                   const showDate = index === 0 || formatDateSeparator(messages[index-1].createdAt) !== formatDateSeparator(msg.createdAt);
@@ -247,19 +349,31 @@ export default function Messages() {
                   return (
                     <div key={msg.id}>
                       {showDate && (
-                        <div style={{ textAlign: 'center', margin: '20px 0', fontSize: '0.75rem', color: '#9ca3af' }}>
+                        <div style={{ textAlign: 'center', margin: '12px 0', fontSize: '0.72rem', color: '#9ca3af' }}>
                             {formatDateSeparator(msg.createdAt)}
                         </div>
                       )}
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
-                        <div className={isMe ? 'msg-bubble-sent' : 'msg-bubble-received'} style={{ maxWidth: '70%', padding: msg.imageUrl ? '8px' : '12px 16px', borderRadius: '16px', borderBottomRightRadius: isMe ? '4px' : '16px', borderBottomLeftRadius: isMe ? '16px' : '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexDirection: isMe ? 'row' : 'row-reverse' }}>
+                          {isMe && (
+                            <button
+                              onClick={() => handleDeleteMessage(msg.id)}
+                              className="msg-delete-btn"
+                              style={{ background: 'none', border: 'none', color: '#d1d5db', cursor: 'pointer', padding: '4px', borderRadius: '4px', opacity: 0, transition: '0.2s' }}
+                              title="Delete message"
+                            >
+                              <FaTrash size={11} />
+                            </button>
+                          )}
+                          <div className={isMe ? 'msg-bubble-sent' : 'msg-bubble-received'} style={{ maxWidth: '70%', padding: msg.imageUrl ? '8px' : '12px 16px', borderRadius: '16px', borderBottomRightRadius: isMe ? '4px' : '16px', borderBottomLeftRadius: isMe ? '16px' : '4px' }}>
                           {msg.imageUrl ? (
                             <img src={msg.imageUrl} alt="Sent" style={{ width: '100%', borderRadius: '12px', display: 'block', cursor: 'pointer' }} onClick={() => window.open(msg.imageUrl, '_blank')} />
                           ) : (
                             <span style={{ fontSize: '0.95rem' }}>{msg.text}</span>
                           )}
                         </div>
-                        <span style={{ fontSize: '0.7rem', color: '#9ca3af', marginTop: '5px', padding: '0 5px' }}>
+                        </div>
+                        <span style={{ fontSize: '0.65rem', color: '#9ca3af', marginTop: '2px', padding: '0 5px' }}>
                             {formatTime(msg.createdAt)}
                         </span>
                       </div>
@@ -269,8 +383,8 @@ export default function Messages() {
                 <div ref={messagesEndRef} />
               </div>
 
-              <div className="msg-input-area" style={{ padding: '20px', borderTop: '1px solid #e5e7eb', borderRadius: '0 0 20px 20px' }}>
-                <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+              <div className="msg-input-area" style={{ padding: '14px 20px', borderTop: '1px solid #e5e7eb', borderRadius: '0 0 20px 20px' }}>
+                <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                   
                   {/* Image Upload Button */}
                   <input type="file" ref={imageInputRef} hidden accept="image/*" onChange={handleImageSelect} />
@@ -278,8 +392,8 @@ export default function Messages() {
                     {isUploading ? <FaSpinner className="spin" size={22} /> : <FaImage size={22} />}
                   </button>
                   
-                  <input type="text" placeholder="Type a message..." value={newMessage} onChange={(e) => setNewMessage(e.target.value)} className="msg-input-field" style={{ flex: 1, padding: '15px', borderRadius: '50px', outline: 'none' }} />
-                  <button type="submit" disabled={!newMessage.trim() && !isUploading} className="msg-send-btn" style={{ border: 'none', width: '50px', height: '50px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><FaPaperPlane /></button>
+                  <input type="text" placeholder="Type a message..." value={newMessage} onChange={(e) => setNewMessage(e.target.value)} className="msg-input-field" style={{ flex: 1, padding: '12px 18px', borderRadius: '50px', outline: 'none' }} />
+                  <button type="submit" disabled={!newMessage.trim() && !isUploading} className="msg-send-btn" style={{ border: 'none', width: '44px', height: '44px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}><FaPaperPlane size={14} /></button>
                 </form>
               </div>
             </>

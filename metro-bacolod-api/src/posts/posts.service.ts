@@ -15,7 +15,7 @@ export class PostsService {
       likes: 0,
       likedBy: [],
       savedBy: [],
-      isDeleted: false,
+      isArchived: false,
       createdAt: new Date().toISOString(),
     });
     return { id: newDoc.id, ...createPostDto };
@@ -30,7 +30,7 @@ export class PostsService {
       
     let posts = snapshot.docs
       .map(doc => ({ id: doc.id, ...doc.data() }))
-      .filter((post: any) => !post.isDeleted);
+      .filter((post: any) => !post.isArchived);
 
     // THE ALGORITHM:
     // If we know the user's location, move those posts to the top
@@ -84,7 +84,7 @@ export class PostsService {
     if (post.data()?.userId !== userId) throw new Error('Unauthorized');
 
     // Instead of .delete(), we update a flag
-    await postRef.update({ isDeleted: true });
+    await postRef.update({ isArchived: true, deletedAt: new Date().toISOString() });
     return { message: 'Post moved to trash' };
   }
 
@@ -96,7 +96,7 @@ export class PostsService {
     if (!post.exists) throw new Error('Post not found');
     if (post.data()?.userId !== userId) throw new Error('Unauthorized');
 
-    await postRef.update({ isDeleted: false });
+    await postRef.update({ isArchived: false, deletedAt: admin.firestore.FieldValue.delete() });
     return { message: 'Post restored' };
   }
 

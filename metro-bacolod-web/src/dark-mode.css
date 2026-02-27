@@ -1523,13 +1523,14 @@
 }
 
 [data-theme="dark"] .glass-toast-close {
-  background: rgba(255, 255, 255, 0.06);
-  color: #9ca3af;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #d1d5db;
 }
 
 [data-theme="dark"] .glass-toast-close:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: #e5e7eb;
+  background: rgba(255, 255, 255, 0.2);
+  color: #f3f4f6;
 }
 
 /* =========================================
@@ -1541,10 +1542,12 @@
 /* =========================================
    11. SWAL (SweetAlert) — DARK OVERRIDES
    ========================================= */
-[data-theme="dark"] .swal2-popup {
-  background: #1a1a1a !important;
-  color: #e5e7eb !important;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+[data-theme="dark"] .swal2-popup.swal2-modal {
+  background: rgba(20, 20, 20, 0.85) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
 }
 
 [data-theme="dark"] .swal2-title {
@@ -1555,20 +1558,50 @@
   color: #9ca3af !important;
 }
 
-[data-theme="dark"] .swal2-input {
+[data-theme="dark"] .swal2-input,
+[data-theme="dark"] .swal2-select,
+[data-theme="dark"] .swal2-textarea {
   background: rgba(255, 255, 255, 0.06) !important;
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
   color: #e5e7eb !important;
 }
 
-[data-theme="dark"] .swal2-input:focus {
-  border-color: rgba(255, 255, 255, 0.2) !important;
+[data-theme="dark"] .swal2-input:focus,
+[data-theme="dark"] .swal2-select:focus,
+[data-theme="dark"] .swal2-textarea:focus {
+  border-color: rgba(255, 255, 255, 0.25) !important;
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.05) !important;
 }
 
+[data-theme="dark"] .swal2-confirm.swal2-styled {
+  background: #e5e7eb !important;
+  color: #111827 !important;
+}
+
+[data-theme="dark"] .swal2-cancel.swal2-styled {
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  color: #d1d5db !important;
+}
+
+[data-theme="dark"] .swal2-cancel.swal2-styled:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+[data-theme="dark"] .swal2-close {
+  color: #6b7280 !important;
+}
+
+[data-theme="dark"] .swal2-close:hover {
+  color: #d1d5db !important;
+}
+
 [data-theme="dark"] .swal2-validation-message {
-  background: rgba(239, 68, 68, 0.1) !important;
+  background: rgba(239, 68, 68, 0.15) !important;
   color: #ef4444 !important;
+}
+
+[data-theme="dark"] .swal2-container.swal2-backdrop-show {
+  background: rgba(0, 0, 0, 0.5) !important;
 }
 
 /* =========================================
@@ -1642,6 +1675,16 @@
 .msg-bubble-received {
   background: #f3f4f6;
   color: #111;
+}
+
+/* Show delete button on hover of the row container */
+div:hover > .msg-delete-btn {
+  opacity: 1 !important;
+}
+
+.msg-delete-btn:hover {
+  color: #ef4444 !important;
+  background: rgba(239, 68, 68, 0.1) !important;
 }
 
 .msg-input-area {

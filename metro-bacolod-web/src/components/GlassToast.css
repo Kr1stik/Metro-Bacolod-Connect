@@ -104,24 +104,24 @@
 /* --- Close button --- */
 .glass-toast-close {
   flex-shrink: 0;
-  background: rgba(0, 0, 0, 0.06);
-  border: none;
+  background: rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 50%;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #6b7280;
+  color: #374151;
   transition: background 0.2s, color 0.2s, transform 0.2s;
-  margin-top: 1px;
+  margin-top: 0;
 }
 
 .glass-toast-close:hover {
-  background: rgba(0, 0, 0, 0.12);
+  background: rgba(0, 0, 0, 0.18);
   color: #111827;
-  transform: scale(1.1);
+  transform: scale(1.12);
 }
 
 /* --- Progress bar --- */
