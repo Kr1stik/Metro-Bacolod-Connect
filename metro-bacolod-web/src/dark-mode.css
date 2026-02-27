@@ -1781,6 +1781,11 @@ div:hover > .msg-delete-btn {
   border-bottom-color: rgba(255, 255, 255, 0.08) !important;
   backdrop-filter: blur(12px);
 }
+[data-theme="dark"] .msg-rate-agent-btn {
+  background: rgba(245, 158, 11, 0.15) !important;
+  border-color: rgba(245, 158, 11, 0.3) !important;
+  color: #fbbf24 !important;
+}
 [data-theme="dark"] .msg-active-name {
   color: #f3f4f6 !important;
 }
