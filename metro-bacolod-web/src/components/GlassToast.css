@@ -23,19 +23,18 @@
   justify-content: space-between;
   gap: 12px;
   padding: 16px 18px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.45);
-  backdrop-filter: blur(40px) saturate(180%);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
-  border: 1.5px solid rgba(255, 255, 255, 0.55);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
   box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.1),
-    0 2px 8px rgba(0, 0, 0, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.7),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.2);
+    0 8px 32px rgba(0, 0, 0, 0.08),
+    0 2px 8px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
   pointer-events: all;
   overflow: hidden;
-  font-family: 'Google Sans', sans-serif;
+  font-family: 'Google Sans', 'Inter', sans-serif;
 }
 
 /* --- Entry animation --- */
@@ -104,8 +103,8 @@
 /* --- Close button --- */
 .glass-toast-close {
   flex-shrink: 0;
-  background: rgba(0, 0, 0, 0.1);
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 50%;
   width: 28px;
   height: 28px;
@@ -113,14 +112,14 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #374151;
+  color: #111827;
   transition: background 0.2s, color 0.2s, transform 0.2s;
   margin-top: 0;
 }
 
 .glass-toast-close:hover {
-  background: rgba(0, 0, 0, 0.18);
-  color: #111827;
+  background: rgba(0, 0, 0, 0.15);
+  color: #000000;
   transform: scale(1.12);
 }
 

@@ -258,11 +258,11 @@ export default function Dashboard() {
     if (user.uid === agentId) return glassToast.info("You can't rate yourself.");
     const { value: rating } = await Swal.fire({
       title: `Rate ${agentName}`,
-      html: `<div style="display:flex;gap:8px;justify-content:center;margin:16px 0;">${[1,2,3,4,5].map(n => `<span class="swal-star" data-val="${n}" style="font-size:2rem;cursor:pointer;color:#d1d5db;transition:color 0.2s;">★</span>`).join('')}</div><p id="swal-rating-label" style="font-size:0.9rem;color:#6b7280;margin:0;">Select a rating</p>`,
+      html: `<div style="display:flex;gap:8px;justify-content:center;margin:16px 0;">${[1,2,3,4,5].map(n => `<span class="swal-star" data-val="${n}" style="font-size:2rem;cursor:pointer;color:#9ca3af;transition:color 0.2s;">★</span>`).join('')}</div><p id="swal-rating-label" style="font-size:0.9rem;color:#6b7280;margin:0;">Select a rating</p>`,
       showCancelButton: true, confirmButtonText: 'Submit', confirmButtonColor: '#111827',
       didOpen: () => {
         let selected = 0; const stars = document.querySelectorAll('.swal-star'); const label = document.getElementById('swal-rating-label'); const labels = ['', 'Poor', 'Fair', 'Good', 'Very Good', 'Excellent'];
-        stars.forEach((s: any) => { s.addEventListener('click', () => { selected = parseInt(s.dataset.val); stars.forEach((st: any) => { st.style.color = parseInt(st.dataset.val) <= selected ? '#f59e0b' : '#d1d5db'; }); if (label) label.textContent = labels[selected] || ''; (Swal.getConfirmButton() as any).dataset.rating = selected; }); });
+        stars.forEach((s: any) => { s.addEventListener('click', () => { selected = parseInt(s.dataset.val); stars.forEach((st: any) => { st.style.color = parseInt(st.dataset.val) <= selected ? '#f59e0b' : '#9ca3af'; }); if (label) label.textContent = labels[selected] || ''; (Swal.getConfirmButton() as any).dataset.rating = selected; }); });
       },
       preConfirm: () => { const r = parseInt((Swal.getConfirmButton() as any)?.dataset?.rating || '0'); if (!r) { Swal.showValidationMessage('Please select a rating'); return false; } return r; }
     });
@@ -621,13 +621,13 @@ export default function Dashboard() {
             <FaBell size={22} />
             {unreadNotifCount > 0 && <span style={{ position: 'absolute', top: '-5px', right: '-8px', background: '#ef4444', color: 'white', fontSize: '0.65rem', fontWeight: 'bold', width: '18px', height: '18px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white' }}>{unreadNotifCount}</span>}
             {showNotifications && (
-              <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', top: '38px', right: 0, width: '320px', maxHeight: '400px', overflowY: 'auto', background: 'white', borderRadius: '12px', boxShadow: '0 10px 30px rgba(0,0,0,0.15)', zIndex: 200, border: '1px solid #e5e7eb' }}>
-                <div style={{ padding: '14px 16px', borderBottom: '1px solid #f3f4f6', fontWeight: '700', fontSize: '0.95rem', color: '#111' }}>Notifications</div>
-                {notifications.length === 0 ? ( <div style={{ padding: '24px 16px', textAlign: 'center', color: '#9ca3af', fontSize: '0.85rem' }}>No notifications yet</div> ) : (
+              <div onClick={(e) => e.stopPropagation()} className="notif-dropdown">
+                <div className="notif-dropdown-header">Notifications</div>
+                {notifications.length === 0 ? ( <div className="notif-dropdown-empty">No notifications yet</div> ) : (
                   notifications.slice(0, 20).map((n: any) => (
-                    <div key={n.id} onClick={() => { markNotificationRead(n.id); if (n.link) navigate(n.link); setShowNotifications(false); }} style={{ padding: '12px 16px', borderBottom: '1px solid #f9fafb', cursor: 'pointer', background: n.read ? 'white' : '#f0f9ff', transition: '0.2s' }} onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'} onMouseOut={(e) => e.currentTarget.style.backgroundColor = n.read ? 'white' : '#f0f9ff'}>
-                      <p style={{ margin: 0, fontSize: '0.85rem', color: '#374151', fontWeight: n.read ? '400' : '600' }}>{n.message}</p>
-                      <span style={{ fontSize: '0.7rem', color: '#9ca3af' }}>{n.createdAt ? new Date(n.createdAt).toLocaleString() : ''}</span>
+                    <div key={n.id} onClick={() => { markNotificationRead(n.id); if (n.link) navigate(n.link); setShowNotifications(false); }} className={`notif-dropdown-item ${n.read ? '' : 'notif-unread'}`}>
+                      <p className="notif-dropdown-msg" style={{ fontWeight: n.read ? '400' : '600' }}>{n.message}</p>
+                      <span className="notif-dropdown-time">{n.createdAt ? new Date(n.createdAt).toLocaleString() : ''}</span>
                     </div>
                   ))
                 )}
