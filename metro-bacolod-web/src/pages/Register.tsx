@@ -265,9 +265,6 @@ export default function Register() {
         </form>
       </div>
 
-      <style>{`
-        input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; filter: invert(0); }
-      `}</style>
     </div>
   );
 }

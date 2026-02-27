@@ -671,7 +671,7 @@ export default function Profile() {
   const [listingSearchQuery, setListingSearchQuery] = useState("");
   const [listingFilterStatus, setListingFilterStatus] = useState("all");
 
-  const filteredListings = profileListings.filter(listing => {
+  const applyListingFilter = (list: any[]) => list.filter(listing => {
     const matchesSearch = listingSearchQuery.trim() === "" ||
       (listing.title || "").toLowerCase().includes(listingSearchQuery.toLowerCase()) ||
       (listing.location || "").toLowerCase().includes(listingSearchQuery.toLowerCase()) ||
@@ -679,6 +679,10 @@ export default function Profile() {
     const matchesFilter = listingFilterStatus === "all" || listing.status === listingFilterStatus;
     return matchesSearch && matchesFilter;
   });
+
+  const filteredListings = applyListingFilter(profileListings);
+  const filteredLikedPosts = applyListingFilter(likedPosts);
+  const filteredSavedPosts = applyListingFilter(savedPosts);
 
   return (
     <div className="profile-page">
@@ -852,31 +856,30 @@ export default function Profile() {
                 </button>
               )}
             </div>
-            {profileTab === 'recent' && (
-              <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto', alignItems: 'center', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', padding: '0 10px', minWidth: '160px' }}>
-                  <FaSearch style={{ color: '#9ca3af', flexShrink: 0 }} size={12} />
-                  <input
-                    type="text"
-                    placeholder="Search..."
-                    value={listingSearchQuery}
-                    onChange={(e) => setListingSearchQuery(e.target.value)}
-                    style={{ border: 'none', outline: 'none', background: 'transparent', padding: '8px 0', fontSize: '0.82rem', color: 'inherit', width: '100%' }}
-                  />
-                </div>
-                <select
-                  value={listingFilterStatus}
-                  onChange={(e) => setListingFilterStatus(e.target.value)}
-                  style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.08)', color: 'inherit', fontSize: '0.82rem', cursor: 'pointer' }}
-                >
-                  <option value="all">All Status</option>
-                  <option value="For Sale">For Sale</option>
-                  <option value="For Rent">For Rent</option>
-                  <option value="Sold">Sold</option>
-                  <option value="Reserved">Reserved</option>
-                </select>
+            <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div className="profile-listing-search" style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '10px', padding: '0 10px', minWidth: '160px' }}>
+                <FaSearch style={{ color: '#9ca3af', flexShrink: 0 }} size={12} />
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  value={listingSearchQuery}
+                  onChange={(e) => setListingSearchQuery(e.target.value)}
+                  style={{ border: 'none', outline: 'none', background: 'transparent', padding: '8px 0', fontSize: '0.82rem', color: 'inherit', width: '100%' }}
+                />
               </div>
-            )}
+              <select
+                className="profile-listing-filter"
+                value={listingFilterStatus}
+                onChange={(e) => setListingFilterStatus(e.target.value)}
+                style={{ padding: '8px 12px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.08)', color: 'inherit', fontSize: '0.82rem', cursor: 'pointer' }}
+              >
+                <option value="all">All Status</option>
+                <option value="For Sale">For Sale</option>
+                <option value="For Rent">For Rent</option>
+                <option value="Sold">Sold</option>
+                <option value="Reserved">Reserved</option>
+              </select>
+            </div>
           </div>
 
           <div className="profile-posts-grid">
@@ -963,10 +966,12 @@ export default function Profile() {
 
             {profileTab === 'liked' && (
               <>
-                {likedPosts.length === 0 && (
-                  <p style={{ color: '#9ca3af', fontStyle: 'italic', fontSize: '0.85rem' }}>No liked posts yet.</p>
+                {filteredLikedPosts.length === 0 && (
+                  <p style={{ color: '#9ca3af', fontStyle: 'italic', fontSize: '0.85rem' }}>
+                    {likedPosts.length === 0 ? 'No liked posts yet.' : 'No liked posts match your search.'}
+                  </p>
                 )}
-                {likedPosts.map((listing) => (
+                {filteredLikedPosts.map((listing) => (
                   <div className="glass-listing-card profile-card" key={listing.id} onClick={() => openListingModal(listing)} style={{ cursor: 'pointer' }}>
                     {/* Card Info - Left */}
                     <div className="glass-card-content">
@@ -1030,10 +1035,12 @@ export default function Profile() {
 
             {profileTab === 'saved' && (
               <>
-                {savedPosts.length === 0 && (
-                  <p style={{ color: '#9ca3af', fontStyle: 'italic', fontSize: '0.85rem' }}>No saved listings yet.</p>
+                {filteredSavedPosts.length === 0 && (
+                  <p style={{ color: '#9ca3af', fontStyle: 'italic', fontSize: '0.85rem' }}>
+                    {savedPosts.length === 0 ? 'No saved listings yet.' : 'No saved listings match your search.'}
+                  </p>
                 )}
-                {savedPosts.map((listing) => (
+                {filteredSavedPosts.map((listing) => (
                   <div className="glass-listing-card profile-card" key={listing.id} onClick={() => openListingModal(listing)} style={{ cursor: 'pointer' }}>
                     <div className="glass-card-content">
                       <div>

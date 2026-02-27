@@ -1534,6 +1534,49 @@
 }
 
 /* =========================================
+   NOTIFICATION DROPDOWN — DARK
+   ========================================= */
+[data-theme="dark"] .notif-dropdown {
+  background: #1f2937;
+  border-color: #374151;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .notif-dropdown-header {
+  color: #f3f4f6;
+  border-bottom-color: #374151;
+}
+
+[data-theme="dark"] .notif-dropdown-empty {
+  color: #6b7280;
+}
+
+[data-theme="dark"] .notif-dropdown-item {
+  background: #1f2937;
+  border-bottom-color: #374151;
+}
+
+[data-theme="dark"] .notif-dropdown-item:hover {
+  background: #374151;
+}
+
+[data-theme="dark"] .notif-dropdown-item.notif-unread {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+[data-theme="dark"] .notif-dropdown-item.notif-unread:hover {
+  background: rgba(59, 130, 246, 0.18);
+}
+
+[data-theme="dark"] .notif-dropdown-msg {
+  color: #e5e7eb;
+}
+
+[data-theme="dark"] .notif-dropdown-time {
+  color: #6b7280;
+}
+
+/* =========================================
    10. LEGACY DASHBOARD (Archive page) — DARK
    (Already dark-themed, minimal changes)
    ========================================= */

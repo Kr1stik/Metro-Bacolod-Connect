@@ -7,6 +7,7 @@ import { SkeletonList } from "../components/SkeletonLoader";
 import logo from "../assets/MBC Logo.png";
 import { glassToast } from "../components/GlassToast";
 import Swal from "sweetalert2";
+import DOMPurify from "dompurify";
 
 export default function Messages() {
   const navigate = useNavigate();
@@ -280,7 +281,7 @@ export default function Messages() {
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(0,0,0,0.06);">
           <span style="font-size:0.85rem;font-weight:500;color:#374151;">${cat}</span>
           <div style="display:flex;gap:4px;" data-category="${idx}">
-            ${[1,2,3,4,5].map(n => `<span class="rate-star" data-cat="${idx}" data-val="${n}" style="font-size:1.3rem;cursor:pointer;color:${n <= existing ? '#f59e0b' : '#d1d5db'};transition:color 0.15s;">★</span>`).join('')}
+            ${[1,2,3,4,5].map(n => `<span class="rate-star" data-cat="${idx}" data-val="${n}" style="font-size:1.3rem;cursor:pointer;color:${n <= existing ? '#f59e0b' : '#9ca3af'};transition:color 0.15s;">★</span>`).join('')}
           </div>
         </div>
       `;
@@ -312,7 +313,7 @@ export default function Messages() {
             // Update star colors for this category
             allStars.forEach((st: any) => {
               if (parseInt(st.dataset.cat) === cat) {
-                st.style.color = parseInt(st.dataset.val) <= val ? '#f59e0b' : '#d1d5db';
+                st.style.color = parseInt(st.dataset.val) <= val ? '#f59e0b' : '#9ca3af';
               }
             });
             updateAvg();
@@ -497,7 +498,7 @@ export default function Messages() {
                           {msg.imageUrl ? (
                             <img src={msg.imageUrl} alt="Sent" style={{ width: '100%', borderRadius: '12px', display: 'block', cursor: 'pointer' }} onClick={() => window.open(msg.imageUrl, '_blank')} />
                           ) : (
-                            <span style={{ fontSize: '0.95rem' }}>{msg.text}</span>
+                            <span style={{ fontSize: '0.95rem' }}>{DOMPurify.sanitize(msg.text)}</span>
                           )}
                         </div>
                         </div>
@@ -533,13 +534,8 @@ export default function Messages() {
 
       <style>{`
         @media (max-width: 768px) {
-          .chat-sidebar-mobile { width: 100% !important; display: ${activeChat ? 'none' : 'flex'} !important; border-radius: 0 !important; }
-          .chat-window-mobile { display: ${activeChat ? 'flex' : 'none'} !important; border-radius: 0 !important; }
-          .chat-back-btn { display: block !important; }
-          .desktop-title { display: none !important; }
-        }
-        @media (min-width: 769px) {
-          .desktop-title { display: block !important; }
+          .chat-sidebar-mobile { width: 100% !important; display: ${activeChat ? 'none' : 'flex'} !important; }
+          .chat-window-mobile { display: ${activeChat ? 'flex' : 'none'} !important; }
         }
       `}</style>
     </div>

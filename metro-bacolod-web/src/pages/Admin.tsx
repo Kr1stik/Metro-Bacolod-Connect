@@ -191,7 +191,7 @@ export default function Admin() {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', fontFamily: "'Inter', sans-serif", background: '#f9fafb' }}>
       {/* ========== SIDEBAR ========== */}
-      <aside style={{
+      <aside className="admin-sidebar" style={{
         width: '260px', background: '#111827', color: 'white', padding: '24px 0',
         display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, left: 0,
         height: '100vh', zIndex: 50, boxShadow: '4px 0 20px rgba(0,0,0,0.1)'
@@ -244,7 +244,7 @@ export default function Admin() {
       </aside>
 
       {/* ========== MAIN CONTENT ========== */}
-      <main style={{ flex: 1, marginLeft: '260px', padding: '32px 40px' }}>
+      <main className="admin-main" style={{ flex: 1, marginLeft: '260px', padding: '32px 40px' }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
           <div>
@@ -523,16 +523,6 @@ export default function Admin() {
       </main>
 
       {/* Responsive sidebar collapse for mobile */}
-      <style>{`
-        @media (max-width: 768px) {
-          aside { width: 60px !important; padding: 16px 0 !important; }
-          aside h2, aside span, aside button span, aside nav button { font-size: 0 !important; }
-          aside nav button { justify-content: center !important; padding: 12px !important; }
-          aside nav button svg { font-size: 1.2rem !important; }
-          main { margin-left: 60px !important; padding: 20px 16px !important; }
-          table { font-size: 0.75rem !important; }
-        }
-      `}</style>
     </div>
   );
 }

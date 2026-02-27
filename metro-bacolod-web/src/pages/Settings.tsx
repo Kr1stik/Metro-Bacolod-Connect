@@ -268,12 +268,29 @@ export default function Settings() {
       },
     });
     if (result.isConfirmed) {
+      // Re-authenticate before deletion
+      const { value: password } = await Swal.fire({
+        title: "Confirm Your Password",
+        html: '<p style="color:#6b7280;font-size:0.85rem;">For security, please enter your password to proceed with account deletion.</p>',
+        input: "password",
+        inputPlaceholder: "Enter your password",
+        showCancelButton: true,
+        confirmButtonColor: "#ef4444",
+        confirmButtonText: "Confirm & Delete",
+      });
+      if (!password) return;
       try {
+        const credential = EmailAuthProvider.credential(user.email, password);
+        await reauthenticateWithCredential(user, credential);
         await user.delete();
         glassToast.success("Account deleted.");
         navigate("/");
       } catch (err: any) {
-        glassToast.error(err.message || "Failed to delete account. Please re-login and try again.");
+        if (err.code === "auth/wrong-password" || err.code === "auth/invalid-credential") {
+          glassToast.error("Incorrect password. Please try again.");
+        } else {
+          glassToast.error(err.message || "Failed to delete account.");
+        }
       }
     }
   };
