@@ -11,7 +11,8 @@ import {
   FaMapMarkerAlt, FaShare, FaChevronLeft, FaChevronRight,
   FaBed, FaBath, FaRulerCombined, FaCalendarAlt, FaPhoneAlt,
   FaHeart, FaRegHeart, FaMap, FaCalculator, FaBookmark, FaPen,
-  FaFacebookF, FaTwitter, FaInstagram, FaFlag
+  FaFacebookF, FaTwitter, FaInstagram, FaFlag,
+  FaRegBookmark
 } from "react-icons/fa";
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
