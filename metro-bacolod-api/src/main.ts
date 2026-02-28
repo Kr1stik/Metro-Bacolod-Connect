@@ -8,7 +8,7 @@ async function bootstrap() {
 
   // Enable global validation pipe
   app.useGlobalPipes(new ValidationPipe({
-    whitelist: true,         // Strip properties not in DTO
+    whitelist: false,         // Strip properties not in DTO
     forbidNonWhitelisted: false, // Don't error on extra fields (some FormData may include extras)
     transform: true,         // Auto-transform types
   }));
