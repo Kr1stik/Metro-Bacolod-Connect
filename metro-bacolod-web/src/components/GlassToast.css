@@ -168,3 +168,27 @@
     font-size: 0.84rem;
   }
 }
+
+/* ADD THIS TO THE BOTTOM OF GlassToast.css */
+
+.glass-toast-close {
+  background: transparent !important;
+  border: none !important;
+  color: #111827 !important; /* Dark gray so it is visible */
+  opacity: 0.5;              /* Slightly faded by default */
+  cursor: pointer;
+  padding: 8px !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s ease;
+  box-shadow: none !important; /* Removes default button shadows */
+}
+
+.glass-toast-close:hover {
+  opacity: 1; /* Fully visible when hovered */
+}
+
+.glass-toast-close svg {
+  fill: currentColor; /* Ensures the SVG icon takes the #111827 color */
+}

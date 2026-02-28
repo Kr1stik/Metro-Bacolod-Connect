@@ -25,7 +25,6 @@ import { BACOLOD_LOCATIONS } from "../constants/locations";
 import { canCreateListings, canAccessTrash, canManagePost, isAdmin } from "../constants/roles";
 import DOMPurify from 'dompurify';
 
-// --- Rating Stars Component ---
 const RatingStars = ({ rating }: { rating: number }) => {
   const stars = [];
   const full = Math.floor(rating);
@@ -38,7 +37,6 @@ const RatingStars = ({ rating }: { rating: number }) => {
   return <span className="rating-stars">{stars}</span>;
 };
 
-// --- Map Click Handler ---
 function MapClickHandler({ onPin }: { onPin: (coords: [number, number]) => void }) {
   useMapEvents({ click(e) { onPin([e.latlng.lat, e.latlng.lng]); } });
   return null;
@@ -63,7 +61,6 @@ const LOCATION_COORDS: Record<string, [number, number]> = {
 };
 const BACOLOD_CENTER: [number, number] = [10.6840, 122.9510];
 
-// --- UPDATED: Robust Image Compression Utility ---
 async function compressImage(file: File, maxWidth = 1920, quality = 0.8): Promise<File> {
   if (!file.type.startsWith('image/')) return file;
   return new Promise((resolve) => {
@@ -83,7 +80,6 @@ async function compressImage(file: File, maxWidth = 1920, quality = 0.8): Promis
         ctx.drawImage(img, 0, 0, width, height);
         canvas.toBlob((blob) => {
           if (!blob) {
-            console.warn("Compression produced null blob, using original.");
             resolve(file);
           } else {
             resolve(new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' }));
@@ -91,14 +87,10 @@ async function compressImage(file: File, maxWidth = 1920, quality = 0.8): Promis
           URL.revokeObjectURL(img.src);
         }, 'image/jpeg', quality);
       } catch (e) {
-        console.error("Compression Logic Error:", e);
-        resolve(file); // Fallback
+        resolve(file); 
       }
     };
-    img.onerror = () => {
-      console.error("Image load failed for compression.");
-      resolve(file); // Fallback
-    };
+    img.onerror = () => resolve(file);
     img.src = URL.createObjectURL(file);
   });
 }
@@ -115,20 +107,24 @@ function calculateMortgage(propertyPrice: number, downPaymentPercent: number, an
   return { monthlyPayment, totalPayment, totalInterest, principal, downPayment };
 }
 
-function parsePriceToNumber(priceStr: string): number {
+// 🔥 BUG FIX: Safely parse numbers without crashing if data is weird
+function parsePriceToNumber(priceStr: any): number {
   if (!priceStr) return 0;
-  const cleaned = priceStr.toLowerCase().replace(/[^0-9.]/g, ' ').trim();
+  const str = String(priceStr).toLowerCase().trim();
+  const cleaned = str.replace(/[^0-9.]/g, ' ').trim();
   const parts = cleaned.split(/\s+/);
   const num = parseFloat(parts[0]);
   if (isNaN(num)) return 0;
-  if (priceStr.toLowerCase().includes('million')) return num * 1_000_000;
-  if (priceStr.toLowerCase().includes('billion')) return num * 1_000_000_000;
+  if (str.includes('million')) return num * 1_000_000;
+  if (str.includes('billion')) return num * 1_000_000_000;
   return num;
 }
 
-function formatPriceDisplay(price: string): string {
+// 🔥 BUG FIX: Safely format price for display
+function formatPriceDisplay(price: any): string {
+  if (!price) return 'Contact for price';
   const num = parsePriceToNumber(price);
-  if (num <= 0) return price;
+  if (num <= 0) return String(price);
   if (num >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(num % 1_000_000_000 === 0 ? 0 : 1)} Billion PHP`;
   if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(num % 1_000_000 === 0 ? 0 : 1)} Million PHP`;
   return `₱${num.toLocaleString()}`;
@@ -202,7 +198,6 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Auto-open listing from shared URL
   useEffect(() => {
     const listingId = searchParams.get('listing');
     if (listingId && posts.length > 0) {
@@ -338,7 +333,6 @@ export default function Dashboard() {
     setImageFiles([]); setListingPinCoords(null); setCreateMapStyle('street');
   };
 
-  // --- UPDATED: handleCreateListing with Parallel Uploads & Debug Logging ---
   const handleCreateListing = async () => {
     if (!canCreateListings(userData?.role, user?.email)) return glassToast.error("Only sellers can create listings.");
     if (!listingTitle.trim() || !listingLocation || !listingPrice.trim() || imageFiles.length === 0 || !listingPinCoords) {
@@ -346,7 +340,6 @@ export default function Dashboard() {
     }
 
     setIsUploading(true);
-    console.log("🚀 [UPLOAD] Starting parallel upload process...");
 
     try {
       const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
@@ -356,33 +349,19 @@ export default function Dashboard() {
         throw new Error("Missing Cloudinary configuration in .env");
       }
 
-      // Parallel Image Upload logic
-      const uploadPromises = imageFiles.map(async (file, index) => {
-        console.log(`📸 [IMG ${index + 1}] Compressing...`);
+      const uploadPromises = imageFiles.map(async (file) => {
         const compressed = await compressImage(file);
-        
-        console.log(`📤 [IMG ${index + 1}] Sending to Cloudinary...`);
         const formData = new FormData();
         formData.append("file", compressed);
         formData.append("upload_preset", UPLOAD_PRESET);
         formData.append("cloud_name", CLOUD_NAME);
-
         const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, { method: "POST", body: formData });
-        
-        if (!response.ok) {
-          const errData = await response.json();
-          console.error(`❌ [IMG ${index + 1}] Cloudinary Error:`, errData);
-          throw new Error(`Failed to upload image ${index + 1}`);
-        }
-
+        if (!response.ok) throw new Error(`Failed to upload image`);
         const data = await response.json();
-        console.log(`✅ [IMG ${index + 1}] Success:`, data.secure_url);
         return data.secure_url;
       });
 
       const imageUrls = await Promise.all(uploadPromises);
-      console.log("📋 [UPLOAD] All images finished. Saving to Firebase...");
-
       const amenitiesArray = listingAmenities.split(",").map((a) => a.trim()).filter((a) => a.length > 0);
       const safeTitle = DOMPurify.sanitize(listingTitle);
       const safeDescription = DOMPurify.sanitize(listingDescription);
@@ -416,16 +395,14 @@ export default function Dashboard() {
         isArchived: false,
       });
 
-      console.log("💾 [DASHBOARD] Listing saved successfully.");
       glassToast.success("Listing published!"); resetCreateForm(); setShowCreateModal(false);
     } catch (error: any) { 
-      console.error("🔥 [CRITICAL] Publishing Failure:", error);
       glassToast.error(error.message || "Failed to publish listing."); 
     } 
     finally { setIsUploading(false); }
   };
 
-  const startEdit = (post: any) => { setEditingPostId(post.id); setEditTitle(post.title || ''); setEditCaption(post.content || ''); setEditPrice(post.price?.toString() || ''); setEditLocation(post.location || ''); setEditStatus(post.status || 'For Sale'); setEditType(post.type || 'House & Lot'); setEditRooms(post.rooms?.toString() || ''); setEditBathrooms(post.bathrooms?.toString() || ''); setEditLotArea(post.lotArea || ''); setEditFloorArea(post.floorArea || ''); setEditYearBuilt(post.yearBuilt?.toString() || ''); setEditAmenities(post.amenities || ''); setEditImages(post.images || [post.image]); setNewEditFiles([]); setActiveDropdown(null); };
+  const startEdit = (post: any) => { setEditingPostId(post.id); setEditTitle(post.title || ''); setEditCaption(post.content || ''); setEditPrice(post.price?.toString() || ''); setEditLocation(post.location || ''); setEditStatus(post.status || 'For Sale'); setEditType(post.type || 'House & Lot'); setEditRooms(post.rooms?.toString() || ''); setEditBathrooms(post.bathrooms?.toString() || ''); setEditLotArea(post.lotArea || ''); setEditFloorArea(post.floorArea || ''); setEditYearBuilt(post.yearBuilt?.toString() || ''); setEditAmenities(Array.isArray(post.amenities) ? post.amenities.join(', ') : post.amenities || ''); setEditImages(post.images || [post.image]); setNewEditFiles([]); setActiveDropdown(null); };
   const handleEditFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => { if (e.target.files) setNewEditFiles([...newEditFiles, ...Array.from(e.target.files)]); };
   const removeEditImage = (index: number) => { setEditImages(prev => prev.filter((_, i) => i !== index)); };
   const removeNewEditFile = (index: number) => { setNewEditFiles(prev => prev.filter((_, i) => i !== index)); };
@@ -449,7 +426,7 @@ export default function Dashboard() {
         const data = await response.json(); if (data.secure_url) newUrls.push(data.secure_url);
       }
       const finalImages = [...editImages, ...newUrls];
-      await updateDoc(postRef, { title: editTitle, content: editCaption, price: editPrice, location: editLocation, status: editStatus, type: editType, rooms: editRooms, bathrooms: editBathrooms, lotArea: editLotArea, floorArea: editFloorArea, yearBuilt: editYearBuilt, amenities: editAmenities, images: finalImages, image: finalImages[0] });
+      await updateDoc(postRef, { title: editTitle, content: editCaption, price: editPrice, location: editLocation, status: editStatus, type: editType, rooms: editRooms, bathrooms: editBathrooms, lotArea: editLotArea, floorArea: editFloorArea, yearBuilt: editYearBuilt, amenities: editAmenities.split(",").map((a) => a.trim()).filter(Boolean), images: finalImages, image: finalImages[0] });
       glassToast.success("Listing updated!"); setEditingPostId(null);
     } catch (error) { glassToast.error("Failed to update listing"); } 
     finally { setIsUploading(false); }
@@ -549,7 +526,6 @@ export default function Dashboard() {
   };
 
   const handleReport = async (listing: any) => {
-    // Check if user already reported this listing
     try {
       const existingReports = await getDocs(query(collection(db, "reports"), where("postId", "==", listing.id), where("reportedBy", "==", user.uid)));
       if (!existingReports.empty) { glassToast.info("You've already reported this listing."); return; }
@@ -566,8 +542,8 @@ export default function Dashboard() {
     } catch { glassToast.error("Failed to submit report."); }
   };
 
-  const nextImage = (e: React.MouseEvent) => { e.stopPropagation(); const imgs = selectedListing?.images || [selectedListing?.image]; setCarouselIndex((prev: number) => (prev + 1) % imgs.length); };
-  const prevImage = (e: React.MouseEvent) => { e.stopPropagation(); const imgs = selectedListing?.images || [selectedListing?.image]; setCarouselIndex((prev: number) => (prev - 1 + imgs.length) % imgs.length); };
+  const nextImage = (e: React.MouseEvent) => { e.stopPropagation(); const rawImgs = selectedListing?.images; const imgs = Array.isArray(rawImgs) && rawImgs.length > 0 ? rawImgs : [selectedListing?.image]; setCarouselIndex((prev: number) => (prev + 1) % imgs.length); };
+  const prevImage = (e: React.MouseEvent) => { e.stopPropagation(); const rawImgs = selectedListing?.images; const imgs = Array.isArray(rawImgs) && rawImgs.length > 0 ? rawImgs : [selectedListing?.image]; setCarouselIndex((prev: number) => (prev - 1 + imgs.length) % imgs.length); };
 
   const allListings = posts.map(post => ({
     id: post.id, title: post.title || post.content?.split('\n')[0]?.substring(0, 40) || 'New Listing', rooms: post.rooms || 0, bathrooms: post.bathrooms || 0, lotArea: post.lotArea || 'N/A',
@@ -580,14 +556,13 @@ export default function Dashboard() {
     if (filterLocation && filterLocation !== "All" && listing.location !== filterLocation) return false;
     if (listingSearchQuery.trim()) { const sq = listingSearchQuery.toLowerCase(); if (!listing.title.toLowerCase().includes(sq) && !listing.description.toLowerCase().includes(sq) && !listing.location.toLowerCase().includes(sq) && !listing.agentName.toLowerCase().includes(sq)) return false; }
     if (filterPrice) { const num = parsePriceToNumber(listing.price); if (filterPrice === "under1m" && num >= 1000000) return false; if (filterPrice === "1m-3m" && (num < 1000000 || num > 3000000)) return false; if (filterPrice === "3m-5m" && (num < 3000000 || num > 5000000)) return false; if (filterPrice === "over5m" && num <= 5000000) return false; }
-    if (filterStatus) { const matchStatus = filterStatus === "RFO" ? "Ready for Occupancy" : filterStatus; if (listing.status !== matchStatus) return false; }
+    if (filterStatus && listing.status !== filterStatus) return false;
     if (filterType && listing.type !== filterType) return false;
     return true;
   });
 
   return (
     <div className="dashboard-revamp">
-      {/* ========== NAVBAR ========== */}
       <nav className="dash-nav">
         <div className="dash-nav-left">
           <img src={logo} alt="MBC" className="dash-logo" onClick={() => navigate("/dashboard")} />
@@ -678,7 +653,7 @@ export default function Dashboard() {
             </div>
             <div className="dash-filter-pill">
               <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-                <option value="">Status</option><option value="For Sale">For Sale</option><option value="Pre-Selling">Pre-Selling</option><option value="RFO">Ready for Occupancy</option><option value="For Lease">For Lease</option>
+                <option value="">Status</option><option value="For Sale">For Sale</option><option value="For Rent">For Rent</option><option value="Sold">Sold</option><option value="Reserved">Reserved</option>
               </select>
               <FaChevronDown className="pill-arrow" />
             </div>
@@ -741,6 +716,7 @@ export default function Dashboard() {
 
       {canCreateListings(userData?.role, user?.email) && ( <button className="agent-fab" onClick={() => setShowCreateModal(true)} title="Create Listing"><FaPlus size={20} /></button> )}
 
+      {/* CREATE MODAL */}
       {showCreateModal && (
         <div className="create-listing-overlay" onClick={() => setShowCreateModal(false)}>
           <div className="create-listing-modal" onClick={(e) => e.stopPropagation()}>
@@ -751,7 +727,7 @@ export default function Dashboard() {
                 <div className="create-listing-field"><label>Price (₱) *</label><input type="number" className="create-listing-input" placeholder="e.g. 1000000" value={listingPrice} onChange={(e) => { const v = e.target.value; if (v === '' || Number(v) >= 0) setListingPrice(v); }} min="0" />{listingPrice && <span style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '4px' }}>Display: {formatPriceDisplay(listingPrice)}</span>}</div>
                 <div className="create-listing-field"><label>Location *</label><select className="create-listing-select" value={listingLocation} onChange={(e) => setListingLocation(e.target.value)}><option value="" disabled>Select location</option>{BACOLOD_LOCATIONS.map((loc) => (<option key={loc} value={loc}>{loc}</option>))}</select></div>
               </div>
-              <div className="create-listing-row"><div className="create-listing-field"><label>Status</label><select className="create-listing-select" value={listingStatus} onChange={(e) => setListingStatus(e.target.value)}><option value="For Sale">For Sale</option><option value="Pre-Selling">Pre-Selling</option><option value="Ready for Occupancy">Ready for Occupancy</option><option value="For Lease">For Lease</option></select></div><div className="create-listing-field"><label>Type</label><select className="create-listing-select" value={listingType} onChange={(e) => setListingType(e.target.value)}><option value="House & Lot">House & Lot</option><option value="Lot Only">Lot Only</option><option value="Condo">Condo</option><option value="Commercial">Commercial</option></select></div></div>
+              <div className="create-listing-row"><div className="create-listing-field"><label>Status</label><select className="create-listing-select" value={listingStatus} onChange={(e) => setListingStatus(e.target.value)}><option value="For Sale">For Sale</option><option value="For Rent">For Rent</option><option value="Sold">Sold</option><option value="Reserved">Reserved</option></select></div><div className="create-listing-field"><label>Type</label><select className="create-listing-select" value={listingType} onChange={(e) => setListingType(e.target.value)}><option value="House & Lot">House & Lot</option><option value="Lot Only">Lot Only</option><option value="Condo">Condo</option><option value="Commercial">Commercial</option></select></div></div>
               <div className="create-listing-section-title">Property Details</div>
               <div className="create-listing-row create-listing-row-4"><div className="create-listing-field"><label>Bedrooms</label><input type="number" className="create-listing-input" placeholder="0" min="0" value={listingRooms} onChange={(e) => setListingRooms(e.target.value)} /></div><div className="create-listing-field"><label>Bathrooms</label><input type="number" className="create-listing-input" placeholder="0" min="0" value={listingBathrooms} onChange={(e) => setListingBathrooms(e.target.value)} /></div><div className="create-listing-field"><label>Lot Area</label><input type="text" className="create-listing-input" placeholder="e.g. 200 sqm" value={listingLotArea} onChange={(e) => setListingLotArea(e.target.value)} /></div><div className="create-listing-field"><label>Floor Area</label><input type="text" className="create-listing-input" placeholder="e.g. 140 sqm" value={listingFloorArea} onChange={(e) => setListingFloorArea(e.target.value)} /></div></div>
               <div className="create-listing-row"><div className="create-listing-field"><label>Year Built</label><input type="number" className="create-listing-input" placeholder="e.g. 2024" min="1900" max="2030" value={listingYearBuilt} onChange={(e) => setListingYearBuilt(e.target.value)} /></div><div className="create-listing-field"><label>Amenities</label><input type="text" className="create-listing-input" placeholder="Separate by commas" value={listingAmenities} onChange={(e) => setListingAmenities(e.target.value)} /></div></div>
@@ -778,7 +754,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ========== EDIT POST MODAL ========== */}
+      {/* EDIT MODAL */}
       {editingPostId && (
         <div className="create-listing-overlay" onClick={() => setEditingPostId(null)}>
           <div className="create-listing-modal" onClick={e => e.stopPropagation()}>
@@ -789,7 +765,7 @@ export default function Dashboard() {
                 <div className="create-listing-field"><label>Price (₱) *</label><input type="number" className="create-listing-input" placeholder="e.g. 1000000" value={editPrice} onChange={(e) => { const v = e.target.value; if (v === '' || Number(v) >= 0) setEditPrice(v); }} min="0" />{editPrice && <span style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '4px' }}>Display: {formatPriceDisplay(editPrice)}</span>}</div>
                 <div className="create-listing-field"><label>Location *</label><select className="create-listing-select" value={editLocation} onChange={(e) => setEditLocation(e.target.value)}><option value="" disabled>Select location</option>{BACOLOD_LOCATIONS.map((loc) => (<option key={loc} value={loc}>{loc}</option>))}</select></div>
               </div>
-              <div className="create-listing-row"><div className="create-listing-field"><label>Status</label><select className="create-listing-select" value={editStatus} onChange={(e) => setEditStatus(e.target.value)}><option value="For Sale">For Sale</option><option value="Pre-Selling">Pre-Selling</option><option value="Ready for Occupancy">Ready for Occupancy</option><option value="For Lease">For Lease</option></select></div><div className="create-listing-field"><label>Type</label><select className="create-listing-select" value={editType} onChange={(e) => setEditType(e.target.value)}><option value="House & Lot">House & Lot</option><option value="Lot Only">Lot Only</option><option value="Condo">Condo</option><option value="Commercial">Commercial</option></select></div></div>
+              <div className="create-listing-row"><div className="create-listing-field"><label>Status</label><select className="create-listing-select" value={editStatus} onChange={(e) => setEditStatus(e.target.value)}><option value="For Sale">For Sale</option><option value="For Rent">For Rent</option><option value="Sold">Sold</option><option value="Reserved">Reserved</option></select></div><div className="create-listing-field"><label>Type</label><select className="create-listing-select" value={editType} onChange={(e) => setEditType(e.target.value)}><option value="House & Lot">House & Lot</option><option value="Lot Only">Lot Only</option><option value="Condo">Condo</option><option value="Commercial">Commercial</option></select></div></div>
               <div className="create-listing-section-title">Property Details</div>
               <div className="create-listing-row create-listing-row-4"><div className="create-listing-field"><label>Bedrooms</label><input type="number" className="create-listing-input" placeholder="0" min="0" value={editRooms} onChange={(e) => setEditRooms(e.target.value)} /></div><div className="create-listing-field"><label>Bathrooms</label><input type="number" className="create-listing-input" placeholder="0" min="0" value={editBathrooms} onChange={(e) => setEditBathrooms(e.target.value)} /></div><div className="create-listing-field"><label>Lot Area</label><input type="text" className="create-listing-input" placeholder="e.g. 200 sqm" value={editLotArea} onChange={(e) => setEditLotArea(e.target.value)} /></div><div className="create-listing-field"><label>Floor Area</label><input type="text" className="create-listing-input" placeholder="e.g. 140 sqm" value={editFloorArea} onChange={(e) => setEditFloorArea(e.target.value)} /></div></div>
               <div className="create-listing-row"><div className="create-listing-field"><label>Year Built</label><input type="number" className="create-listing-input" placeholder="e.g. 2024" min="1900" max="2030" value={editYearBuilt} onChange={(e) => setEditYearBuilt(e.target.value)} /></div><div className="create-listing-field"><label>Amenities</label><input type="text" className="create-listing-input" placeholder="Separate by commas" value={editAmenities} onChange={(e) => setEditAmenities(e.target.value)} /></div></div>
@@ -807,17 +783,26 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ========== LISTING DETAIL MODAL ========== */}
+      {/* DETAIL MODAL (BULLETPROOFED) */}
       {selectedListing && (() => {
-        const imgs = selectedListing.images?.length > 0 ? selectedListing.images : [selectedListing.image];
-        const listingCoords = selectedListing.pinCoords || LOCATION_COORDS[selectedListing.location] || BACOLOD_CENTER;
-        const listingPrice = parsePriceToNumber(selectedListing.price);
-        const propertyPrice = listingPrice;
+        // 🔥 SAFEGUARD 1: Fallback if images array is malformed or missing
+        const rawImgs = selectedListing.images;
+        const fallbackImg = selectedListing.image || 'https://via.placeholder.com/600x400?text=No+Image';
+        const imgs = Array.isArray(rawImgs) && rawImgs.length > 0 ? rawImgs : [fallbackImg];
+        
+        // 🔥 SAFEGUARD 2: Fallback if map coordinates are corrupted
+        let listingCoords = selectedListing.pinCoords || LOCATION_COORDS[selectedListing.location];
+        if (!Array.isArray(listingCoords) || listingCoords.length !== 2 || typeof listingCoords[0] !== 'number' || typeof listingCoords[1] !== 'number') {
+          listingCoords = BACOLOD_CENTER;
+        }
+
+        const propertyPrice = parsePriceToNumber(selectedListing.price);
         const downPaymentError = mortgageDownPayment < 10 ? 'Minimum 10%' : mortgageDownPayment > 50 ? 'Maximum 50%' : '';
         const rateError = mortgageRate < 3 ? 'Minimum 3%' : mortgageRate > 12 ? 'Maximum 12%' : '';
         const termError = mortgageTerm < 5 ? 'Minimum 5 years' : mortgageTerm > 30 ? 'Maximum 30 years' : '';
         const hasValidationError = !!(downPaymentError || rateError || termError || propertyPrice <= 0);
         const mortgage = !hasValidationError && propertyPrice > 0 ? calculateMortgage(propertyPrice, mortgageDownPayment, mortgageRate, mortgageTerm) : null;
+        
         return (
           <div className="listing-modal-overlay" onClick={closeListingModal}>
             <div className="listing-modal" onClick={(e) => e.stopPropagation()}>
@@ -842,7 +827,7 @@ export default function Dashboard() {
               <div className="listing-modal-tabs">
                 <button className={`listing-modal-tab ${activeModalTab === 'details' ? 'listing-modal-tab-active' : ''}`} onClick={() => setActiveModalTab('details')}><FaHome size={13} /> Details</button>
                 <button className={`listing-modal-tab ${activeModalTab === 'map' ? 'listing-modal-tab-active' : ''}`} onClick={() => setActiveModalTab('map')}><FaMap size={13} /> Map</button>
-                {listingPrice > 0 && ( <button className={`listing-modal-tab ${activeModalTab === 'calculator' ? 'listing-modal-tab-active' : ''}`} onClick={() => setActiveModalTab('calculator')}><FaCalculator size={13} /> Calculator</button> )}
+                {propertyPrice > 0 && ( <button className={`listing-modal-tab ${activeModalTab === 'calculator' ? 'listing-modal-tab-active' : ''}`} onClick={() => setActiveModalTab('calculator')}><FaCalculator size={13} /> Calculator</button> )}
               </div>
               <div className="listing-modal-body" key={activeModalTab}>
                 {activeModalTab === 'details' && (
@@ -857,7 +842,17 @@ export default function Dashboard() {
                         {selectedListing.yearBuilt > 0 && ( <div className="listing-detail-item"><FaCalendarAlt className="listing-detail-icon" /><div><span className="listing-detail-value">{selectedListing.yearBuilt}</span><span className="listing-detail-label">Year Built</span></div></div> )}
                       </div>
                       <div className="listing-modal-section"><h4 className="listing-modal-section-title">Description</h4><p className="listing-modal-desc">{selectedListing.fullDescription || selectedListing.description}</p></div>
-                      {selectedListing.amenities?.length > 0 && ( <div className="listing-modal-section"><h4 className="listing-modal-section-title">Amenities & Features</h4><div className="listing-modal-amenities">{selectedListing.amenities.map((a: string, i: number) => (<span key={i} className="listing-amenity-tag">{a}</span>))}</div></div> )}
+                      
+                      {/* 🔥 SAFEGUARD 3: Ensure amenities is actually an Array before calling .map */}
+                      {Array.isArray(selectedListing.amenities) && selectedListing.amenities.length > 0 && ( 
+                        <div className="listing-modal-section">
+                          <h4 className="listing-modal-section-title">Amenities & Features</h4>
+                          <div className="listing-modal-amenities">
+                            {selectedListing.amenities.map((a: string, i: number) => (<span key={i} className="listing-amenity-tag">{a}</span>))}
+                          </div>
+                        </div> 
+                      )}
+
                       <div className="listing-modal-meta"><span>Type: <strong>{selectedListing.type}</strong></span><span>Listed: <strong>{selectedListing.listedDate || 'Recently'}</strong></span></div>
                     </div>
                     <div className="listing-modal-agent-card">

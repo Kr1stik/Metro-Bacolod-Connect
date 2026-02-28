@@ -11,7 +11,7 @@ import {
   FaMapMarkerAlt, FaShare, FaChevronLeft, FaChevronRight,
   FaBed, FaBath, FaRulerCombined, FaCalendarAlt, FaPhoneAlt,
   FaHeart, FaRegHeart, FaMap, FaCalculator, FaBookmark, FaPen,
-  FaFacebookF, FaTwitter, FaInstagram
+  FaFacebookF, FaTwitter, FaInstagram, FaFlag
 } from "react-icons/fa";
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -23,7 +23,6 @@ import { glassToast } from "../components/GlassToast";
 import { BACOLOD_LOCATIONS } from "../constants/locations";
 import { canCreateListings, canAccessTrash, canManagePost } from "../constants/roles";
 import DOMPurify from 'dompurify';
-import { compressImage } from '../utils';
 
 // --- Fix Leaflet default marker icons ---
 // @ts-ignore
@@ -36,27 +35,45 @@ L.Icon.Default.mergeOptions({
 
 // --- Bacolod location coordinates ---
 const LOCATION_COORDS: Record<string, [number, number]> = {
-  "Alijis": [10.6560, 122.9280],
-  "Banago": [10.7050, 122.9520],
-  "Bata": [10.6870, 122.9580],
-  "Cabug": [10.7200, 122.9400],
-  "Estefania": [10.6790, 122.9530],
-  "Felisa": [10.7010, 122.9500],
-  "Granada": [10.6720, 122.9350],
-  "Handumanan": [10.6480, 122.9530],
-  "Mandalagan": [10.6920, 122.9430],
-  "Mansilingan": [10.6590, 122.9680],
-  "Montevista": [10.6650, 122.9420],
-  "Pahanocoy": [10.6700, 122.9600],
-  "Punta Taytay": [10.7100, 122.9630],
-  "Singcang-Airport": [10.6480, 122.9320],
-  "Sum-ag": [10.6370, 122.9400],
-  "Taculing": [10.6530, 122.9500],
-  "Tangub": [10.7150, 122.9420],
-  "Villamonte": [10.6750, 122.9500],
+  "Alijis": [10.6560, 122.9280], "Banago": [10.7050, 122.9520], "Bata": [10.6870, 122.9580],
+  "Cabug": [10.7200, 122.9400], "Estefania": [10.6790, 122.9530], "Felisa": [10.7010, 122.9500],
+  "Granada": [10.6720, 122.9350], "Handumanan": [10.6480, 122.9530], "Mandalagan": [10.6920, 122.9430],
+  "Mansilingan": [10.6590, 122.9680], "Montevista": [10.6650, 122.9420], "Pahanocoy": [10.6700, 122.9600],
+  "Punta Taytay": [10.7100, 122.9630], "Singcang-Airport": [10.6480, 122.9320], "Sum-ag": [10.6370, 122.9400],
+  "Taculing": [10.6530, 122.9500], "Tangub": [10.7150, 122.9420], "Villamonte": [10.6750, 122.9500],
   "Vista Alegre": [10.6690, 122.9480],
 };
 const BACOLOD_CENTER: [number, number] = [10.6840, 122.9510];
+
+// --- Image Compression Utility ---
+async function compressImage(file: File, maxWidth = 1920, quality = 0.8): Promise<File> {
+  if (!file.type.startsWith('image/')) return file;
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error("Canvas failed");
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob((blob) => {
+          if (!blob) resolve(file);
+          else resolve(new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' }));
+          URL.revokeObjectURL(img.src);
+        }, 'image/jpeg', quality);
+      } catch (e) { resolve(file); }
+    };
+    img.onerror = () => resolve(file);
+    img.src = URL.createObjectURL(file);
+  });
+}
 
 // --- Mortgage Calculator ---
 function calculateMortgage(propertyPrice: number, downPaymentPercent: number, annualRate: number, termYears: number) {
@@ -64,30 +81,31 @@ function calculateMortgage(propertyPrice: number, downPaymentPercent: number, an
   const principal = propertyPrice - downPayment;
   const monthlyRate = annualRate / 100 / 12;
   const totalPayments = termYears * 12;
-  if (monthlyRate === 0) {
-    return { monthlyPayment: principal / totalPayments, totalPayment: principal, totalInterest: 0, principal, downPayment };
-  }
+  if (monthlyRate === 0) return { monthlyPayment: principal / totalPayments, totalPayment: principal, totalInterest: 0, principal, downPayment };
   const monthlyPayment = principal * (monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / (Math.pow(1 + monthlyRate, totalPayments) - 1);
   const totalPayment = monthlyPayment * totalPayments;
   const totalInterest = totalPayment - principal;
   return { monthlyPayment, totalPayment, totalInterest, principal, downPayment };
 }
 
-function parsePriceToNumber(priceStr: string): number {
+// 🔥 BUG FIX: Safely parse numbers
+function parsePriceToNumber(priceStr: any): number {
   if (!priceStr) return 0;
-  const cleaned = priceStr.toLowerCase().replace(/[^0-9.]/g, ' ').trim();
+  const str = String(priceStr).toLowerCase().trim();
+  const cleaned = str.replace(/[^0-9.]/g, ' ').trim();
   const parts = cleaned.split(/\s+/);
   const num = parseFloat(parts[0]);
   if (isNaN(num)) return 0;
-  if (priceStr.toLowerCase().includes('million')) return num * 1_000_000;
-  if (priceStr.toLowerCase().includes('billion')) return num * 1_000_000_000;
+  if (str.includes('million')) return num * 1_000_000;
+  if (str.includes('billion')) return num * 1_000_000_000;
   return num;
 }
 
-// --- Format price number for display ---
-function formatPriceDisplay(price: string): string {
+// 🔥 BUG FIX: Safely format price
+function formatPriceDisplay(price: any): string {
+  if (!price) return 'Contact for price';
   const num = parsePriceToNumber(price);
-  if (num <= 0) return price;
+  if (num <= 0) return String(price);
   if (num >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(num % 1_000_000_000 === 0 ? 0 : 1)} Billion PHP`;
   if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(num % 1_000_000 === 0 ? 0 : 1)} Million PHP`;
   return `₱${num.toLocaleString()}`;
@@ -106,13 +124,9 @@ const RatingStars = ({ rating }: { rating: number }) => {
   return <span className="rating-stars">{stars}</span>;
 };
 
-// --- Map Click Handler for pin placement ---
+// --- Map Click Handler ---
 function MapClickHandler({ onPin }: { onPin: (coords: [number, number]) => void }) {
-  useMapEvents({
-    click(e) {
-      onPin([e.latlng.lat, e.latlng.lng]);
-    },
-  });
+  useMapEvents({ click(e) { onPin([e.latlng.lat, e.latlng.lng]); } });
   return null;
 }
 
@@ -134,14 +148,15 @@ const formatPostData = (d: any) => {
     amenities: p.amenities || [],
     agentName: p.userName || 'Unknown Agent',
     agentRating: p.agentRating || 0,
-    agentPhone: p.phone || 'N/A',
+    agentPhone: p.userPhone || 'N/A',
     agentAvatar: p.userAvatar || 'https://ui-avatars.com/api/?name=U&rounded=true',
     image: p.images?.[0] || p.image || '',
     images: p.images || (p.image ? [p.image] : []),
     status: p.status || 'For Sale',
     type: p.type || 'Property',
+    pinCoords: p.pinCoords || null,
     listedDate: p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently',
-    originalPost: { ...p, id: d.id },
+    originalPost: { ...p, id: d.id, userId: p.userId },
   };
 };
 
@@ -149,10 +164,10 @@ export default function Profile() {
   const { userId: routeUserId } = useParams<{ userId?: string }>();
   const [user, setUser] = useState<any>(null);
   const [userData, setUserData] = useState<any>(null);
-  const [myPosts, setMyPosts] = useState<any[]>([]); // User's own dynamic posts
+  const [myPosts, setMyPosts] = useState<any[]>([]); 
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
-  const [likedPosts, setLikedPosts] = useState<any[]>([]); // Posts the user has liked
-  const [savedPosts, setSavedPosts] = useState<any[]>([]); // Posts the user has saved
+  const [likedPosts, setLikedPosts] = useState<any[]>([]); 
+  const [savedPosts, setSavedPosts] = useState<any[]>([]); 
   const [profileTab, setProfileTab] = useState<'recent' | 'liked' | 'saved'>('recent');
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
@@ -195,6 +210,24 @@ export default function Profile() {
   const [listingPinCoords, setListingPinCoords] = useState<[number, number] | null>(null);
   const [createMapStyle, setCreateMapStyle] = useState<'street' | 'satellite'>('street');
 
+  // Edit Listing Modal State
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editPrice, setEditPrice] = useState("");
+  const [editLocation, setEditLocation] = useState("");
+  const [editStatus, setEditStatus] = useState("For Sale");
+  const [editType, setEditType] = useState("House & Lot");
+  const [editRooms, setEditRooms] = useState("");
+  const [editBathrooms, setEditBathrooms] = useState("");
+  const [editLotArea, setEditLotArea] = useState("");
+  const [editFloorArea, setEditFloorArea] = useState("");
+  const [editYearBuilt, setEditYearBuilt] = useState("");
+  const [editAmenities, setEditAmenities] = useState("");
+  const [editCaption, setEditCaption] = useState("");
+  const [editImages, setEditImages] = useState<string[]>([]);
+  const [newEditFiles, setNewEditFiles] = useState<File[]>([]);
+  const editFileRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
       if (!currentUser) {
@@ -208,7 +241,6 @@ export default function Profile() {
             setUserData(userSnap.data());
           }
 
-          // Fetch the current user's actual posts (exclude trashed/archived)
           const postsQuery = query(
             collection(db, "posts"),
             where("userId", "==", currentUser.uid)
@@ -229,7 +261,6 @@ export default function Profile() {
     return () => unsubscribe();
   }, [navigate]);
 
-  // Fetch own posts from Firestore
   useEffect(() => {
     if (!user?.uid) return;
     const fetchMyPosts = async () => {
@@ -242,34 +273,7 @@ export default function Profile() {
         const postsSnap = await getDocs(postsQuery);
         const ownPosts = postsSnap.docs
           .filter(d => !d.data().isArchived && !d.data().isDeleted)
-          .map(d => {
-            const p = d.data();
-            return {
-              id: d.id,
-              title: p.title || p.content?.split('\n')[0]?.substring(0, 40) || 'New Listing',
-              rooms: p.rooms || 0,
-              bathrooms: p.bathrooms || 0,
-              lotArea: p.lotArea || 'N/A',
-              floorArea: p.floorArea || 'N/A',
-              yearBuilt: p.yearBuilt || 0,
-              location: p.location || 'Bacolod',
-              price: p.price || 'Contact for price',
-              description: p.content || 'No description provided.',
-              fullDescription: p.content || 'No description provided.',
-              amenities: p.amenities || [],
-              agentName: p.userName || 'Unknown Agent',
-              agentRating: p.agentRating || 0,
-              agentPhone: p.userPhone || 'N/A',
-              agentAvatar: p.userAvatar || 'https://ui-avatars.com/api/?name=U&rounded=true',
-              image: p.images?.[0] || p.image || '',
-              images: p.images || (p.image ? [p.image] : []),
-              status: p.status || 'For Sale',
-              type: p.type || 'Property',
-              pinCoords: p.pinCoords || null,
-              listedDate: p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently',
-              originalPost: { ...p, id: d.id, userId: p.userId },
-            };
-          });
+          .map(formatPostData);
         setMyPosts(ownPosts);
       } catch (err) {
         console.error("Error fetching own posts:", err);
@@ -278,7 +282,6 @@ export default function Profile() {
     fetchMyPosts();
   }, [user?.uid]);
 
-  // Fetch viewed agent's data and posts when viewing another profile
   useEffect(() => {
     if (!routeUserId || routeUserId === user?.uid) {
       setViewedUser(null);
@@ -294,7 +297,6 @@ export default function Profile() {
           setViewedUserData(userSnap.data());
           setViewedUser({ uid: routeUserId, ...userSnap.data() });
         }
-        // Fetch their posts dynamically
         const postsQuery = query(
           collection(db, "posts"),
           where("userId", "==", routeUserId),
@@ -312,7 +314,6 @@ export default function Profile() {
     fetchAgent();
   }, [routeUserId, user?.uid]);
 
-  // Fetch liked posts for the current profile user
   useEffect(() => {
     const targetUid = isViewingOther ? routeUserId : user?.uid;
     if (!targetUid) return;
@@ -335,7 +336,6 @@ export default function Profile() {
     fetchLikedPosts();
   }, [user?.uid, routeUserId, isViewingOther]);
 
-  // Fetch saved posts (M3)
   useEffect(() => {
     const targetUid = isViewingOther ? routeUserId : user?.uid;
     if (!targetUid) return;
@@ -358,8 +358,7 @@ export default function Profile() {
     fetchSavedPosts();
   }, [user?.uid, routeUserId, isViewingOther]);
 
-  // --- DELETE LISTING FROM PROFILE (M11) ---
-  const handleDeletePost = async (postId: string) => {
+  const handleDelete = async (postId: string) => {
     setActiveDropdown(null);
     const result = await Swal.fire({
       title: 'Move to Trash?', text: "Items in trash will be deleted after 30 days.",
@@ -391,25 +390,35 @@ export default function Profile() {
     }
   };
 
-  // --- NEW: Real Firebase Chat Inquiry ---
+  // 🔥 ADDED MISSING REPORT FUNCTION
+  const handleReport = async (listing: any) => {
+    try {
+      const existingReports = await getDocs(query(collection(db, "reports"), where("postId", "==", listing.id), where("reportedBy", "==", user.uid)));
+      if (!existingReports.empty) { glassToast.info("You've already reported this listing."); return; }
+    } catch { /* proceed if check fails */ }
+    const { value: reason } = await Swal.fire({
+      title: 'Report Listing', input: 'select', inputOptions: { 'misleading': 'Misleading Information', 'inappropriate': 'Inappropriate Content', 'scam': 'Suspected Scam', 'duplicate': 'Duplicate Listing', 'other': 'Other' },
+      inputPlaceholder: 'Select a reason', showCancelButton: true, confirmButtonColor: '#111827', confirmButtonText: 'Submit Report',
+      inputValidator: (value) => { if (!value) return 'Please select a reason.'; },
+    });
+    if (!reason) return;
+    try {
+      await addDoc(collection(db, "reports"), { postId: listing.id, postTitle: listing.title, reportedBy: user.uid, reporterName: userData?.firstName ? `${userData.firstName} ${userData.lastName}` : user.displayName, reason, status: 'pending', createdAt: new Date().toISOString() });
+      glassToast.success("Report submitted. We'll review it shortly.");
+    } catch { glassToast.error("Failed to submit report."); }
+  };
+
   const handleInquire = async (listing?: any) => {
     if (!listing) return;
-
     const agentId = listing.originalPost?.userId;
-    
-    // Prevent messaging yourself
-    if (user?.uid === agentId) {
-      return glassToast.info("You cannot inquire about your own listing.");
-    }
+    if (user?.uid === agentId) return glassToast.info("You cannot inquire about your own listing.");
 
     try {
-      // 1. Create a unique, deterministic ID so a Client and Agent only ever share ONE chat room
       const ids = [user.uid, agentId].sort();
       const chatId = `${ids[0]}_${ids[1]}`;
       const chatRef = doc(db, "chats", chatId);
       const chatSnap = await getDoc(chatRef);
 
-      // 2. If they have never chatted before, create the chat document
       if (!chatSnap.exists()) {
           await setDoc(chatRef, {
               participants: [user.uid, agentId],
@@ -425,22 +434,15 @@ export default function Profile() {
               },
               lastMessage: `Interested in: ${listing.title}`,
               updatedAt: new Date(),
-              hasUnread: {
-                  [user.uid]: false, 
-                  [agentId]: true 
-              }
+              hasUnread: { [user.uid]: false, [agentId]: true }
           });
-          // 3. Send an automatic first message on behalf of the client
           await addDoc(collection(db, `chats/${chatId}/messages`), {
               text: `Hi ${listing.agentName}, I am interested in your listing: "${listing.title}" located in ${listing.location}. Is it still available?`,
               senderId: user.uid,
               createdAt: new Date()
           });
       }
-
-      // 4. Teleport the user to the messages page
       navigate('/messages');
-
     } catch (error) {
       console.error(error);
       glassToast.error("Failed to start chat.");
@@ -448,8 +450,8 @@ export default function Profile() {
   };
 
   const handleShare = async (listing: any) => {
-    const shareUrl = window.location.href;
-    const shareText = `Check out this listing: ${listing.title} - ${listing.price}`;
+    const shareUrl = `${window.location.origin}/dashboard?listing=${listing.id}`;
+    const shareText = `Check out this listing: ${listing.title} - ${formatPriceDisplay(listing.price)}`;
     await Swal.fire({
       title: '<span style="font-weight:600;font-size:1.1rem;">Share Listing</span>',
       html: `
@@ -468,11 +470,9 @@ export default function Profile() {
     });
   };
 
-  // --- Listing Modal Handlers ---
   const openListingModal = (listing: any) => {
     setSelectedListing(listing);
     setCarouselIndex(0);
-    // Check if current user already liked this post
     const likedBy = listing.originalPost?.likedBy || [];
     setIsLiked(user?.uid ? likedBy.includes(user.uid) : false);
     setActiveModalTab('details');
@@ -494,7 +494,7 @@ export default function Profile() {
       } else {
         await updateDoc(postRef, { likedBy: arrayRemove(user.uid) });
       }
-      // Update local posts state so re-opening the modal reflects the change
+      
       const updatePosts = (prev: any[]) => prev.map(p => {
         if (p.id === selectedListing.id) {
           const currentLikedBy = p.originalPost?.likedBy || [];
@@ -512,9 +512,8 @@ export default function Profile() {
       });
       setMyPosts(updatePosts);
       setViewedPosts(updatePosts);
-      // Update liked posts tab
+      
       if (newLiked) {
-        // Add to liked posts if not already there
         setLikedPosts(prev => {
           if (prev.some(p => p.id === selectedListing.id)) return prev;
           return [selectedListing, ...prev];
@@ -533,19 +532,36 @@ export default function Profile() {
     setShowShareSocials(false);
   };
 
+  const handleToggleSave = async (postId: string) => {
+    if (!user?.uid) return;
+    const postRef = doc(db, "posts", postId);
+    try {
+      const postSnap = await getDoc(postRef);
+      const savedBy = postSnap.data()?.savedBy || [];
+      if (savedBy.includes(user.uid)) {
+        await updateDoc(postRef, { savedBy: arrayRemove(user.uid) });
+        glassToast.info("Removed from saved.");
+      } else {
+        await updateDoc(postRef, { savedBy: arrayUnion(user.uid) });
+        glassToast.success("Listing saved!");
+      }
+    } catch { glassToast.error("Failed to save listing."); }
+  };
+
   const nextImage = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const imgs = selectedListing?.images || [selectedListing?.image];
+    const rawImgs = selectedListing?.images;
+    const imgs = Array.isArray(rawImgs) && rawImgs.length > 0 ? rawImgs : [selectedListing?.image];
     setCarouselIndex((prev: number) => (prev + 1) % imgs.length);
   };
 
   const prevImage = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const imgs = selectedListing?.images || [selectedListing?.image];
+    const rawImgs = selectedListing?.images;
+    const imgs = Array.isArray(rawImgs) && rawImgs.length > 0 ? rawImgs : [selectedListing?.image];
     setCarouselIndex((prev: number) => (prev - 1 + imgs.length) % imgs.length);
   };
 
-  // --- Create Listing Handlers ---
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) setImageFiles([...imageFiles, ...Array.from(e.target.files)]);
   };
@@ -555,119 +571,185 @@ export default function Profile() {
   };
 
   const resetCreateForm = () => {
-    setListingTitle("");
-    setListingDescription("");
-    setListingPrice("");
-    setListingLocation("");
-    setListingStatus("For Sale");
-    setListingType("House & Lot");
-    setListingRooms("");
-    setListingBathrooms("");
-    setListingLotArea("");
-    setListingFloorArea("");
-    setListingYearBuilt("");
-    setListingAmenities("");
-    setImageFiles([]);
-    setListingPinCoords(null);
-    setCreateMapStyle('street');
+    setListingTitle(""); setListingDescription(""); setListingPrice(""); setListingLocation("");
+    setListingStatus("For Sale"); setListingType("House & Lot"); setListingRooms(""); setListingBathrooms("");
+    setListingLotArea(""); setListingFloorArea(""); setListingYearBuilt(""); setListingAmenities("");
+    setImageFiles([]); setListingPinCoords(null); setCreateMapStyle('street');
   };
 
   const handleCreateListing = async () => {
     if (!canCreateListings(userData?.role, user?.email)) return glassToast.error("Only agents can create listings.");
-    if (!listingTitle.trim()) return glassToast.warning("Enter a listing title.");
-    if (!listingLocation) return glassToast.warning("Select a location.");
-    if (!listingPrice.trim()) return glassToast.warning("Enter a price.");
-    if (imageFiles.length === 0) return glassToast.warning("Upload at least 1 image.");
-    if (!listingPinCoords) return glassToast.warning("Pin the listing location on the map.");
+    if (!listingTitle.trim() || !listingLocation || !listingPrice.trim() || imageFiles.length === 0 || !listingPinCoords) {
+      return glassToast.warning("Please fill all required fields and pin the location.");
+    }
 
     setIsUploading(true);
+
     try {
-      const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-      const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+      const idToken = await user.getIdToken(true);
+      const formData = new FormData();
+      
+      const safeTitle = DOMPurify.sanitize(listingTitle);
+      const safeDescription = DOMPurify.sanitize(listingDescription);
 
-      if (!CLOUD_NAME || !UPLOAD_PRESET) {
-        throw new Error("Missing Cloudinary configuration in .env");
-      }
-      const imageUrls: string[] = [];
+      formData.append('title', safeTitle);
+      formData.append('content', safeDescription);
+      formData.append('location', listingLocation);
+      formData.append('price', listingPrice);
+      formData.append('status', listingStatus); 
+      formData.append('type', listingType);
+      formData.append('rooms', listingRooms || '0');
+      formData.append('bathrooms', listingBathrooms || '0');
+      formData.append('lotArea', listingLotArea || 'N/A');
+      formData.append('floorArea', listingFloorArea || 'N/A');
+      formData.append('yearBuilt', listingYearBuilt || '0');
+      
+      const amenitiesArray = listingAmenities.split(",").map((a) => a.trim()).filter((a) => a.length > 0);
+      formData.append('amenities', JSON.stringify(amenitiesArray));
+      formData.append('pinCoords', JSON.stringify(listingPinCoords));
+      
+      formData.append('userName', userData?.firstName ? `${userData.firstName} ${userData.lastName}` : (user.displayName || "Metro User"));
+      formData.append('userAvatar', user.photoURL || "");
+      formData.append('userCustomId', userData?.customId || "USER");
+      formData.append('userRole', userData?.role || "Client");
+      formData.append('userPhone', userData?.mobile || "N/A");
 
-      for (const file of imageFiles) {
+      const uploadPromises = imageFiles.map(async (file) => {
         const compressed = await compressImage(file);
+        formData.append('images', compressed); 
+      });
+      await Promise.all(uploadPromises);
+
+      const API_URL = import.meta.env.VITE_API_URL || 'https://metro-bacolod-connect.onrender.com';
+      
+      const response = await fetch(`${API_URL}/posts/create`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${idToken}` },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.message || "Backend rejected the upload.");
+      }
+
+      // Refresh the posts after a short delay to let Firebase sync
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+
+      glassToast.success("Listing published successfully!"); 
+      resetCreateForm(); 
+      setShowCreateModal(false);
+
+    } catch (error: any) { 
+      console.error("🔥 [CRITICAL] Upload Failure:", error);
+      glassToast.error(error.message || "Failed to contact backend API."); 
+    } finally { 
+      setIsUploading(false); 
+    }
+  };
+
+  const startEdit = (post: any) => {
+    setEditingPostId(post.id);
+    setEditTitle(post.title || '');
+    setEditCaption(post.content || '');
+    setEditPrice(post.price?.toString() || '');
+    setEditLocation(post.location || '');
+    setEditStatus(post.status || 'For Sale');
+    setEditType(post.type || 'House & Lot');
+    setEditRooms(post.rooms?.toString() || '');
+    setEditBathrooms(post.bathrooms?.toString() || '');
+    setEditLotArea(post.lotArea || '');
+    setEditFloorArea(post.floorArea || '');
+    setEditYearBuilt(post.yearBuilt?.toString() || '');
+    setEditAmenities(Array.isArray(post.amenities) ? post.amenities.join(', ') : post.amenities || '');
+    setEditImages(post.images || [post.image]);
+    setNewEditFiles([]);
+    setActiveDropdown(null);
+  };
+
+  const handleEditFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) setNewEditFiles([...newEditFiles, ...Array.from(e.target.files)]);
+  };
+
+  const removeEditImage = (index: number) => {
+    setEditImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeNewEditFile = (index: number) => {
+    setNewEditFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const saveEdit = async () => {
+    if (!editingPostId) return;
+    if (editImages.length === 0 && newEditFiles.length === 0) return glassToast.warning("Post must have at least one image.");
+    setIsUploading(true);
+    try {
+      const postRef = doc(db, "posts", editingPostId);
+      const postSnap = await getDoc(postRef);
+      if (!postSnap.exists() || !canManagePost(user?.uid, postSnap.data()?.userId, user?.email, userData?.role)) {
+        glassToast.error("You don't have permission to edit this post.");
+        setIsUploading(false);
+        return;
+      }
+      const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || "dg6kzqq5n";
+      const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || "jdj7tsar";
+      const newUrls: string[] = [];
+      for (const file of newEditFiles) {
         const formData = new FormData();
-        formData.append("file", compressed);
+        formData.append("file", file);
         formData.append("upload_preset", UPLOAD_PRESET);
         formData.append("cloud_name", CLOUD_NAME);
         const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, { method: "POST", body: formData });
         const data = await response.json();
-        if (data.secure_url) imageUrls.push(data.secure_url);
-        else throw new Error("Image upload failed");
+        if (data.secure_url) newUrls.push(data.secure_url);
       }
+      const finalImages = [...editImages, ...newUrls];
+      
+      const safeTitle = DOMPurify.sanitize(editTitle);
+      const safeCaption = DOMPurify.sanitize(editCaption);
+      const amenitiesArray = editAmenities.split(",").map((a) => a.trim()).filter((a) => a.length > 0);
 
-      const amenitiesArray = listingAmenities
-        .split(",")
-        .map((a) => a.trim())
-        .filter((a) => a.length > 0);
+      const updatedData = { 
+        title: safeTitle, 
+        content: safeCaption, 
+        price: editPrice, 
+        location: editLocation, 
+        status: editStatus, 
+        type: editType, 
+        rooms: parseInt(editRooms) || 0, 
+        bathrooms: parseInt(editBathrooms) || 0, 
+        lotArea: editLotArea || "N/A", 
+        floorArea: editFloorArea || "N/A", 
+        yearBuilt: parseInt(editYearBuilt) || 0, 
+        amenities: amenitiesArray, 
+        images: finalImages, 
+        image: finalImages[0] 
+      };
 
-      await addDoc(collection(db, "posts"), {
-        userId: user.uid,
-        userName: userData?.firstName ? `${userData.firstName} ${userData.lastName}` : (user.displayName || "Metro User"),
-        userAvatar: user.photoURL,
-        userCustomId: userData?.customId || "USER",
-        userRole: userData?.role || "Client",
-        title: DOMPurify.sanitize(listingTitle),
-        content: DOMPurify.sanitize(listingDescription),
-        location: listingLocation,
-        price: listingPrice,
-        status: listingStatus,
-        type: listingType,
-        rooms: parseInt(listingRooms) || 0,
-        bathrooms: parseInt(listingBathrooms) || 0,
-        lotArea: listingLotArea || "N/A",
-        floorArea: listingFloorArea || "N/A",
-        yearBuilt: parseInt(listingYearBuilt) || 0,
-        amenities: amenitiesArray,
-        images: imageUrls,
-        image: imageUrls[0],
-        pinCoords: listingPinCoords,
-        createdAt: new Date().toISOString(),
-        likes: 0,
-        likedBy: [],
-        savedBy: [],
-        isArchived: false,
-      });
-
-      glassToast.success("Listing published!");
-      resetCreateForm();
-      setShowCreateModal(false);
-      // Optional: Refresh myPosts here so the UI instantly shows the new listing
-    } catch (error: any) {
-      console.error(error);
-      glassToast.error("Failed to publish: " + error.message);
+      await updateDoc(postRef, updatedData);
+      
+      setMyPosts(prev => prev.map(p => p.id === editingPostId ? { ...p, ...updatedData, originalPost: { ...p.originalPost, ...updatedData } } : p));
+      
+      glassToast.success("Listing updated!");
+      setEditingPostId(null);
+    } catch (error) {
+      glassToast.error("Failed to update listing");
     } finally {
       setIsUploading(false);
     }
   };
 
-  // Use viewed agent data if viewing another profile, otherwise own data
   const profileData = isViewingOther ? viewedUserData : userData;
   const profileUser = isViewingOther ? viewedUser : user;
-
-  // Navbar always shows the logged-in user
-  const navDisplayName = userData?.firstName
-    ? `${userData.firstName} ${userData.lastName}`
-    : user?.displayName || "User";
-
-  // Profile sidebar shows the viewed agent (or self)
-  const displayName = profileData?.firstName
-    ? `${profileData.firstName} ${profileData.lastName}`
-    : profileUser?.displayName || profileUser?.userName || "User";
-
+  const navDisplayName = userData?.firstName ? `${userData.firstName} ${userData.lastName}` : user?.displayName || "User";
+  const displayName = profileData?.firstName ? `${profileData.firstName} ${profileData.lastName}` : profileUser?.displayName || profileUser?.userName || "User";
   const userRole = userData?.role || "Client";
   const isAgent = canCreateListings(userData?.role, user?.email);
   
-  // This completely removes the mock data dependency!
   const profileListings = isViewingOther ? viewedPosts : myPosts;
 
-  // Search/filter state for listings
   const [listingSearchQuery, setListingSearchQuery] = useState("");
   const [listingFilterStatus, setListingFilterStatus] = useState("all");
 
@@ -686,13 +768,11 @@ export default function Profile() {
 
   return (
     <div className="profile-page">
-      {/* ========== BLACK BLOBS (background) ========== */}
       <div className="profile-blob profile-blob-1" />
       <div className="profile-blob profile-blob-2" />
       <div className="profile-blob profile-blob-3" />
       <div className="profile-blob profile-blob-4" />
 
-      {/* ========== NAVBAR (same as Dashboard) ========== */}
       <nav className="dash-nav">
         <div className="dash-nav-left">
           <img
@@ -712,7 +792,6 @@ export default function Profile() {
         </div>
         <div className="dash-nav-right" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           
-          {/* --- NEW DESKTOP MESSAGES ICON --- */}
           <div 
             onClick={() => navigate('/messages')} 
             style={{ cursor: 'pointer', color: '#4b5563', display: 'flex', alignItems: 'center', transition: '0.2s' }} 
@@ -782,7 +861,6 @@ export default function Profile() {
         </div>
       </nav>
 
-      {/* ========== MAIN CONTENT ========== */}
       {isLoadingProfile && !userData ? (
         <div className="profile-content">
           <aside className="profile-sidebar"><SkeletonProfile /></aside>
@@ -790,7 +868,6 @@ export default function Profile() {
         </div>
       ) : (
       <div className="profile-content">
-        {/* --- LEFT: Profile Info --- */}
         <aside className="profile-sidebar">
           <div className="profile-avatar-wrapper">
             <img
@@ -830,9 +907,7 @@ export default function Profile() {
           )}
         </aside>
 
-        {/* --- RIGHT: Posts with Tabs --- */}
         <section className="profile-posts-section">
-          {/* Tab Switcher + Search/Filter */}
           <div className="profile-tabs" style={{ flexWrap: 'wrap', gap: '10px' }}>
             <div style={{ display: 'flex', gap: '0', flex: 'none' }}>
               <button
@@ -892,7 +967,6 @@ export default function Profile() {
                 )}
                 {filteredListings.map((listing) => (
                   <div className="glass-listing-card profile-card" key={listing.id} onClick={() => openListingModal(listing)} style={{ cursor: 'pointer' }}>
-                    {/* Card Info - Left */}
                     <div className="glass-card-content">
                       <div>
                         <h3 className="glass-card-title">
@@ -933,7 +1007,6 @@ export default function Profile() {
                       </div>
                     </div>
 
-                    {/* Card Right - Image + Inquire */}
                     <div className="glass-card-right">
                       <div className="glass-card-image">
                         {listing.image && (
@@ -948,13 +1021,20 @@ export default function Profile() {
                       </button>
                     </div>
 
-                    {/* Owner Actions (M11) */}
                     {!isViewingOther && canManagePost(user?.uid, listing.originalPost?.userId, user?.email, userData?.role) && (
                       <div className="glass-card-actions">
                         <button onClick={(e) => { e.stopPropagation(); setActiveDropdown(activeDropdown === listing.id ? null : listing.id); }} className="glass-dots-btn">&#8942;</button>
                         {activeDropdown === listing.id && (
                           <div className="glass-action-dropdown">
-                            <button onClick={(e) => { e.stopPropagation(); handleDeletePost(listing.id); }} className="glass-delete-btn"><FaTrash size={11} /> Delete</button>
+                            <button onClick={(e) => { e.stopPropagation(); startEdit(listing.originalPost); }}>
+                              <FaPen size={11} /> Edit
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); handleShare(listing); }}>
+                              <FaShare size={11} /> Share
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); handleDelete(listing.id); }} className="glass-delete-btn">
+                              <FaTrash size={11} /> Delete
+                            </button>
                           </div>
                         )}
                       </div>
@@ -973,7 +1053,6 @@ export default function Profile() {
                 )}
                 {filteredLikedPosts.map((listing) => (
                   <div className="glass-listing-card profile-card" key={listing.id} onClick={() => openListingModal(listing)} style={{ cursor: 'pointer' }}>
-                    {/* Card Info - Left */}
                     <div className="glass-card-content">
                       <div>
                         <h3 className="glass-card-title">
@@ -1014,7 +1093,6 @@ export default function Profile() {
                       </div>
                     </div>
 
-                    {/* Card Right - Image + Inquire */}
                     <div className="glass-card-right">
                       <div className="glass-card-image">
                         {listing.image && (
@@ -1086,15 +1164,12 @@ export default function Profile() {
       {showCreateModal && (
         <div className="create-listing-overlay" onClick={() => setShowCreateModal(false)}>
           <div className="create-listing-modal" onClick={(e) => e.stopPropagation()}>
-            {/* Header */}
             <div className="create-listing-header">
               <h2>New Listing</h2>
               <FaTimes className="create-listing-close" onClick={() => setShowCreateModal(false)} />
             </div>
 
-            {/* Scrollable Body */}
             <div className="create-listing-body">
-              {/* Title */}
               <div className="create-listing-field">
                 <label>Listing Title *</label>
                 <input
@@ -1106,7 +1181,6 @@ export default function Profile() {
                 />
               </div>
 
-              {/* Two-column row: Price + Location */}
               <div className="create-listing-row">
                 <div className="create-listing-field">
                   <label>Price (₱) *</label>
@@ -1138,7 +1212,6 @@ export default function Profile() {
                 </div>
               </div>
 
-              {/* Two-column row: Status + Type */}
               <div className="create-listing-row">
                 <div className="create-listing-field">
                   <label>Status</label>
@@ -1148,9 +1221,9 @@ export default function Profile() {
                     onChange={(e) => setListingStatus(e.target.value)}
                   >
                     <option value="For Sale">For Sale</option>
-                    <option value="Pre-Selling">Pre-Selling</option>
-                    <option value="Ready for Occupancy">Ready for Occupancy</option>
-                    <option value="For Lease">For Lease</option>
+                    <option value="For Rent">For Rent</option>
+                    <option value="Sold">Sold</option>
+                    <option value="Reserved">Reserved</option>
                   </select>
                 </div>
                 <div className="create-listing-field">
@@ -1168,10 +1241,8 @@ export default function Profile() {
                 </div>
               </div>
 
-              {/* Section Title */}
               <div className="create-listing-section-title">Property Details</div>
 
-              {/* Four-column row: Rooms, Bathrooms, Lot Area, Floor Area */}
               <div className="create-listing-row create-listing-row-4">
                 <div className="create-listing-field">
                   <label>Bedrooms</label>
@@ -1217,7 +1288,6 @@ export default function Profile() {
                 </div>
               </div>
 
-              {/* Year Built */}
               <div className="create-listing-row">
                 <div className="create-listing-field">
                   <label>Year Built</label>
@@ -1236,25 +1306,23 @@ export default function Profile() {
                   <input
                     type="text"
                     className="create-listing-input"
-                    placeholder="Separate by commas (e.g. Pool, Gym, Parking)"
+                    placeholder="Separate by commas"
                     value={listingAmenities}
                     onChange={(e) => setListingAmenities(e.target.value)}
                   />
                 </div>
               </div>
 
-              {/* Description */}
               <div className="create-listing-field">
                 <label>Description</label>
                 <textarea
                   className="create-listing-textarea"
-                  placeholder="Describe the property, its features, and surroundings..."
+                  placeholder="Describe the property..."
                   value={listingDescription}
                   onChange={(e) => setListingDescription(e.target.value)}
                 />
               </div>
 
-              {/* Image Upload */}
               <div className="create-listing-section-title">Photos *</div>
               <div className="create-listing-photos">
                 {imageFiles.map((file, i) => (
@@ -1280,9 +1348,7 @@ export default function Profile() {
                 />
               </div>
 
-              {/* Pin Location on Map */}
               <div className="create-listing-section-title">Pin Location on Map *</div>
-              <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: '0 0 8px 0' }}>Click on the map to place a pin where the property is located.</p>
               <div className="create-listing-map-wrapper">
                 <div className="create-listing-map-toggle">
                   <button
@@ -1307,9 +1373,9 @@ export default function Profile() {
                   key={`create-map-${listingLocation}-${createMapStyle}`}
                 >
                   {createMapStyle === 'street' ? (
-                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap' />
+                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                   ) : (
-                    <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" attribution='&copy; Esri' />
+                    <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" />
                   )}
                   <MapClickHandler onPin={(coords) => setListingPinCoords(coords)} />
                   {listingPinCoords && (
@@ -1318,15 +1384,9 @@ export default function Profile() {
                     </Marker>
                   )}
                 </MapContainer>
-                {listingPinCoords && (
-                  <p style={{ fontSize: '0.72rem', color: '#10b981', marginTop: '6px', fontWeight: 500 }}>
-                    <FaMapMarkerAlt size={10} /> Pinned at {listingPinCoords[0].toFixed(5)}, {listingPinCoords[1].toFixed(5)}
-                  </p>
-                )}
               </div>
             </div>
 
-            {/* Footer */}
             <div className="create-listing-footer">
               <button className="create-listing-cancel" onClick={() => { resetCreateForm(); setShowCreateModal(false); }}>
                 Cancel
@@ -1339,384 +1399,240 @@ export default function Profile() {
         </div>
       )}
 
-      {/* ========== LISTING DETAIL MODAL ========== */}
-      {selectedListing && (() => {
-        const imgs = selectedListing.images?.length > 0 ? selectedListing.images : [selectedListing.image];
-        const listingCoords = selectedListing.pinCoords || LOCATION_COORDS[selectedListing.location] || BACOLOD_CENTER;
-        const listingPrice = parsePriceToNumber(selectedListing.price);
-        const propertyPrice = listingPrice;
+      {/* ========== EDIT POST MODAL ========== */}
+      {editingPostId && (
+        <div className="create-listing-overlay" onClick={() => setEditingPostId(null)}>
+          <div className="create-listing-modal" onClick={e => e.stopPropagation()}>
+            <div className="create-listing-header">
+              <h2>Edit Listing</h2>
+              <FaTimes className="create-listing-close" onClick={() => setEditingPostId(null)} />
+            </div>
+            
+            <div className="create-listing-body">
+              <div className="create-listing-field">
+                <label>Listing Title *</label>
+                <input type="text" className="create-listing-input" placeholder="e.g. Greenfield Residences" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+              </div>
+              
+              <div className="create-listing-row">
+                <div className="create-listing-field">
+                  <label>Price (₱) *</label>
+                  <input type="number" className="create-listing-input" placeholder="e.g. 1000000" value={editPrice} onChange={(e) => { const v = e.target.value; if (v === '' || Number(v) >= 0) setEditPrice(v); }} min="0" />
+                  {editPrice && <span style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '4px' }}>Display: {formatPriceDisplay(editPrice)}</span>}
+                </div>
+                <div className="create-listing-field">
+                  <label>Location *</label>
+                  <select className="create-listing-select" value={editLocation} onChange={(e) => setEditLocation(e.target.value)}>
+                    <option value="" disabled>Select location</option>
+                    {BACOLOD_LOCATIONS.map((loc) => (<option key={loc} value={loc}>{loc}</option>))}
+                  </select>
+                </div>
+              </div>
+              
+              <div className="create-listing-row">
+                <div className="create-listing-field">
+                  <label>Status</label>
+                  <select className="create-listing-select" value={editStatus} onChange={(e) => setEditStatus(e.target.value)}>
+                    <option value="For Sale">For Sale</option>
+                    <option value="For Rent">For Rent</option>
+                    <option value="Sold">Sold</option>
+                    <option value="Reserved">Reserved</option>
+                  </select>
+                </div>
+                <div className="create-listing-field">
+                  <label>Type</label>
+                  <select className="create-listing-select" value={editType} onChange={(e) => setEditType(e.target.value)}>
+                    <option value="House & Lot">House & Lot</option>
+                    <option value="Lot Only">Lot Only</option>
+                    <option value="Condo">Condo</option>
+                    <option value="Commercial">Commercial</option>
+                  </select>
+                </div>
+              </div>
 
-        // Validation (price comes from listing, no price validation needed)
+              <div className="create-listing-section-title">Property Details</div>
+              <div className="create-listing-row create-listing-row-4">
+                <div className="create-listing-field">
+                  <label>Bedrooms</label>
+                  <input type="number" className="create-listing-input" placeholder="0" min="0" value={editRooms} onChange={(e) => setEditRooms(e.target.value)} />
+                </div>
+                <div className="create-listing-field">
+                  <label>Bathrooms</label>
+                  <input type="number" className="create-listing-input" placeholder="0" min="0" value={editBathrooms} onChange={(e) => setEditBathrooms(e.target.value)} />
+                </div>
+                <div className="create-listing-field">
+                  <label>Lot Area</label>
+                  <input type="text" className="create-listing-input" placeholder="e.g. 200 sqm" value={editLotArea} onChange={(e) => setEditLotArea(e.target.value)} />
+                </div>
+                <div className="create-listing-field">
+                  <label>Floor Area</label>
+                  <input type="text" className="create-listing-input" placeholder="e.g. 140 sqm" value={editFloorArea} onChange={(e) => setEditFloorArea(e.target.value)} />
+                </div>
+              </div>
+              
+              <div className="create-listing-row">
+                <div className="create-listing-field">
+                  <label>Year Built</label>
+                  <input type="number" className="create-listing-input" placeholder="e.g. 2024" min="1900" max="2030" value={editYearBuilt} onChange={(e) => setEditYearBuilt(e.target.value)} />
+                </div>
+                <div className="create-listing-field">
+                  <label>Amenities</label>
+                  <input type="text" className="create-listing-input" placeholder="Separate by commas" value={editAmenities} onChange={(e) => setEditAmenities(e.target.value)} />
+                </div>
+              </div>
+
+              <div className="create-listing-field">
+                <label>Description</label>
+                <textarea className="create-listing-textarea" placeholder="Describe the property..." value={editCaption} onChange={(e) => setEditCaption(e.target.value)} />
+              </div>
+              
+              <div className="create-listing-section-title">Photos *</div>
+              <div className="create-listing-photos">
+                {editImages.map((img, i) => (
+                  <div key={i} className="create-listing-photo-item">
+                    <img src={img} alt="" />
+                    <button onClick={() => removeEditImage(i)} className="create-listing-photo-remove">&#215;</button>
+                  </div>
+                ))}
+                {newEditFiles.map((file, i) => (
+                  <div key={`new-${i}`} className="create-listing-photo-item new-file">
+                    <img src={URL.createObjectURL(file)} alt="" />
+                    <button onClick={() => removeNewEditFile(i)} className="create-listing-photo-remove">&#215;</button>
+                  </div>
+                ))}
+                <button className="create-listing-photo-add" onClick={() => editFileRef.current?.click()}>
+                  <FaImage size={20} /><span>Add Photos</span>
+                </button>
+                <input type="file" ref={editFileRef} hidden accept="image/*" multiple onChange={handleEditFileSelect} />
+              </div>
+            </div>
+
+            <div className="create-listing-footer">
+              <button className="create-listing-cancel" onClick={() => setEditingPostId(null)}>Cancel</button>
+              <button className="create-listing-publish" onClick={saveEdit} disabled={isUploading}>
+                {isUploading ? <><FaSpinner className="spin" /> Saving...</> : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========== LISTING DETAIL MODAL (BULLETPROOF) ========== */}
+      {selectedListing && (() => {
+        // 🔥 SAFEGUARD 1: Fallback if images array is malformed or missing
+        const rawImgs = selectedListing.images;
+        const fallbackImg = selectedListing.image || 'https://via.placeholder.com/600x400?text=No+Image';
+        const imgs = Array.isArray(rawImgs) && rawImgs.length > 0 ? rawImgs : [fallbackImg];
+        
+        // 🔥 SAFEGUARD 2: Fallback if map coordinates are corrupted
+        let listingCoords = selectedListing.pinCoords || LOCATION_COORDS[selectedListing.location];
+        if (!Array.isArray(listingCoords) || listingCoords.length !== 2 || typeof listingCoords[0] !== 'number' || typeof listingCoords[1] !== 'number') {
+          listingCoords = BACOLOD_CENTER;
+        }
+
+        const propertyPrice = parsePriceToNumber(selectedListing.price);
         const downPaymentError = mortgageDownPayment < 10 ? 'Minimum 10%' : mortgageDownPayment > 50 ? 'Maximum 50%' : '';
         const rateError = mortgageRate < 3 ? 'Minimum 3%' : mortgageRate > 12 ? 'Maximum 12%' : '';
         const termError = mortgageTerm < 5 ? 'Minimum 5 years' : mortgageTerm > 30 ? 'Maximum 30 years' : '';
         const hasValidationError = !!(downPaymentError || rateError || termError || propertyPrice <= 0);
         const mortgage = !hasValidationError && propertyPrice > 0 ? calculateMortgage(propertyPrice, mortgageDownPayment, mortgageRate, mortgageTerm) : null;
+        
         return (
           <div className="listing-modal-overlay" onClick={closeListingModal}>
             <div className="listing-modal" onClick={(e) => e.stopPropagation()}>
-              {/* Image Carousel */}
               <div className="listing-modal-carousel">
-                <img
-                  src={imgs[carouselIndex]}
-                  alt={selectedListing.title}
-                  className="listing-modal-carousel-img"
-                />
+                <img src={imgs[carouselIndex]} alt={selectedListing.title} className="listing-modal-carousel-img" />
                 {imgs.length > 1 && (
                   <>
-                    <button className="carousel-arrow carousel-arrow-left" onClick={prevImage}>
-                      <FaChevronLeft />
-                    </button>
-                    <button className="carousel-arrow carousel-arrow-right" onClick={nextImage}>
-                      <FaChevronRight />
-                    </button>
-                    <div className="carousel-dots">
-                      {imgs.map((_: any, i: number) => (
-                        <span
-                          key={i}
-                          className={`carousel-dot ${i === carouselIndex ? 'carousel-dot-active' : ''}`}
-                          onClick={(e) => { e.stopPropagation(); setCarouselIndex(i); }}
-                        />
-                      ))}
-                    </div>
+                    <button className="carousel-arrow carousel-arrow-left" onClick={prevImage}><FaChevronLeft /></button>
+                    <button className="carousel-arrow carousel-arrow-right" onClick={nextImage}><FaChevronRight /></button>
+                    <div className="carousel-dots">{imgs.map((_: any, i: number) => (<span key={i} className={`carousel-dot ${i === carouselIndex ? 'carousel-dot-active' : ''}`} onClick={(e) => { e.stopPropagation(); setCarouselIndex(i); }} />))}</div>
                   </>
                 )}
-                {/* Status Badge */}
                 <span className="listing-modal-status">{selectedListing.status}</span>
-                {/* Top-Right: Like + Close */}
                 <div className="listing-modal-top-actions">
-                  <button className="listing-modal-like" onClick={(e) => { e.stopPropagation(); handleToggleLike(); }}>
-                    {isLiked ? <FaHeart color="#ef4444" /> : <FaRegHeart />}
-                  </button>
-                  <button className="listing-modal-close" onClick={(e) => { e.stopPropagation(); closeListingModal(); }}>
-                    <FaTimes />
-                  </button>
+                  <button className="listing-modal-like" onClick={(e) => { e.stopPropagation(); handleToggleLike(); }}>{isLiked ? <FaHeart color="#ef4444" /> : <FaRegHeart />}</button>
+                  <button className="listing-modal-like" onClick={(e) => { e.stopPropagation(); handleToggleSave(selectedListing.id); }} title="Save">{selectedListing.originalPost?.savedBy?.includes(user?.uid) ? <FaBookmark color="#f59e0b" /> : <FaRegBookmark />}</button>
+                  <button className="listing-modal-like" onClick={(e) => { e.stopPropagation(); handleReport(selectedListing); }} title="Report"><FaFlag size={14} /></button>
+                  <button className="listing-modal-close" onClick={(e) => { e.stopPropagation(); closeListingModal(); }}><FaTimes /></button>
                 </div>
-                {/* Image Counter */}
                 <span className="listing-modal-counter">{carouselIndex + 1} / {imgs.length}</span>
               </div>
-
-              {/* Tab Navigation */}
               <div className="listing-modal-tabs">
-                <button
-                  className={`listing-modal-tab ${activeModalTab === 'details' ? 'listing-modal-tab-active' : ''}`}
-                  onClick={() => setActiveModalTab('details')}
-                >
-                  <FaHome size={13} /> Details
-                </button>
-                <button
-                  className={`listing-modal-tab ${activeModalTab === 'map' ? 'listing-modal-tab-active' : ''}`}
-                  onClick={() => setActiveModalTab('map')}
-                >
-                  <FaMap size={13} /> Map
-                </button>
-                {listingPrice > 0 && (
-                  <button
-                    className={`listing-modal-tab ${activeModalTab === 'calculator' ? 'listing-modal-tab-active' : ''}`}
-                    onClick={() => setActiveModalTab('calculator')}
-                  >
-                    <FaCalculator size={13} /> Calculator
-                  </button>
-                )}
+                <button className={`listing-modal-tab ${activeModalTab === 'details' ? 'listing-modal-tab-active' : ''}`} onClick={() => setActiveModalTab('details')}><FaHome size={13} /> Details</button>
+                <button className={`listing-modal-tab ${activeModalTab === 'map' ? 'listing-modal-tab-active' : ''}`} onClick={() => setActiveModalTab('map')}><FaMap size={13} /> Map</button>
+                {propertyPrice > 0 && ( <button className={`listing-modal-tab ${activeModalTab === 'calculator' ? 'listing-modal-tab-active' : ''}`} onClick={() => setActiveModalTab('calculator')}><FaCalculator size={13} /> Calculator</button> )}
               </div>
-
-              {/* Modal Body */}
               <div className="listing-modal-body" key={activeModalTab}>
                 {activeModalTab === 'details' && (
                   <>
                     <div className="listing-modal-body-left">
-                      <div className="listing-modal-title-row">
-                        <div>
-                          <h2 className="listing-modal-title">{selectedListing.title}</h2>
-                          <p className="listing-modal-location">
-                            <FaMapMarkerAlt size={12} /> {selectedListing.location}, Bacolod City
-                          </p>
-                        </div>
-                        <div className="listing-modal-price">{formatPriceDisplay(selectedListing.price)}</div>
-                      </div>
-
+                      <div className="listing-modal-title-row"><div><h2 className="listing-modal-title">{selectedListing.title}</h2><p className="listing-modal-location"><FaMapMarkerAlt size={12} /> {selectedListing.location}, Bacolod City</p></div><div className="listing-modal-price">{formatPriceDisplay(selectedListing.price)}</div></div>
                       <div className="listing-modal-details">
-                        {selectedListing.rooms > 0 && (
-                          <div className="listing-detail-item">
-                            <FaBed className="listing-detail-icon" />
-                            <div>
-                              <span className="listing-detail-value">{selectedListing.rooms}</span>
-                              <span className="listing-detail-label">Bedrooms</span>
-                            </div>
-                          </div>
-                        )}
-                        {selectedListing.bathrooms > 0 && (
-                          <div className="listing-detail-item">
-                            <FaBath className="listing-detail-icon" />
-                            <div>
-                              <span className="listing-detail-value">{selectedListing.bathrooms}</span>
-                              <span className="listing-detail-label">Bathrooms</span>
-                            </div>
-                          </div>
-                        )}
-                        <div className="listing-detail-item">
-                          <FaRulerCombined className="listing-detail-icon" />
-                          <div>
-                            <span className="listing-detail-value">{selectedListing.lotArea}</span>
-                            <span className="listing-detail-label">Lot Area</span>
-                          </div>
-                        </div>
-                        {selectedListing.floorArea !== 'N/A' && (
-                          <div className="listing-detail-item">
-                            <FaRulerCombined className="listing-detail-icon" />
-                            <div>
-                              <span className="listing-detail-value">{selectedListing.floorArea}</span>
-                              <span className="listing-detail-label">Floor Area</span>
-                            </div>
-                          </div>
-                        )}
-                        {selectedListing.yearBuilt > 0 && (
-                          <div className="listing-detail-item">
-                            <FaCalendarAlt className="listing-detail-icon" />
-                            <div>
-                              <span className="listing-detail-value">{selectedListing.yearBuilt}</span>
-                              <span className="listing-detail-label">Year Built</span>
-                            </div>
-                          </div>
-                        )}
+                        {selectedListing.rooms > 0 && ( <div className="listing-detail-item"><FaBed className="listing-detail-icon" /><div><span className="listing-detail-value">{selectedListing.rooms}</span><span className="listing-detail-label">Bedrooms</span></div></div> )}
+                        {selectedListing.bathrooms > 0 && ( <div className="listing-detail-item"><FaBath className="listing-detail-icon" /><div><span className="listing-detail-value">{selectedListing.bathrooms}</span><span className="listing-detail-label">Bathrooms</span></div></div> )}
+                        <div className="listing-detail-item"><FaRulerCombined className="listing-detail-icon" /><div><span className="listing-detail-value">{selectedListing.lotArea}</span><span className="listing-detail-label">Lot Area</span></div></div>
+                        {selectedListing.floorArea !== 'N/A' && ( <div className="listing-detail-item"><FaRulerCombined className="listing-detail-icon" /><div><span className="listing-detail-value">{selectedListing.floorArea}</span><span className="listing-detail-label">Floor Area</span></div></div> )}
+                        {selectedListing.yearBuilt > 0 && ( <div className="listing-detail-item"><FaCalendarAlt className="listing-detail-icon" /><div><span className="listing-detail-value">{selectedListing.yearBuilt}</span><span className="listing-detail-label">Year Built</span></div></div> )}
                       </div>
-
-                      <div className="listing-modal-section">
-                        <h4 className="listing-modal-section-title">Description</h4>
-                        <p className="listing-modal-desc">{selectedListing.fullDescription || selectedListing.description}</p>
-                      </div>
-
-                      {selectedListing.amenities?.length > 0 && (
+                      <div className="listing-modal-section"><h4 className="listing-modal-section-title">Description</h4><p className="listing-modal-desc">{selectedListing.fullDescription || selectedListing.description}</p></div>
+                      
+                      {/* 🔥 SAFEGUARD 3: Ensure amenities is an array */}
+                      {Array.isArray(selectedListing.amenities) && selectedListing.amenities.length > 0 && ( 
                         <div className="listing-modal-section">
                           <h4 className="listing-modal-section-title">Amenities & Features</h4>
                           <div className="listing-modal-amenities">
-                            {selectedListing.amenities.map((a: string, i: number) => (
-                              <span key={i} className="listing-amenity-tag">{a}</span>
-                            ))}
+                            {selectedListing.amenities.map((a: string, i: number) => (<span key={i} className="listing-amenity-tag">{a}</span>))}
                           </div>
-                        </div>
+                        </div> 
                       )}
 
-                      <div className="listing-modal-meta">
-                        <span>Type: <strong>{selectedListing.type}</strong></span>
-                        <span>Listed: <strong>{selectedListing.listedDate || 'Recently'}</strong></span>
-                      </div>
+                      <div className="listing-modal-meta"><span>Type: <strong>{selectedListing.type}</strong></span><span>Listed: <strong>{selectedListing.listedDate || 'Recently'}</strong></span></div>
                     </div>
-
                     <div className="listing-modal-agent-card">
-                      <img
-                        src={selectedListing.agentAvatar}
-                        alt={selectedListing.agentName}
-                        className="listing-modal-agent-avatar"
-                        style={{ cursor: 'pointer' }}
-                        onClick={() => {
-                          const agentId = selectedListing.originalPost?.userId;
-                          if (agentId) { closeListingModal(); navigate(`/profile/${agentId}`); }
-                        }}
-                      />
-                      <h4
-                        className="listing-modal-agent-name"
-                        style={{ cursor: 'pointer' }}
-                        onClick={() => {
-                          const agentId = selectedListing.originalPost?.userId;
-                          if (agentId) { closeListingModal(); navigate(`/profile/${agentId}`); }
-                        }}
-                      >{selectedListing.agentName}</h4>
+                      <img src={selectedListing.agentAvatar} alt={selectedListing.agentName} className="listing-modal-agent-avatar" style={{ cursor: 'pointer' }} onClick={() => { const agentId = selectedListing.originalPost?.userId; if (agentId) { closeListingModal(); navigate(`/profile/${agentId}`); } }} />
+                      <h4 className="listing-modal-agent-name" style={{ cursor: 'pointer' }} onClick={() => { const agentId = selectedListing.originalPost?.userId; if (agentId) { closeListingModal(); navigate(`/profile/${agentId}`); } }}>{selectedListing.agentName}</h4>
                       <span className="listing-modal-agent-role">Listing Agent</span>
-                      <div className="listing-modal-agent-rating">
-                        <RatingStars rating={selectedListing.agentRating} />
-                        <span>{selectedListing.agentRating > 0 ? `${selectedListing.agentRating} Stars` : 'No Reviews'}</span>
-                      </div>
-                      {selectedListing.agentPhone && selectedListing.agentPhone !== 'N/A' && (
-                        <p className="listing-modal-agent-phone">
-                          <FaPhoneAlt size={11} /> {selectedListing.agentPhone}
-                        </p>
-                      )}
-                      <button className="listing-modal-inquire-btn" onClick={() => handleInquire(selectedListing)}>
-                        INQUIRE NOW →
-                      </button>
+                      <div className="listing-modal-agent-rating"><RatingStars rating={selectedListing.agentRating} /><span>{selectedListing.agentRating > 0 ? `${selectedListing.agentRating} Stars` : 'No Reviews'}</span></div>
+                      {user?.uid !== selectedListing.originalPost?.userId && ( <button className="listing-modal-share-btn" style={{ marginTop: '6px', fontSize: '0.8rem' }} onClick={() => handleRateAgent(selectedListing.originalPost?.userId, selectedListing.agentName)}><FaStar size={11} /> Rate Agent</button> )}
+                      {selectedListing.agentPhone && selectedListing.agentPhone !== 'N/A' && (<p className="listing-modal-agent-phone"><FaPhoneAlt size={11} /> {selectedListing.agentPhone}</p>)}
+                      <button className="listing-modal-inquire-btn" onClick={() => handleInquire(selectedListing)}>INQUIRE NOW →</button>
                       <div className="listing-modal-share-wrapper">
-                        <button className="listing-modal-share-btn" onClick={() => setShowShareSocials(!showShareSocials)}>
-                          <FaShare size={12} /> Share Listing
-                        </button>
+                        <button className="listing-modal-share-btn" onClick={() => setShowShareSocials(!showShareSocials)}><FaShare size={12} /> Share Listing</button>
                         <div className={`listing-modal-share-socials ${showShareSocials ? 'show' : ''}`}>
-                          <button
-                            className="modal-social-btn modal-social-fb"
-                            title="Share to Facebook"
-                            onClick={() => {
-                              const url = window.location.href;
-                              window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}&quote=${encodeURIComponent(`${selectedListing.title} - ${formatPriceDisplay(selectedListing.price)} in ${selectedListing.location}`)}`, '_blank', 'width=600,height=400');
-                            }}
-                          >
-                            <FaFacebookF size={14} />
-                          </button>
-                          <button
-                            className="modal-social-btn modal-social-tw"
-                            title="Share to X (Twitter)"
-                            onClick={() => {
-                              const url = window.location.href;
-                              const text = `Check out this listing: ${selectedListing.title} - ${formatPriceDisplay(selectedListing.price)} in ${selectedListing.location}`;
-                              window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank', 'width=600,height=400');
-                            }}
-                          >
-                            <FaTwitter size={14} />
-                          </button>
-                          <button
-                            className="modal-social-btn modal-social-ig"
-                            title="Share to Instagram"
-                            onClick={() => {
-                              navigator.clipboard.writeText(`${selectedListing.title} - ${formatPriceDisplay(selectedListing.price)} in ${selectedListing.location}\n${window.location.href}`);
-                              glassToast.success('Link copied! Paste it on Instagram.');
-                            }}
-                          >
-                            <FaInstagram size={14} />
-                          </button>
+                          <button className="modal-social-btn modal-social-fb" title="Share to Facebook" onClick={() => { const url = `${window.location.origin}/dashboard?listing=${selectedListing.id}`; window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}&quote=${encodeURIComponent(`${selectedListing.title} - ${formatPriceDisplay(selectedListing.price)} in ${selectedListing.location}`)}`, '_blank', 'width=600,height=400'); }}><FaFacebookF size={14} /></button>
+                          <button className="modal-social-btn modal-social-tw" title="Share to X (Twitter)" onClick={() => { const url = `${window.location.origin}/dashboard?listing=${selectedListing.id}`; const text = `Check out this listing: ${selectedListing.title} - ${formatPriceDisplay(selectedListing.price)} in ${selectedListing.location}`; window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank', 'width=600,height=400'); }}><FaTwitter size={14} /></button>
+                          <button className="modal-social-btn modal-social-ig" title="Share to Instagram" onClick={() => { const url = `${window.location.origin}/dashboard?listing=${selectedListing.id}`; navigator.clipboard.writeText(`${selectedListing.title} - ${formatPriceDisplay(selectedListing.price)} in ${selectedListing.location}\n${url}`); glassToast.success('Link copied! Paste it on Instagram.'); }}><FaInstagram size={14} /></button>
                         </div>
                       </div>
                     </div>
                   </>
                 )}
-
                 {activeModalTab === 'map' && (
                   <div className="listing-modal-map-container">
-                    <div className="listing-modal-map-header">
-                      <div>
-                        <h3 className="listing-modal-map-title">
-                          <FaMapMarkerAlt size={14} /> {selectedListing.location}, Bacolod City
-                        </h3>
-                        <p className="listing-modal-map-subtitle">Approximate property location</p>
-                      </div>
-                      <div className="listing-modal-map-toggle">
-                        <button className={`map-style-btn ${mapStyle === 'street' ? 'map-style-btn-active' : ''}`} onClick={() => setMapStyle('street')}>Map</button>
-                        <button className={`map-style-btn ${mapStyle === 'satellite' ? 'map-style-btn-active' : ''}`} onClick={() => setMapStyle('satellite')}>Satellite</button>
-                      </div>
-                    </div>
-                    <div className="listing-modal-map-wrapper">
-                      <MapContainer center={listingCoords} zoom={15} style={{ width: '100%', height: '100%', borderRadius: '16px' }} scrollWheelZoom={true} key={`${selectedListing.id}-${mapStyle}`}>
-                        {mapStyle === 'street' ? (
-                          <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                        ) : (
-                          <TileLayer attribution='&copy; <a href="https://www.esri.com/">Esri</a>' url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" />
-                        )}
-                        <Marker position={listingCoords}>
-                          <Popup><strong>{selectedListing.title}</strong><br />{selectedListing.location}, Bacolod City<br />{formatPriceDisplay(selectedListing.price)}</Popup>
-                        </Marker>
-                      </MapContainer>
-                    </div>
+                    <div className="listing-modal-map-header"><div><h3 className="listing-modal-map-title"><FaMapMarkerAlt size={14} /> {selectedListing.location}, Bacolod City</h3><p className="listing-modal-map-subtitle">Approximate property location</p></div><div className="listing-modal-map-toggle"><button className={`map-style-btn ${mapStyle === 'street' ? 'map-style-btn-active' : ''}`} onClick={() => setMapStyle('street')}>Map</button><button className={`map-style-btn ${mapStyle === 'satellite' ? 'map-style-btn-active' : ''}`} onClick={() => setMapStyle('satellite')}>Satellite</button></div></div>
+                    <div className="listing-modal-map-wrapper"><MapContainer center={listingCoords} zoom={15} style={{ width: '100%', height: '100%', borderRadius: '16px' }} scrollWheelZoom={true} key={`${selectedListing.id}-${mapStyle}`}>{mapStyle === 'street' ? ( <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" /> ) : ( <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" /> )}<Marker position={listingCoords}><Popup><strong>{selectedListing.title}</strong><br />{selectedListing.location}, Bacolod City<br />{formatPriceDisplay(selectedListing.price)}</Popup></Marker></MapContainer></div>
                   </div>
                 )}
-
                 {activeModalTab === 'calculator' && (
                   <div className="listing-modal-calculator-container">
-                    <div className="listing-modal-calc-header">
-                      <h3 className="listing-modal-calc-title"><FaCalculator size={14} /> Mortgage Calculator</h3>
-                      <p className="listing-modal-calc-subtitle">Estimate your monthly payments for <strong>{selectedListing.title}</strong></p>
-                    </div>
+                    <div className="listing-modal-calc-header"><h3 className="listing-modal-calc-title"><FaCalculator size={14} /> Mortgage Calculator</h3><p className="listing-modal-calc-subtitle">Estimate your monthly payments for <strong>{selectedListing.title}</strong></p></div>
                     <div className="listing-modal-calc-body">
                       <div className="listing-modal-calc-inputs">
-                        <div className="calc-input-group">
-                          <label className="calc-label">Property Price (₱)</label>
-                          <div className="calc-value-display">₱{propertyPrice.toLocaleString()}</div>
-                        </div>
-                        <div className="calc-input-group">
-                          <label className="calc-label">Down Payment (%)</label>
-                          <div className="calc-input-row">
-                            <input
-                              type="number"
-                              min="10"
-                              max="50"
-                              step="1"
-                              value={mortgageDownPayment}
-                              onChange={(e) => {
-                                const v = Number(e.target.value);
-                                setMortgageDownPayment(v >= 0 ? v : 0);
-                              }}
-                              className={`calc-number-input ${downPaymentError ? 'calc-input-error' : ''}`}
-                            />
-                            <span className="calc-input-suffix">%</span>
-                          </div>
-                          {downPaymentError
-                            ? <span className="calc-validation-error">{downPaymentError}</span>
-                            : !hasValidationError && mortgage && <span className="calc-input-hint">₱{mortgage.downPayment.toLocaleString(undefined, { maximumFractionDigits: 0 })} down payment</span>
-                          }
-                        </div>
-                        <div className="calc-input-group">
-                          <label className="calc-label">Interest Rate (%)</label>
-                          <div className="calc-input-row">
-                            <input
-                              type="number"
-                              min="3"
-                              max="12"
-                              step="0.1"
-                              value={mortgageRate}
-                              onChange={(e) => {
-                                const v = Number(e.target.value);
-                                setMortgageRate(v >= 0 ? v : 0);
-                              }}
-                              className={`calc-number-input ${rateError ? 'calc-input-error' : ''}`}
-                            />
-                            <span className="calc-input-suffix">%</span>
-                          </div>
-                          {rateError && <span className="calc-validation-error">{rateError}</span>}
-                        </div>
-                        <div className="calc-input-group">
-                          <label className="calc-label">Loan Term (Years)</label>
-                          <div className="calc-input-row">
-                            <input
-                              type="number"
-                              min="5"
-                              max="30"
-                              step="1"
-                              value={mortgageTerm}
-                              onChange={(e) => {
-                                const v = Number(e.target.value);
-                                setMortgageTerm(v >= 0 ? v : 0);
-                              }}
-                              className={`calc-number-input ${termError ? 'calc-input-error' : ''}`}
-                            />
-                            <span className="calc-input-suffix">yrs</span>
-                          </div>
-                          {termError && <span className="calc-validation-error">{termError}</span>}
-                        </div>
+                        <div className="calc-input-group"><label className="calc-label">Property Price (₱)</label><div className="calc-value-display">₱{propertyPrice.toLocaleString()}</div></div>
+                        <div className="calc-input-group"><label className="calc-label">Down Payment (%)</label><div className="calc-input-row"><input type="number" min="10" max="50" step="1" value={mortgageDownPayment} onChange={(e) => setMortgageDownPayment(Number(e.target.value) >= 0 ? Number(e.target.value) : 0)} className={`calc-number-input ${downPaymentError ? 'calc-input-error' : ''}`} /><span className="calc-input-suffix">%</span></div>{downPaymentError ? <span className="calc-validation-error">{downPaymentError}</span> : !hasValidationError && mortgage && <span className="calc-input-hint">₱{mortgage.downPayment.toLocaleString()} down payment</span>}</div>
+                        <div className="calc-input-group"><label className="calc-label">Interest Rate (%)</label><div className="calc-input-row"><input type="number" min="3" max="12" step="0.1" value={mortgageRate} onChange={(e) => setMortgageRate(Number(e.target.value) >= 0 ? Number(e.target.value) : 0)} className={`calc-number-input ${rateError ? 'calc-input-error' : ''}`} /><span className="calc-input-suffix">%</span></div>{rateError && <span className="calc-validation-error">{rateError}</span>}</div>
+                        <div className="calc-input-group"><label className="calc-label">Loan Term (Years)</label><div className="calc-input-row"><input type="number" min="5" max="30" step="1" value={mortgageTerm} onChange={(e) => setMortgageTerm(Number(e.target.value) >= 0 ? Number(e.target.value) : 0)} className={`calc-number-input ${termError ? 'calc-input-error' : ''}`} /><span className="calc-input-suffix">yrs</span></div>{termError && <span className="calc-validation-error">{termError}</span>}</div>
                       </div>
                       <div className="listing-modal-calc-results">
-                        {hasValidationError ? (
-                          <div className="calc-result-card" style={{ textAlign: 'center', gridColumn: '1 / -1' }}>
-                            <span className="calc-result-label" style={{ color: '#ef4444' }}>Please fix the input errors above to see results.</span>
-                          </div>
-                        ) : mortgage ? (
+                        {hasValidationError ? ( <div className="calc-result-card" style={{ textAlign: 'center', gridColumn: '1 / -1' }}><span className="calc-result-label" style={{ color: '#ef4444' }}>Please fix the input errors above.</span></div> ) : mortgage ? (
                           <>
-                            <div className="calc-result-card calc-result-primary">
-                              <span className="calc-result-label">Monthly Payment</span>
-                              <span className="calc-result-value">₱{mortgage.monthlyPayment.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                            </div>
-                            <div className="calc-result-card">
-                              <span className="calc-result-label">Loan Amount</span>
-                              <span className="calc-result-value-sm">₱{mortgage.principal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                            </div>
-                            <div className="calc-result-card">
-                              <span className="calc-result-label">Down Payment</span>
-                              <span className="calc-result-value-sm">₱{mortgage.downPayment.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                            </div>
-                            <div className="calc-result-card">
-                              <span className="calc-result-label">Total Interest</span>
-                              <span className="calc-result-value-sm">₱{mortgage.totalInterest.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                            </div>
-                            <div className="calc-result-card">
-                              <span className="calc-result-label">Total Payment</span>
-                              <span className="calc-result-value-sm">₱{mortgage.totalPayment.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                            </div>
+                            <div className="calc-result-card calc-result-primary"><span className="calc-result-label">Monthly Payment</span><span className="calc-result-value">₱{mortgage.monthlyPayment.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span></div>
+                            <div className="calc-result-card"><span className="calc-result-label">Loan Amount</span><span className="calc-result-value-sm">₱{mortgage.principal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span></div>
+                            <div className="calc-result-card"><span className="calc-result-label">Down Payment</span><span className="calc-result-value-sm">₱{mortgage.downPayment.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span></div>
                           </>
                         ) : null}
-                        <div className="calc-disclaimer" style={{ gridColumn: '1 / -1', marginTop: '8px' }}>
-                          <strong>Disclaimer:</strong>
-                          <p style={{ margin: '6px 0 4px' }}>
-                            This mortgage calculator provides estimated monthly payments based on the values entered. The property price reflects the listing price and is not editable. Down payment must be between 10% and 50%. Interest rates must be between 3% and 12%, and loan terms between 5 and 30 years.
-                          </p>
-                          <p style={{ margin: 0 }}>
-                            Actual loan terms, interest rates, and approval are subject to bank policies, credit evaluation, and market conditions. This tool is for informational purposes only and does not constitute a loan offer.
-                          </p>
-                        </div>
+                        <div className="calc-disclaimer" style={{ gridColumn: '1 / -1', marginTop: '8px' }}><strong>Disclaimer:</strong><p style={{ margin: '6px 0 4px' }}>This mortgage calculator provides estimates only. Approval is subject to bank policies.</p></div>
                       </div>
                     </div>
                   </div>

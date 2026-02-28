@@ -14,27 +14,28 @@ async function bootstrap() {
   }));
 
   // 1. Initialize Firebase Admin
-  // We wrap this in a try-catch to catch errors early
   try {
     const serviceAccount = firebaseConfig.getServiceAccount();
-  
     console.log('✅ Firebase Admin Initialized Successfully');
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Firebase Init Error:', error.message);
   }
 
-  // 2. Enable CORS — restricted to known domains
+  // 2. Enable CORS — explicitly adding your actual production domain!
   app.enableCors({
     origin: [
       'http://localhost:5173',
       'http://localhost:3000',
+      'https://metrobcd.cosedevs.com', // Added your live frontend domain!
       process.env.FRONTEND_URL || 'https://metro-bacolod-connect.vercel.app',
     ].filter(Boolean),
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
 
-  await app.listen(3000);
-  console.log('Backend is running on: http://localhost:3000');
+  // 3. Fix Port Binding for Render
+  const PORT = process.env.PORT || 3000;
+  await app.listen(PORT);
+  console.log(`🚀 Backend is running on port: ${PORT}`);
 }
 bootstrap();

@@ -681,15 +681,28 @@ ul { list-style: none; }
 }
 
 .glass-dots-btn {
-  background: rgba(0, 0, 0, 0.05) !important;
+  background: #ffffff !important;
+  border-radius: 50% !important;
+  width: 32px !important;
+  height: 32px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2) !important;
+  color: #111827 !important;
+  font-size: 1.1rem !important;
   border: none !important;
-  color: rgba(0, 0, 0, 0.4);
-  font-size: 1.3rem;
-  padding: 4px 10px;
-  border-radius: 8px;
   cursor: pointer;
-  transition: background 0.2s;
-  line-height: 1;
+  transition: all 0.2s ease !important;
+}
+
+.glass-dots-btn:hover,
+.glass-dots-btn:focus,
+.glass-dots-btn:active {
+  background: #f3f4f6 !important;
+  color: #111827 !important;
+  opacity: 1 !important;
+  transform: scale(1.05);
 }
 
 .glass-dots-btn:hover {
@@ -1069,19 +1082,33 @@ ul { list-style: none; }
   }
 
   .glass-card-right {
-    flex: 0 0 100%;
-    max-width: 100%;
-    padding: 0 20px 20px 20px;
-  }
+  flex: 0 0 60%;
+  max-width: 60%;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch !important; /* Stretches elements wide */
+  justify-content: space-between !important; /* Pushes button to bottom, image to top */
+  gap: 16px;
+}
 
-  .glass-card-image {
-    width: 100%;
-  }
+.glass-card-image {
+  flex: 1 1 auto !important; /* Stretches to fill all empty vertical space! */
+  position: relative;
+  width: 100%;
+  min-height: 140px; 
+}
 
-  .glass-card-image img {
-    max-height: 200px;
-    width: 100%;
-  }
+.glass-card-image img {
+  position: absolute; /* Allows it to perfectly fill the growing parent container */
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 18px;
+  max-height: none !important;
+}
 
   .glass-card-footer {
     flex-direction: column;
@@ -1309,15 +1336,29 @@ ul { list-style: none; }
   color: #111827;
 }
 
+/* =======================================================
+   FIX: RESTORE 2-COLUMN GRID FOR PROFILE POSTS
+   ======================================================= */
 .profile-posts-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 24px;
+  display: grid !important;
+  grid-template-columns: repeat(2, 1fr) !important; /* Forces 2 columns side-by-side */
+  gap: 24px !important;
+  width: 100% !important;
+  max-width: 100% !important; /* Removes the previous 750px limit */
+  margin: 0 !important;       /* Removes the forced centering */
+  align-items: stretch !important;
 }
 
-/* Profile cards: same white glassmorphism as dashboard, sized to fit */
 .profile-card.glass-listing-card {
+  width: 100% !important; 
   min-height: unset;
+}
+
+/* Ensure it gracefully falls back to 1 column on smaller screens */
+@media (max-width: 1100px) {
+  .profile-posts-grid {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 .profile-card .glass-card-content {
@@ -5080,12 +5121,14 @@ ul { list-style: none; }
    MESSAGES PAGE — RESPONSIVE
    (Extracted from inline <style> tags)
    ========================================= */
-@media (max-width: 768px) {
-  .chat-sidebar-mobile { width: 100% !important; border-radius: 0 !important; }
-  .chat-window-mobile { border-radius: 0 !important; }
-  .chat-back-btn { display: block !important; }
-  .desktop-title { display: none !important; }
-}
+/* Inside your existing @media (max-width: 768px) block */
+  .glass-card-image {
+    width: 100% !important;
+    height: 100px !important; 
+    min-height: 100px !important;
+    flex: none !important; /* Prevents the stretching trick on mobile */
+    border-radius: 8px !important;
+  }
 
 @media (min-width: 769px) {
   .desktop-title { display: block !important; }
@@ -5151,4 +5194,87 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .custom-glass-input:focus {
   border-color: #111827 !important;
   box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.08) !important;
+}
+
+/* =======================================================
+   1. FIX: 3 DOTS MENU OVERLAP (DESKTOP & MOBILE)
+   ======================================================= */
+.glass-listing-card {
+  position: relative !important;
+}
+
+.glass-card-actions {
+  position: absolute !important;
+  top: 12px !important;
+  right: 12px !important;
+  z-index: 100 !important; /* Forces it to sit on top of the image */
+}
+
+.glass-dots-btn {
+  background: #ffffff !important; /* Gives it a solid white background! */
+  border-radius: 50% !important;
+  width: 32px !important;
+  height: 32px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2) !important;
+  color: #111827 !important;
+  font-size: 1.1rem !important;
+  border: none !important;
+}
+
+
+/* =======================================================
+   2. FIX: COMPACT SIDE-BY-SIDE MOBILE LAYOUT
+   ======================================================= */
+@media (max-width: 768px) {
+  .glass-listing-card {
+    display: flex !important;
+    flex-direction: row !important; /* Forces it back to side-by-side! */
+    align-items: stretch !important;
+    padding: 12px !important;
+    gap: 12px !important;
+  }
+
+  .glass-card-content {
+    flex: 1 !important; /* Takes up the left side naturally */
+    min-width: 0 !important; /* Prevents long text from breaking the layout */
+    padding-right: 0 !important;
+  }
+
+  .glass-card-right {
+    width: 120px !important; /* Fixed width for the image side */
+    flex-shrink: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    margin: 0 !important;
+  }
+
+  .glass-card-image {
+    width: 100% !important;
+    height: 90px !important; /* Perfect square-ish thumbnail height */
+    border-radius: 8px !important;
+  }
+
+  .glass-card-image img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important; /* Prevents the image from squishing */
+    border-radius: 8px !important;
+  }
+
+  .glass-inquire-btn {
+    width: 100% !important;
+    font-size: 0.7rem !important;
+    padding: 8px 4px !important;
+    margin: 0 !important;
+  }
+
+  /* Hides the long description on mobile so the card stays compact */
+  .glass-card-desc {
+    display: none !important; 
+  }
 }
