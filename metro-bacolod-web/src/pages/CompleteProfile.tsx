@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase-config";
 import { onAuthStateChanged } from "firebase/auth";
@@ -6,13 +6,14 @@ import { doc, setDoc, getDoc } from "firebase/firestore";
 import { glassToast } from '../components/GlassToast';
 import logo from "../assets/MBC Logo.png"; 
 import { BACOLOD_LOCATIONS } from "../constants/locations";
+import { FaCheckCircle, FaIdCard, FaCertificate, FaUser, FaImage, FaSpinner } from "react-icons/fa";
 
 export default function CompleteProfile() {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // --- FORM STATE ---
-  const [isSeller, setIsSeller] = useState(false); 
+  // --- ROLE STATE ---
+  const [selectedRole, setSelectedRole] = useState<"Client" | "Seller" | "Agent">("Client");
   
   const [firstName, setFirstName] = useState("");
   const [middleInitial, setMiddleInitial] = useState(""); 
@@ -26,10 +27,15 @@ export default function CompleteProfile() {
   const [prcLicenseNo, setPrcLicenseNo] = useState("");
   const province = "Negros Occidental";
 
+  // Seller: Gov ID upload
+  const [govIdFile, setGovIdFile] = useState<File | null>(null);
+  const [govIdPreview, setGovIdPreview] = useState<string>("");
+  const [isUploadingId, setIsUploadingId] = useState(false);
+  const govIdInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (!user) { navigate("/"); return; }
-      // 1. Pull their name from their Google Account automatically!
       if (user.displayName) {
         const nameParts = user.displayName.split(" ");
         setFirstName(nameParts[0] || "");
@@ -37,7 +43,6 @@ export default function CompleteProfile() {
           setLastName(nameParts.slice(1).join(" "));
         }
       }
-      // 2. Safety check: if they already have a profile, redirect to dashboard
       const snap = await getDoc(doc(db, "users", user.uid));
       if (snap.exists() && snap.data().role) {
         navigate("/dashboard");
@@ -47,7 +52,7 @@ export default function CompleteProfile() {
   }, [navigate]);
 
   const generateRandomId = (role: string) => {
-    const prefix = role === "Seller" ? "SELR" : "CLNT";
+    const prefix = role === "Seller" ? "SELR" : role === "Agent" ? "AGNT" : "CLNT";
     const randomChars = Math.random().toString(36).substring(2, 8).toUpperCase(); 
     return `${prefix}-${randomChars}`;
   };
@@ -57,10 +62,52 @@ export default function CompleteProfile() {
     if (val.length <= 10) setMobile(val);
   };
 
+  const handleGovIdSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { glassToast.error("File too large. Max 10MB."); return; }
+    if (!file.type.startsWith("image/")) { glassToast.error("Only image files are allowed."); return; }
+    setGovIdFile(file);
+    setGovIdPreview(URL.createObjectURL(file));
+  };
+
+  const uploadGovId = async (): Promise<{ url: string; ocrText: string }> => {
+    if (!govIdFile) throw new Error("No government ID file selected.");
+    const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+    const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+    if (!CLOUD_NAME || !UPLOAD_PRESET) throw new Error("Missing Cloudinary config.");
+
+    const formData = new FormData();
+    formData.append("file", govIdFile);
+    formData.append("upload_preset", UPLOAD_PRESET);
+    formData.append("cloud_name", CLOUD_NAME);
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, { method: "POST", body: formData });
+    const data = await res.json();
+    if (!data.secure_url) throw new Error("Failed to upload ID image.");
+
+    let ocrText = "";
+    try {
+      const OCR_KEY = import.meta.env.VITE_OCR_SPACE_API_KEY;
+      if (OCR_KEY) {
+        const ocrForm = new FormData();
+        ocrForm.append("url", data.secure_url);
+        ocrForm.append("apikey", OCR_KEY);
+        ocrForm.append("language", "eng");
+        ocrForm.append("isOverlayRequired", "false");
+        const ocrRes = await fetch("https://api.ocr.space/parse/image", { method: "POST", body: ocrForm });
+        const ocrData = await ocrRes.json();
+        if (ocrData.ParsedResults?.[0]?.ParsedText) ocrText = ocrData.ParsedResults[0].ParsedText;
+      }
+    } catch (ocrErr) { console.warn("OCR extraction failed (non-blocking):", ocrErr); }
+    return { url: data.secure_url, ocrText };
+  };
+
   const handleCompleteProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!city) return glassToast.error("Please select a City/Barangay.");
     if (mobile.length !== 10) return glassToast.error("Mobile number must be 10 digits.");
+    if (selectedRole === "Agent" && !prcLicenseNo.trim()) return glassToast.error("PRC License Number is required for Agents.");
+    if (selectedRole === "Seller" && !govIdFile) return glassToast.error("Government-issued ID is required for Sellers.");
 
     const user = auth.currentUser;
     if (!user) return glassToast.error("No authenticated user found.");
@@ -68,15 +115,23 @@ export default function CompleteProfile() {
     setIsSubmitting(true);
 
     try {
-      const accountRole = isSeller ? "Seller" : "Client";
-      const customId = generateRandomId(accountRole);
+      let govIdUrl = "";
+      let govIdOcrText = "";
+      if (selectedRole === "Seller" && govIdFile) {
+        setIsUploadingId(true);
+        const result = await uploadGovId();
+        govIdUrl = result.url;
+        govIdOcrText = result.ocrText;
+        setIsUploadingId(false);
+      }
+
+      const customId = generateRandomId(selectedRole);
       const fullMobile = `+63${mobile}`; 
 
-      // Save to Firestore
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         email: user.email,
-        role: accountRole, 
+        role: selectedRole, 
         customId: customId,
         firstName, 
         middleName: middleInitial, 
@@ -85,15 +140,19 @@ export default function CompleteProfile() {
         mobile: fullMobile,
         address: city, 
         fullAddress: { street, city, province, zipCode: "6100" },
-        ...(isSeller && prcLicenseNo.trim() ? { prcLicenseNo: prcLicenseNo.trim() } : {}),
+        isVerified: selectedRole === "Client",
+        verificationStatus: selectedRole === "Client" ? "approved" : "pending",
+        ...(selectedRole === "Agent" ? { prcLicenseNo: prcLicenseNo.trim() } : {}),
+        ...(selectedRole === "Seller" ? { governmentIdUrl: govIdUrl, governmentIdOcrText: govIdOcrText } : {}),
         createdAt: new Date().toISOString()
-      }, { merge: true }); // Merge ensures we don't overwrite anything Google created
+      }, { merge: true });
 
       glassToast.success(`Profile complete! Welcome to MBC.`);
       navigate("/dashboard");
 
     } catch (error: any) {
         console.error(error);
+        setIsUploadingId(false);
         glassToast.error("Failed to complete profile.");
     } finally {
         setIsSubmitting(false);
@@ -147,23 +206,85 @@ export default function CompleteProfile() {
             </div>
           </section>
 
-          <div style={{ marginBottom: '40px', background: '#f9fafb', padding: '15px', borderRadius: '12px', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'flex-start', gap: '15px' }}>
-             <input type="checkbox" id="sellerCheck" checked={isSeller} onChange={e => setIsSeller(e.target.checked)} style={{ width: '22px', height: '22px', cursor: 'pointer' }} />
-             <div>
-                <label htmlFor="sellerCheck" style={{ fontWeight: '700', fontSize: '1rem', cursor: 'pointer' }}>I want to sell properties</label>
-                <span style={{ fontSize: '0.85rem', color: '#6b7280', display: 'block' }}>Check this box if you intend to post listings and connect with buyers.</span>
-             </div>
-          </div>
-          {isSeller && (
-            <div style={{ marginBottom: '40px', marginTop: '-20px' }}>
-              <label style={labelStyle}>PRC License Number (optional)</label>
-              <input type="text" style={inputStyle} value={prcLicenseNo} onChange={e => setPrcLicenseNo(e.target.value)} placeholder="e.g. 0012345" />
-              <p style={{ fontSize: '0.78rem', color: '#6b7280', marginTop: '6px' }}>Enter your PRC license number for verification badge.</p>
+          {/* --- ROLE SELECTION --- */}
+          <section style={{ marginBottom: '40px' }}>
+            <h4 style={sectionHeaderStyle}>Account Type</h4>
+            <p style={{ color: '#6b7280', fontSize: '0.85rem', marginTop: '-15px', marginBottom: '20px' }}>
+              Select what best describes you. Sellers and Agents require verification before posting listings.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+              {([
+                { role: "Client" as const, icon: <FaUser size={20} />, title: "Client / Buyer", desc: "Browse listings and connect with sellers." },
+                { role: "Seller" as const, icon: <FaIdCard size={20} />, title: "Property Seller", desc: "Post property listings. Requires a valid government-issued ID." },
+                { role: "Agent" as const, icon: <FaCertificate size={20} />, title: "Licensed Agent", desc: "Post listings as a licensed broker. Requires PRC License." },
+              ]).map(item => (
+                <div key={item.role} onClick={() => setSelectedRole(item.role)} style={{
+                  padding: '20px', borderRadius: '14px', cursor: 'pointer', transition: '0.2s',
+                  border: selectedRole === item.role ? '2px solid #111827' : '2px solid #e5e7eb',
+                  background: selectedRole === item.role ? '#f9fafb' : 'white',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                    <span style={{ color: selectedRole === item.role ? '#111827' : '#9ca3af' }}>{item.icon}</span>
+                    <span style={{ fontWeight: '700', fontSize: '0.95rem', color: '#111' }}>{item.title}</span>
+                    {selectedRole === item.role && <FaCheckCircle size={14} style={{ color: '#10b981', marginLeft: 'auto' }} />}
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: '#6b7280', lineHeight: '1.4' }}>{item.desc}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* --- SELLER: Government ID Upload --- */}
+          {selectedRole === "Seller" && (
+            <section style={{ marginBottom: '40px', background: '#fffbeb', padding: '24px', borderRadius: '14px', border: '1px solid #fde68a' }}>
+              <h4 style={{ ...sectionHeaderStyle, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FaIdCard size={16} color="#d97706" /> Government-Issued ID *
+              </h4>
+              <p style={{ fontSize: '0.83rem', color: '#92400e', marginBottom: '16px', lineHeight: '1.5' }}>
+                Upload a clear photo of a valid government-issued ID (e.g. Driver's License, Passport, PhilSys ID).
+              </p>
+              {govIdPreview ? (
+                <div style={{ position: 'relative', display: 'inline-block', marginBottom: '12px' }}>
+                  <img src={govIdPreview} alt="Gov ID" style={{ maxWidth: '300px', maxHeight: '200px', borderRadius: '10px', border: '2px solid #e5e7eb', objectFit: 'cover' }} />
+                  <button type="button" onClick={() => { setGovIdFile(null); setGovIdPreview(""); }}
+                    style={{ position: 'absolute', top: '-8px', right: '-8px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontSize: '0.7rem', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+                  <p style={{ fontSize: '0.78rem', color: '#10b981', fontWeight: '600', marginTop: '8px' }}><FaCheckCircle size={11} /> {govIdFile?.name}</p>
+                </div>
+              ) : (
+                <button type="button" onClick={() => govIdInputRef.current?.click()}
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 24px', borderRadius: '10px', border: '2px dashed #d97706', background: 'white', cursor: 'pointer', fontSize: '0.9rem', fontWeight: '600', color: '#92400e' }}>
+                  <FaImage size={16} /> Upload ID Photo
+                </button>
+              )}
+              <input type="file" ref={govIdInputRef} hidden accept="image/*" onChange={handleGovIdSelect} />
+            </section>
+          )}
+
+          {/* --- AGENT: PRC License Number --- */}
+          {selectedRole === "Agent" && (
+            <section style={{ marginBottom: '40px', background: '#eff6ff', padding: '24px', borderRadius: '14px', border: '1px solid #bfdbfe' }}>
+              <h4 style={{ ...sectionHeaderStyle, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FaCertificate size={16} color="#2563eb" /> PRC License Number *
+              </h4>
+              <p style={{ fontSize: '0.83rem', color: '#1e40af', marginBottom: '16px', lineHeight: '1.5' }}>
+                Enter your Professional Regulation Commission (PRC) license number.
+              </p>
+              <input type="text" style={{ ...inputStyle, borderColor: '#93c5fd', background: 'white' }} value={prcLicenseNo} onChange={e => setPrcLicenseNo(e.target.value)} placeholder="e.g. 0012345" required />
+            </section>
+          )}
+
+          {/* Verification notice */}
+          {(selectedRole === "Seller" || selectedRole === "Agent") && (
+            <div style={{ marginBottom: '25px', background: '#fef3c7', padding: '14px 18px', borderRadius: '10px', border: '1px solid #fde68a', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+              <FaCheckCircle size={14} style={{ color: '#d97706', marginTop: '2px', flexShrink: 0 }} />
+              <p style={{ margin: 0, fontSize: '0.82rem', color: '#92400e', lineHeight: '1.4' }}>
+                <strong>Verification Required:</strong> Your account will need admin verification before you can create listings.
+              </p>
             </div>
           )}
 
-          <button type="submit" disabled={isSubmitting} style={{ padding: '15px 60px', borderRadius: '50px', border: 'none', background: 'black', color: 'white', fontWeight: '700', fontSize: '1rem', cursor: 'pointer', width: '100%' }}>
-            {isSubmitting ? "Saving..." : "Finish Setup"}
+          <button type="submit" disabled={isSubmitting} style={{ padding: '15px 60px', borderRadius: '50px', border: 'none', background: 'black', color: 'white', fontWeight: '700', fontSize: '1rem', cursor: 'pointer', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+            {isSubmitting ? (<>{isUploadingId ? <><FaSpinner className="spin" /> Uploading ID...</> : <><FaSpinner className="spin" /> Saving...</>}</>) : "Finish Setup"}
           </button>
         </form>
       </div>
@@ -171,7 +292,7 @@ export default function CompleteProfile() {
   );
 }
 
-const sectionHeaderStyle = { margin: '0 0 25px 0', color: '#111827', fontSize: '1.2rem', fontWeight: '700' };
-const labelStyle = { display: 'block', marginBottom: '8px', fontSize: '0.9rem', fontWeight: '600', color: '#374151' };
-const inputStyle = { width: '100%', padding: '12px 15px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '1rem', outline: 'none' };
-const grid3Style = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '25px', marginBottom: '20px' };
+const sectionHeaderStyle: React.CSSProperties = { margin: '0 0 25px 0', color: '#111827', fontSize: '1.2rem', fontWeight: '700' };
+const labelStyle: React.CSSProperties = { display: 'block', marginBottom: '8px', fontSize: '0.9rem', fontWeight: '600', color: '#374151' };
+const inputStyle: React.CSSProperties = { width: '100%', padding: '12px 15px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '1rem', outline: 'none' };
+const grid3Style: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '25px', marginBottom: '20px' };

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { createUserWithEmailAndPassword, updateProfile, sendEmailVerification, signOut } from "firebase/auth";
 import { auth, db } from "../firebase-config";
@@ -6,14 +6,14 @@ import { doc, setDoc } from "firebase/firestore";
 import { glassToast } from '../components/GlassToast';
 import logo from "../assets/MBC Logo.png"; 
 import { BACOLOD_LOCATIONS } from "../constants/locations";
-import { FaEye, FaEyeSlash, FaCheckCircle, FaTimesCircle } from "react-icons/fa"; 
+import { FaEye, FaEyeSlash, FaCheckCircle, FaTimesCircle, FaImage, FaSpinner, FaIdCard, FaCertificate, FaUser } from "react-icons/fa"; 
 
 export default function Register() {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // --- FORM STATE ---
-  const [isSeller, setIsSeller] = useState(false); // Replaces the PRC Checkbox
+  // --- ROLE STATE ---
+  const [selectedRole, setSelectedRole] = useState<"Client" | "Seller" | "Agent">("Client");
   
   // Personal
   const [firstName, setFirstName] = useState("");
@@ -30,20 +30,27 @@ export default function Register() {
   // Address
   const [street, setStreet] = useState("");
   const [city, setCity] = useState(""); 
-  const [province, setProvince] = useState("Negros Occidental");
+  const [province] = useState("Negros Occidental");
   const zipCode = "6100";
 
   // Security
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false); 
-  const [prcLicenseNo, setPrcLicenseNo] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
 
+  // Agent-specific
+  const [prcLicenseNo, setPrcLicenseNo] = useState("");
+
+  // Seller-specific: Government ID upload
+  const [govIdFile, setGovIdFile] = useState<File | null>(null);
+  const [govIdPreview, setGovIdPreview] = useState<string>("");
+  const [isUploadingId, setIsUploadingId] = useState(false);
+  const govIdInputRef = useRef<HTMLInputElement>(null);
+
   // --- RANDOM ID GENERATOR ---
-  // Generates IDs like "SELR-X4F9A2" or "CLNT-M7V1Q8"
   const generateRandomId = (role: string) => {
-    const prefix = role === "Seller" ? "SELR" : "CLNT";
+    const prefix = role === "Seller" ? "SELR" : role === "Agent" ? "AGNT" : "CLNT";
     const randomChars = Math.random().toString(36).substring(2, 8).toUpperCase(); 
     return `${prefix}-${randomChars}`;
   };
@@ -65,6 +72,66 @@ export default function Register() {
     }
   };
 
+  const handleGovIdSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      glassToast.error("File too large. Max 10MB.");
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      glassToast.error("Only image files are allowed.");
+      return;
+    }
+    setGovIdFile(file);
+    setGovIdPreview(URL.createObjectURL(file));
+  };
+
+  const uploadGovId = async (): Promise<{ url: string; ocrText: string }> => {
+    if (!govIdFile) throw new Error("No government ID file selected.");
+
+    const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+    const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+    if (!CLOUD_NAME || !UPLOAD_PRESET) throw new Error("Missing Cloudinary config.");
+
+    // Upload to Cloudinary
+    const formData = new FormData();
+    formData.append("file", govIdFile);
+    formData.append("upload_preset", UPLOAD_PRESET);
+    formData.append("cloud_name", CLOUD_NAME);
+    
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+      method: "POST", body: formData,
+    });
+    const data = await res.json();
+    if (!data.secure_url) throw new Error("Failed to upload ID image.");
+
+    // Run OCR on the uploaded image
+    let ocrText = "";
+    try {
+      const OCR_KEY = import.meta.env.VITE_OCR_SPACE_API_KEY;
+      if (OCR_KEY) {
+        const ocrForm = new FormData();
+        ocrForm.append("url", data.secure_url);
+        ocrForm.append("apikey", OCR_KEY);
+        ocrForm.append("language", "eng");
+        ocrForm.append("isOverlayRequired", "false");
+        
+        const ocrRes = await fetch("https://api.ocr.space/parse/image", {
+          method: "POST", body: ocrForm,
+        });
+        const ocrData = await ocrRes.json();
+        if (ocrData.ParsedResults?.[0]?.ParsedText) {
+          ocrText = ocrData.ParsedResults[0].ParsedText;
+        }
+      }
+    } catch (ocrErr) {
+      console.warn("OCR extraction failed (non-blocking):", ocrErr);
+    }
+
+    return { url: data.secure_url, ocrText };
+  };
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password !== confirmPassword) return glassToast.error("Passwords do not match!");
@@ -72,15 +139,32 @@ export default function Register() {
     if (mobile.length !== 10) return glassToast.error("Mobile number must be 10 digits (excluding +63).");
     if (!acceptedTerms) return glassToast.error("You must accept the Terms of Service and Privacy Policy.");
 
+    // Role-specific validation
+    if (selectedRole === "Agent" && !prcLicenseNo.trim()) {
+      return glassToast.error("PRC License Number is required for Agents.");
+    }
+    if (selectedRole === "Seller" && !govIdFile) {
+      return glassToast.error("Government-issued ID is required for Sellers.");
+    }
+
     setIsSubmitting(true);
 
     try {
+      // Upload Gov ID first if seller
+      let govIdUrl = "";
+      let govIdOcrText = "";
+      if (selectedRole === "Seller" && govIdFile) {
+        setIsUploadingId(true);
+        const result = await uploadGovId();
+        govIdUrl = result.url;
+        govIdOcrText = result.ocrText;
+        setIsUploadingId(false);
+      }
+
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Determine role based on the checkbox!
-      const accountRole = isSeller ? "Seller" : "Client";
-      const customId = generateRandomId(accountRole);
+      const customId = generateRandomId(selectedRole);
       const fullMobile = `+63${mobile}`; 
 
       await updateProfile(user, {
@@ -91,8 +175,8 @@ export default function Register() {
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         email: user.email,
-        role: accountRole, // "Seller" or "Client"
-        customId: customId, // "SELR-123456" or "CLNT-123456"
+        role: selectedRole,
+        customId: customId,
         firstName, 
         middleName: middleInitial, 
         lastName,
@@ -100,7 +184,15 @@ export default function Register() {
         mobile: fullMobile,
         address: city, 
         fullAddress: { street, city, province, zipCode },
-        ...(isSeller && prcLicenseNo.trim() ? { prcLicenseNo: prcLicenseNo.trim() } : {}),
+        // Verification status
+        isVerified: selectedRole === "Client",
+        verificationStatus: selectedRole === "Client" ? "approved" : "pending",
+        // Role-specific fields
+        ...(selectedRole === "Agent" ? { prcLicenseNo: prcLicenseNo.trim() } : {}),
+        ...(selectedRole === "Seller" ? { 
+          governmentIdUrl: govIdUrl,
+          governmentIdOcrText: govIdOcrText,
+        } : {}),
         termsAcceptedAt: new Date().toISOString(),
         createdAt: new Date().toISOString()
       });
@@ -113,13 +205,14 @@ export default function Register() {
 
     } catch (error: any) {
         console.error(error);
+        setIsUploadingId(false);
         glassToast.error(error.message);
     } finally {
         setIsSubmitting(false);
     }
   };
 
-  // --- PASSWORD STRENGTH (M12) ---
+  // --- PASSWORD STRENGTH ---
   const getPasswordStrength = (pwd: string) => {
     let score = 0;
     if (pwd.length >= 8) score++;
@@ -223,19 +316,113 @@ export default function Register() {
              )}
           </section>
 
-          {/* --- NEW CHECKBOX FOR SELLERS --- */}
-          <div style={{ marginBottom: '40px', background: '#f9fafb', padding: '15px', borderRadius: '12px', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'flex-start', gap: '15px' }}>
-             <input type="checkbox" id="sellerCheck" checked={isSeller} onChange={e => setIsSeller(e.target.checked)} style={{ width: '22px', height: '22px', accentColor: 'black', marginTop: '3px', cursor: 'pointer' }} />
-             <div>
-                <label htmlFor="sellerCheck" style={{ fontWeight: '700', fontSize: '1rem', cursor: 'pointer', display: 'block', color: '#111' }}>I want to sell properties</label>
-                <span style={{ fontSize: '0.85rem', color: '#6b7280' }}>Check this box if you intend to post listings and connect with buyers.</span>
-             </div>
-          </div>
-          {isSeller && (
-            <div style={{ marginBottom: '40px', marginTop: '-20px' }}>
-              <label style={labelStyle}>PRC License Number (optional)</label>
-              <input type="text" style={inputStyle} value={prcLicenseNo} onChange={e => setPrcLicenseNo(e.target.value)} placeholder="e.g. 0012345" />
-              <p style={{ fontSize: '0.78rem', color: '#6b7280', marginTop: '6px' }}>Enter your PRC license number for verification badge.</p>
+          <hr style={{ border: 'none', borderTop: '1px solid #f3f4f6', margin: '30px 0' }} />
+
+          {/* --- ROLE SELECTION --- */}
+          <section style={{ marginBottom: '40px' }}>
+            <h4 style={sectionHeaderStyle}>Account Type</h4>
+            <p style={{ color: '#6b7280', fontSize: '0.85rem', marginTop: '-15px', marginBottom: '20px' }}>
+              Select what best describes you. Sellers and Agents require verification before posting listings.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+              {([
+                { role: "Client" as const, icon: <FaUser size={20} />, title: "Client / Buyer", desc: "Browse listings and connect with sellers. Only phone and email required." },
+                { role: "Seller" as const, icon: <FaIdCard size={20} />, title: "Property Seller", desc: "Post property listings. Requires a valid government-issued ID for verification." },
+                { role: "Agent" as const, icon: <FaCertificate size={20} />, title: "Licensed Agent", desc: "Post listings as a licensed broker. Requires a valid PRC License Number." },
+              ]).map(item => (
+                <div
+                  key={item.role}
+                  onClick={() => setSelectedRole(item.role)}
+                  style={{
+                    padding: '20px', borderRadius: '14px', cursor: 'pointer', transition: '0.2s',
+                    border: selectedRole === item.role ? '2px solid #111827' : '2px solid #e5e7eb',
+                    background: selectedRole === item.role ? '#f9fafb' : 'white',
+                    boxShadow: selectedRole === item.role ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                    <span style={{ color: selectedRole === item.role ? '#111827' : '#9ca3af' }}>{item.icon}</span>
+                    <span style={{ fontWeight: '700', fontSize: '0.95rem', color: '#111' }}>{item.title}</span>
+                    {selectedRole === item.role && <FaCheckCircle size={14} style={{ color: '#10b981', marginLeft: 'auto' }} />}
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: '#6b7280', lineHeight: '1.4' }}>{item.desc}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* --- SELLER: Government ID Upload --- */}
+          {selectedRole === "Seller" && (
+            <section style={{ marginBottom: '40px', background: '#fffbeb', padding: '24px', borderRadius: '14px', border: '1px solid #fde68a' }}>
+              <h4 style={{ ...sectionHeaderStyle, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FaIdCard size={16} color="#d97706" /> Government-Issued ID *
+              </h4>
+              <p style={{ fontSize: '0.83rem', color: '#92400e', marginBottom: '16px', lineHeight: '1.5' }}>
+                Upload a clear photo of a valid government-issued ID (e.g. Driver's License, Passport, PhilSys ID, SSS ID).
+                This will be reviewed by our admins before you can post listings.
+              </p>
+              
+              {govIdPreview ? (
+                <div style={{ position: 'relative', display: 'inline-block', marginBottom: '12px' }}>
+                  <img src={govIdPreview} alt="Gov ID Preview" style={{ maxWidth: '300px', maxHeight: '200px', borderRadius: '10px', border: '2px solid #e5e7eb', objectFit: 'cover' }} />
+                  <button
+                    type="button"
+                    onClick={() => { setGovIdFile(null); setGovIdPreview(""); }}
+                    style={{ position: 'absolute', top: '-8px', right: '-8px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontSize: '0.7rem', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    ✕
+                  </button>
+                  <p style={{ fontSize: '0.78rem', color: '#10b981', fontWeight: '600', marginTop: '8px' }}>
+                    <FaCheckCircle size={11} /> {govIdFile?.name}
+                  </p>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => govIdInputRef.current?.click()}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 24px',
+                    borderRadius: '10px', border: '2px dashed #d97706', background: 'white',
+                    cursor: 'pointer', fontSize: '0.9rem', fontWeight: '600', color: '#92400e',
+                    transition: '0.2s',
+                  }}
+                >
+                  <FaImage size={16} /> Upload ID Photo
+                </button>
+              )}
+              <input type="file" ref={govIdInputRef} hidden accept="image/*" onChange={handleGovIdSelect} />
+            </section>
+          )}
+
+          {/* --- AGENT: PRC License Number --- */}
+          {selectedRole === "Agent" && (
+            <section style={{ marginBottom: '40px', background: '#eff6ff', padding: '24px', borderRadius: '14px', border: '1px solid #bfdbfe' }}>
+              <h4 style={{ ...sectionHeaderStyle, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FaCertificate size={16} color="#2563eb" /> PRC License Number *
+              </h4>
+              <p style={{ fontSize: '0.83rem', color: '#1e40af', marginBottom: '16px', lineHeight: '1.5' }}>
+                Enter your Professional Regulation Commission (PRC) license number.
+                This will be verified by our admins before you can post listings.
+              </p>
+              <input
+                type="text"
+                style={{ ...inputStyle, borderColor: '#93c5fd', background: 'white' }}
+                value={prcLicenseNo}
+                onChange={e => setPrcLicenseNo(e.target.value)}
+                placeholder="e.g. 0012345"
+                required
+              />
+            </section>
+          )}
+
+          {/* Verification Notice for Sellers/Agents */}
+          {(selectedRole === "Seller" || selectedRole === "Agent") && (
+            <div style={{ marginBottom: '25px', background: '#fef3c7', padding: '14px 18px', borderRadius: '10px', border: '1px solid #fde68a', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+              <FaCheckCircle size={14} style={{ color: '#d97706', marginTop: '2px', flexShrink: 0 }} />
+              <p style={{ margin: 0, fontSize: '0.82rem', color: '#92400e', lineHeight: '1.4' }}>
+                <strong>Verification Required:</strong> Your account will need to be verified by an admin before you can create listings. 
+                You can still browse and message other users while your verification is pending.
+              </p>
             </div>
           )}
 
@@ -258,8 +445,8 @@ export default function Register() {
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginBottom: '50px' }}>
-             <button type="submit" disabled={isSubmitting || !acceptedTerms} style={{ padding: '15px 60px', borderRadius: '50px', border: 'none', background: 'black', color: 'white', fontWeight: '700', fontSize: '1rem', cursor: 'pointer', opacity: (isSubmitting || !acceptedTerms) ? 0.7 : 1, boxShadow: '0 4px 15px rgba(0,0,0,0.2)', width: '100%' }}>
-               {isSubmitting ? "Creating Account..." : "Complete Registration"}
+             <button type="submit" disabled={isSubmitting || !acceptedTerms} style={{ padding: '15px 60px', borderRadius: '50px', border: 'none', background: 'black', color: 'white', fontWeight: '700', fontSize: '1rem', cursor: 'pointer', opacity: (isSubmitting || !acceptedTerms) ? 0.7 : 1, boxShadow: '0 4px 15px rgba(0,0,0,0.2)', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+               {isSubmitting ? (<>{isUploadingId ? <><FaSpinner className="spin" /> Uploading ID...</> : <><FaSpinner className="spin" /> Creating Account...</>}</>) : "Complete Registration"}
              </button>
           </div>
         </form>
@@ -269,7 +456,7 @@ export default function Register() {
   );
 }
 
-const sectionHeaderStyle = { margin: '0 0 25px 0', color: '#111827', fontSize: '1.2rem', fontWeight: '700' };
-const labelStyle = { display: 'block', marginBottom: '8px', fontSize: '0.9rem', fontWeight: '600', color: '#374151' };
-const inputStyle = { width: '100%', padding: '12px 15px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '1rem', outline: 'none', transition: '0.2s', background: '#ffffff', color: '#000000' };
-const grid3Style = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '25px', marginBottom: '20px' };
+const sectionHeaderStyle: React.CSSProperties = { margin: '0 0 25px 0', color: '#111827', fontSize: '1.2rem', fontWeight: '700' };
+const labelStyle: React.CSSProperties = { display: 'block', marginBottom: '8px', fontSize: '0.9rem', fontWeight: '600', color: '#374151' };
+const inputStyle: React.CSSProperties = { width: '100%', padding: '12px 15px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '1rem', outline: 'none', transition: '0.2s', background: '#ffffff', color: '#000000' };
+const grid3Style: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '25px', marginBottom: '20px' };
