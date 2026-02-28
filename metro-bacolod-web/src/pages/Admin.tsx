@@ -6,7 +6,8 @@ import { signOut } from "firebase/auth";
 import {
   FaUsers, FaHome, FaFlag, FaChartBar, FaSignOutAlt,
   FaTrash, FaSearch, FaBan, FaCheckCircle, FaChevronDown,
-  FaArrowLeft, FaTimes, FaExclamationTriangle, FaEye
+  FaArrowLeft, FaTimes, FaExclamationTriangle, FaEye,
+  FaShieldAlt, FaIdCard, FaCertificate, FaTimesCircle
 } from "react-icons/fa";
 import logo from "../assets/MBC Logo.png";
 import "../App.css";
@@ -14,7 +15,7 @@ import Swal from "sweetalert2";
 import { glassToast } from "../components/GlassToast";
 import { isAdmin } from "../constants/roles";
 
-type AdminTab = "dashboard" | "users" | "posts" | "reports";
+type AdminTab = "dashboard" | "users" | "posts" | "reports" | "verifications";
 
 export default function Admin() {
   const [user, setUser] = useState<any>(null);
@@ -66,17 +67,59 @@ export default function Admin() {
     navigate("/");
   };
 
-  // --- USER MANAGEMENT ---
-  const handleChangeRole = async (userId: string, currentRole: string) => {
-    const newRole = currentRole === "Seller" ? "Client" : "Seller";
+  // --- VERIFICATION MANAGEMENT ---
+  const pendingVerifications = users.filter(u => u.verificationStatus === "pending");
+
+  const handleApproveVerification = async (userId: string) => {
     const result = await Swal.fire({
-      title: `Change role to ${newRole}?`,
+      title: "Approve this user?",
+      text: "They will be able to create listings after approval.",
       icon: "question",
       showCancelButton: true,
-      confirmButtonColor: "#111827",
-      confirmButtonText: "Yes, change",
+      confirmButtonColor: "#10b981",
+      confirmButtonText: "Approve",
     });
     if (result.isConfirmed) {
+      try {
+        await updateDoc(doc(db, "users", userId), { isVerified: true, verificationStatus: "approved" });
+        setUsers(prev => prev.map(u => u.id === userId ? { ...u, isVerified: true, verificationStatus: "approved" } : u));
+        glassToast.success("User verified and approved!");
+      } catch { glassToast.error("Failed to approve user."); }
+    }
+  };
+
+  const handleRejectVerification = async (userId: string) => {
+    const { value: reason } = await Swal.fire({
+      title: "Reject verification?",
+      input: "textarea",
+      inputLabel: "Reason for rejection (optional)",
+      inputPlaceholder: "e.g. ID image is unclear, PRC number is invalid...",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      confirmButtonText: "Reject",
+    });
+    if (reason !== undefined) {
+      try {
+        await updateDoc(doc(db, "users", userId), { verificationStatus: "rejected", rejectionReason: reason || "" });
+        setUsers(prev => prev.map(u => u.id === userId ? { ...u, verificationStatus: "rejected", rejectionReason: reason || "" } : u));
+        glassToast.success("User verification rejected.");
+      } catch { glassToast.error("Failed to reject verification."); }
+    }
+  };
+
+  // --- USER MANAGEMENT ---
+  const handleChangeRole = async (userId: string, currentRole: string) => {
+    const roles = ["Client", "Seller", "Agent"];
+    const otherRoles = roles.filter(r => r !== currentRole);
+    const { value: newRole } = await Swal.fire({
+      title: "Change role to:",
+      input: "select",
+      inputOptions: Object.fromEntries(otherRoles.map(r => [r, r])),
+      showCancelButton: true,
+      confirmButtonColor: "#111827",
+      confirmButtonText: "Change",
+    });
+    if (newRole) {
       try {
         await updateDoc(doc(db, "users", userId), { role: newRole });
         setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
@@ -154,7 +197,9 @@ export default function Admin() {
   // --- STATS ---
   const totalUsers = users.length;
   const totalSellers = users.filter(u => u.role === "Seller").length;
+  const totalAgents = users.filter(u => u.role === "Agent").length;
   const totalClients = users.filter(u => u.role === "Client").length;
+  const pendingVerCount = pendingVerifications.length;
   const activePosts = posts.filter(p => !p.isArchived).length;
   const archivedPosts = posts.filter(p => p.isArchived).length;
   const pendingReports = reports.filter(r => r.status === "pending").length;
@@ -207,6 +252,7 @@ export default function Admin() {
         <nav style={{ flex: 1, padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
           {([
             { key: "dashboard", icon: <FaChartBar size={16} />, label: "Dashboard" },
+            { key: "verifications", icon: <FaShieldAlt size={16} />, label: "Verifications" },
             { key: "users", icon: <FaUsers size={16} />, label: "Users" },
             { key: "posts", icon: <FaHome size={16} />, label: "Posts" },
             { key: "reports", icon: <FaFlag size={16} />, label: "Reports" },
@@ -227,6 +273,11 @@ export default function Admin() {
               {item.key === 'reports' && pendingReports > 0 && (
                 <span style={{ marginLeft: 'auto', background: '#ef4444', padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: '700' }}>
                   {pendingReports}
+                </span>
+              )}
+              {item.key === 'verifications' && pendingVerCount > 0 && (
+                <span style={{ marginLeft: 'auto', background: '#f59e0b', padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: '700' }}>
+                  {pendingVerCount}
                 </span>
               )}
             </button>
@@ -250,12 +301,14 @@ export default function Admin() {
           <div>
             <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '800', color: '#111827' }}>
               {activeTab === 'dashboard' && 'Dashboard Overview'}
+              {activeTab === 'verifications' && 'Identity Verification'}
               {activeTab === 'users' && 'User Management'}
               {activeTab === 'posts' && 'Post Management'}
               {activeTab === 'reports' && 'Reports'}
             </h1>
             <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: '0.85rem' }}>
               {activeTab === 'dashboard' && 'Platform statistics and overview'}
+              {activeTab === 'verifications' && `${pendingVerCount} pending verifications`}
               {activeTab === 'users' && `${totalUsers} total users`}
               {activeTab === 'posts' && `${activePosts} active listings`}
               {activeTab === 'reports' && `${pendingReports} pending reports`}
@@ -282,7 +335,9 @@ export default function Admin() {
               {[
                 { label: 'Total Users', value: totalUsers, color: '#3b82f6', icon: <FaUsers /> },
                 { label: 'Sellers', value: totalSellers, color: '#10b981', icon: <FaCheckCircle /> },
+                { label: 'Agents', value: totalAgents, color: '#2563eb', icon: <FaCertificate /> },
                 { label: 'Clients', value: totalClients, color: '#8b5cf6', icon: <FaUsers /> },
+                { label: 'Pending Verification', value: pendingVerCount, color: '#f59e0b', icon: <FaShieldAlt /> },
                 { label: 'Active Listings', value: activePosts, color: '#f59e0b', icon: <FaHome /> },
                 { label: 'Archived', value: archivedPosts, color: '#6b7280', icon: <FaTrash /> },
                 { label: 'Pending Reports', value: pendingReports, color: '#ef4444', icon: <FaFlag /> },
@@ -367,8 +422,8 @@ export default function Admin() {
                     <td style={tdStyle}>
                       <span style={{
                         padding: '3px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600',
-                        background: u.role === 'Seller' ? '#ecfdf5' : '#eff6ff',
-                        color: u.role === 'Seller' ? '#10b981' : '#3b82f6',
+                        background: u.role === 'Seller' ? '#ecfdf5' : u.role === 'Agent' ? '#eff6ff' : u.role === 'Admin' ? '#fef3c7' : '#f3f4f6',
+                        color: u.role === 'Seller' ? '#10b981' : u.role === 'Agent' ? '#2563eb' : u.role === 'Admin' ? '#d97706' : '#6b7280',
                       }}>
                         {u.role || 'Client'}
                       </span>
@@ -474,6 +529,100 @@ export default function Admin() {
           </div>
         )}
 
+        {/* ====== VERIFICATIONS TAB ====== */}
+        {activeTab === 'verifications' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {pendingVerifications.length === 0 ? (
+              <div style={{ background: 'white', borderRadius: '16px', border: '1px solid #e5e7eb', padding: '40px', textAlign: 'center' }}>
+                <FaCheckCircle size={32} color="#10b981" />
+                <p style={{ margin: '12px 0 0', color: '#6b7280', fontSize: '0.9rem' }}>No pending verifications.</p>
+              </div>
+            ) : (
+              pendingVerifications.map(u => (
+                <div key={u.id} style={{ background: 'white', borderRadius: '16px', border: '1px solid #e5e7eb', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                  {/* User Info Header */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '16px' }}>
+                    <img
+                      src={u.photoURL || `https://ui-avatars.com/api/?name=${u.firstName || 'U'}+${u.lastName || ''}&rounded=true&size=48`}
+                      style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }}
+                      alt=""
+                    />
+                    <div style={{ flex: 1 }}>
+                      <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: '700', color: '#111' }}>
+                        {u.firstName} {u.lastName}
+                      </h3>
+                      <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#6b7280' }}>
+                        {u.email} &middot;{' '}
+                        <span style={{ padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: '600',
+                          background: u.role === 'Seller' ? '#ecfdf5' : '#eff6ff',
+                          color: u.role === 'Seller' ? '#10b981' : '#2563eb'
+                        }}>
+                          {u.role}
+                        </span>
+                        {' '}&middot; ID: <span style={{ fontFamily: 'monospace', fontSize: '0.78rem' }}>{u.customId}</span>
+                        {' '}&middot; Registered: {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Seller: Gov ID */}
+                  {u.role === 'Seller' && (
+                    <div style={{ background: '#fffbeb', padding: '16px', borderRadius: '12px', border: '1px solid #fde68a', marginBottom: '16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                        <FaIdCard size={14} color="#d97706" />
+                        <span style={{ fontWeight: '700', fontSize: '0.85rem', color: '#92400e' }}>Government-Issued ID</span>
+                      </div>
+                      {u.governmentIdUrl ? (
+                        <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                          <a href={u.governmentIdUrl} target="_blank" rel="noopener noreferrer">
+                            <img src={u.governmentIdUrl} alt="Gov ID" style={{ maxWidth: '320px', maxHeight: '220px', borderRadius: '10px', border: '2px solid #e5e7eb', objectFit: 'cover', cursor: 'pointer' }} />
+                          </a>
+                          {u.governmentIdOcrText && (
+                            <div style={{ flex: 1, minWidth: '200px' }}>
+                              <p style={{ fontSize: '0.78rem', fontWeight: '600', color: '#92400e', marginBottom: '6px' }}>Extracted Text (OCR):</p>
+                              <pre style={{ background: '#fef3c7', padding: '12px', borderRadius: '8px', fontSize: '0.75rem', color: '#78350f', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: '180px', overflow: 'auto', margin: 0, border: '1px solid #fde68a' }}>
+                                {u.governmentIdOcrText}
+                              </pre>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <p style={{ color: '#d97706', fontSize: '0.85rem' }}>No government ID uploaded.</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Agent: PRC License */}
+                  {u.role === 'Agent' && (
+                    <div style={{ background: '#eff6ff', padding: '16px', borderRadius: '12px', border: '1px solid #bfdbfe', marginBottom: '16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <FaCertificate size={14} color="#2563eb" />
+                        <span style={{ fontWeight: '700', fontSize: '0.85rem', color: '#1e40af' }}>PRC License Number</span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700', fontFamily: 'monospace', color: '#1d4ed8', letterSpacing: '0.05em' }}>
+                        {u.prcLicenseNo || '—'}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                    <button onClick={() => navigate(`/profile/${u.id}`)} style={{ ...actionBtnStyle, padding: '10px 18px', fontSize: '0.82rem' }}>
+                      <FaEye size={12} /> View Profile
+                    </button>
+                    <button onClick={() => handleRejectVerification(u.id)} style={{ ...actionBtnStyle, padding: '10px 18px', fontSize: '0.82rem', color: '#ef4444', background: '#fef2f2' }}>
+                      <FaTimesCircle size={12} /> Reject
+                    </button>
+                    <button onClick={() => handleApproveVerification(u.id)} style={{ background: '#10b981', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <FaCheckCircle size={12} /> Approve
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
         {/* ====== REPORTS TAB ====== */}
         {activeTab === 'reports' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -504,6 +653,12 @@ export default function Admin() {
                     <p style={{ margin: 0, fontSize: '0.8rem', color: '#6b7280' }}>
                       Reason: <strong>{r.reason}</strong> • Reported by: {r.reporterName || 'Anonymous'} • {r.createdAt ? new Date(r.createdAt).toLocaleString() : ''}
                     </p>
+                    {r.description && (
+                      <div style={{ marginTop: '8px', background: '#f9fafb', padding: '10px 14px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                        <p style={{ margin: 0, fontSize: '0.78rem', color: '#374151', fontWeight: '600' }}>Description / Proof:</p>
+                        <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#4b5563', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>{r.description}</p>
+                      </div>
+                    )}
                   </div>
                   {r.status === 'pending' && (
                     <div style={{ display: 'flex', gap: '8px', marginLeft: '16px' }}>

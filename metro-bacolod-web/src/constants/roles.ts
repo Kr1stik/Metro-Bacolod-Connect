@@ -6,7 +6,7 @@
 export const ADMIN_EMAIL = "kin3.mahinay@gmail.com";
 
 // Role types
-export type UserRole = "Seller" | "Client" | "Admin";
+export type UserRole = "Seller" | "Agent" | "Client" | "Admin";
 
 /**
  * Check if the user is the platform admin.
@@ -17,18 +17,18 @@ export function isAdmin(email?: string | null): boolean {
 
 /**
  * Check if the user can create/edit/delete listings.
- * Only Agents and Admins can do this.
+ * Only verified Sellers, Agents, and Admins can do this.
  */
 export function canCreateListings(role?: string | null, email?: string | null): boolean {
-  return role === "Seller" || isAdmin(email);
+  return role === "Seller" || role === "Agent" || isAdmin(email);
 }
 
 /**
  * Check if the user can access the Trash/Archive page.
- * Only Agents and Admins can do this.
+ * Only Sellers, Agents, and Admins can do this.
  */
 export function canAccessTrash(role?: string | null, email?: string | null): boolean {
-  return role === "Seller" || isAdmin(email);
+  return role === "Seller" || role === "Agent" || isAdmin(email);
 }
 
 /**
@@ -45,4 +45,11 @@ export function canManagePost(
   // Clients can never edit/delete posts
   if (role === "Client") return false;
   return !!currentUserId && !!postOwnerId && currentUserId === postOwnerId;
+}
+
+/**
+ * Check if the role requires admin verification before posting.
+ */
+export function requiresVerification(role?: string | null): boolean {
+  return role === "Seller" || role === "Agent";
 }

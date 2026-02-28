@@ -22,7 +22,7 @@ import "../App.css";
 import Swal from 'sweetalert2';
 import { glassToast } from '../components/GlassToast';
 import { BACOLOD_LOCATIONS } from "../constants/locations";
-import { canCreateListings, canAccessTrash, canManagePost, isAdmin } from "../constants/roles";
+import { canCreateListings, canAccessTrash, canManagePost, isAdmin, requiresVerification } from "../constants/roles";
 import DOMPurify from 'dompurify';
 
 const RatingStars = ({ rating }: { rating: number }) => {
@@ -334,7 +334,10 @@ export default function Dashboard() {
   };
 
   const handleCreateListing = async () => {
-    if (!canCreateListings(userData?.role, user?.email)) return glassToast.error("Only sellers can create listings.");
+    if (!canCreateListings(userData?.role, user?.email)) return glassToast.error("Only sellers and agents can create listings.");
+    if (requiresVerification(userData?.role) && !userData?.isVerified) {
+      return glassToast.error("Your account is pending verification. An admin must verify your identity before you can post listings.");
+    }
     if (!listingTitle.trim() || !listingLocation || !listingPrice.trim() || imageFiles.length === 0 || !listingPinCoords) {
       return glassToast.warning("Please fill all required fields and pin the location.");
     }
@@ -532,12 +535,25 @@ export default function Dashboard() {
     } catch { /* proceed if check fails */ }
     const { value: reason } = await Swal.fire({
       title: 'Report Listing', input: 'select', inputOptions: { 'misleading': 'Misleading Information', 'inappropriate': 'Inappropriate Content', 'scam': 'Suspected Scam', 'duplicate': 'Duplicate Listing', 'other': 'Other' },
-      inputPlaceholder: 'Select a reason', showCancelButton: true, confirmButtonColor: '#111827', confirmButtonText: 'Submit Report',
+      inputPlaceholder: 'Select a reason', showCancelButton: true, confirmButtonColor: '#111827', confirmButtonText: 'Next',
       inputValidator: (value) => { if (!value) return 'Please select a reason.'; },
     });
     if (!reason) return;
+    // Step 2: Ask for description/proof
+    const { value: description } = await Swal.fire({
+      title: 'Provide Details',
+      html: '<p style="font-size:0.85rem;color:#6b7280;margin-bottom:10px">Please describe why you are reporting this listing. Include any evidence or context that supports your report.</p>',
+      input: 'textarea',
+      inputPlaceholder: 'e.g. The listing photos appear to be from a different property. The price is suspiciously low compared to market value...',
+      inputAttributes: { 'aria-label': 'Description', style: 'min-height:120px' },
+      showCancelButton: true,
+      confirmButtonColor: '#111827',
+      confirmButtonText: 'Submit Report',
+      inputValidator: (value) => { if (!value || !value.trim()) return 'Please provide a description for your report.'; },
+    });
+    if (!description) return;
     try {
-      await addDoc(collection(db, "reports"), { postId: listing.id, postTitle: listing.title, reportedBy: user.uid, reporterName: userData?.firstName ? `${userData.firstName} ${userData.lastName}` : user.displayName, reason, status: 'pending', createdAt: new Date().toISOString() });
+      await addDoc(collection(db, "reports"), { postId: listing.id, postTitle: listing.title, reportedBy: user.uid, reporterName: userData?.firstName ? `${userData.firstName} ${userData.lastName}` : user.displayName, reason, description: description.trim(), status: 'pending', createdAt: new Date().toISOString() });
       glassToast.success("Report submitted. We'll review it shortly.");
     } catch { glassToast.error("Failed to submit report."); }
   };
