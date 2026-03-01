@@ -1,4 +1,5 @@
 import { Controller, Post, Get, Put, Delete, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { UsersService } from './users.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
 import { AdminGuard } from '../guards/admin.guard';
@@ -34,9 +35,10 @@ export class UsersController {
     return this.usersService.updateProfile(req.user.uid, body);
   }
 
-  // GET /users/search?q=name - Search users
+  // GET /users/search?q=name - Search users (OWASP A04: stricter rate limit)
   @Get('search')
   @UseGuards(FirebaseAuthGuard)
+  @Throttle({ default: { ttl: 60000, limit: 30 } })
   search(@Query('q') q: string, @Query('limit') limit?: string) {
     return this.usersService.searchUsers(q || '', limit ? parseInt(limit) : 20);
   }
@@ -62,38 +64,43 @@ export class UsersController {
     return this.usersService.findOne(id);
   }
 
-  // PUT /users/:id/role - Admin: change role
+  // PUT /users/:id/role - Admin: change role (OWASP A07: revokes tokens)
   @Put(':id/role')
   @UseGuards(FirebaseAuthGuard, AdminGuard)
-  changeRole(@Param('id') id: string, @Body() body: ChangeRoleDto) {
-    return this.usersService.changeRole(id, body.role);
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  changeRole(@Param('id') id: string, @Body() body: ChangeRoleDto, @Req() req: any) {
+    return this.usersService.changeRole(id, body.role, req.user.uid, req.user.email);
   }
 
   // PUT /users/:id/deactivate - Admin: deactivate/reactivate
   @Put(':id/deactivate')
   @UseGuards(FirebaseAuthGuard, AdminGuard)
-  setDeactivated(@Param('id') id: string, @Body() body: DeactivateUserDto) {
-    return this.usersService.setDeactivated(id, body.isDeactivated);
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  setDeactivated(@Param('id') id: string, @Body() body: DeactivateUserDto, @Req() req: any) {
+    return this.usersService.setDeactivated(id, body.isDeactivated, req.user.uid, req.user.email);
   }
 
   // DELETE /users/:id - Admin: soft delete user
   @Delete(':id')
   @UseGuards(FirebaseAuthGuard, AdminGuard)
-  deleteUser(@Param('id') id: string) {
-    return this.usersService.deleteUser(id);
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  deleteUser(@Param('id') id: string, @Req() req: any) {
+    return this.usersService.deleteUser(id, req.user.uid, req.user.email);
   }
 
-  // PUT /users/:id/verify-approve - Admin: approve verification & send email
+  // PUT /users/:id/verify-approve - Admin: approve verification & send email (OWASP A04: strict rate limit)
   @Put(':id/verify-approve')
   @UseGuards(FirebaseAuthGuard, AdminGuard)
-  approveVerification(@Param('id') id: string) {
-    return this.usersService.approveVerification(id);
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  approveVerification(@Param('id') id: string, @Req() req: any) {
+    return this.usersService.approveVerification(id, req.user.uid, req.user.email);
   }
 
-  // PUT /users/:id/verify-reject - Admin: reject verification & send email
+  // PUT /users/:id/verify-reject - Admin: reject verification & send email (OWASP A04: strict rate limit)
   @Put(':id/verify-reject')
   @UseGuards(FirebaseAuthGuard, AdminGuard)
-  rejectVerification(@Param('id') id: string, @Body() body: RejectVerificationDto) {
-    return this.usersService.rejectVerification(id, body.reason);
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  rejectVerification(@Param('id') id: string, @Body() body: RejectVerificationDto, @Req() req: any) {
+    return this.usersService.rejectVerification(id, body.reason, req.user.uid, req.user.email);
   }
 }

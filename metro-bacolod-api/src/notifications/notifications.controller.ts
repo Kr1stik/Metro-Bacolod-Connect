@@ -9,9 +9,11 @@ import {
   Query,
   UseGuards,
   Req,
+  ForbiddenException,
 } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
+import { AdminGuard } from '../guards/admin.guard';
 import { CreateNotificationDto } from './dto/notification.dto';
 
 @Controller('notifications')
@@ -34,12 +36,28 @@ export class NotificationsController {
     return this.notificationsService.getUnreadCount(req.user.uid);
   }
 
-  // POST /notifications - create a notification
+  // POST /notifications - create a notification (OWASP A01: restricted to system/admin actions)
+  // Users can only create notifications where they are the sender
+  // They cannot impersonate other users as the sender
   @Post()
   create(@Body() body: CreateNotificationDto, @Req() req: any) {
+    // Prevent users from setting an arbitrary senderId different from themselves
+    if (body.senderId && body.senderId !== req.user.uid) {
+      throw new ForbiddenException('Cannot create notifications on behalf of another user.');
+    }
     return this.notificationsService.createNotification({
       ...body,
       senderId: req.user.uid,
+    });
+  }
+
+  // POST /notifications/system - Admin only: create system notifications for any user
+  @Post('system')
+  @UseGuards(AdminGuard)
+  createSystemNotification(@Body() body: CreateNotificationDto) {
+    return this.notificationsService.createNotification({
+      ...body,
+      senderId: 'system',
     });
   }
 

@@ -19,3 +19,7 @@ Thumbs.db
 # IDE files
 .vscode/
 .idea/
+
+# Markdown docs (keep local only)
+*.md
+!README.md
