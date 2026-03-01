@@ -11,12 +11,14 @@ import { PostsModule } from './posts/posts.module';
 import { ChatsModule } from './chats/chats.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ReportsModule } from './reports/reports.module';
+import { EmailModule } from './email/email.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     FirebaseModule,
+    EmailModule,
     UsersModule,
     CloudinaryModule,
     PostsModule,
