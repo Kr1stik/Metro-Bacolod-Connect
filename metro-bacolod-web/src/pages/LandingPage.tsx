@@ -105,15 +105,34 @@ export default function LandingPage() {
         return; 
       }
 
-      // Check if account is deactivated
+      // 1. Check if user profile exists in Firestore
       const userDoc = await getDoc(doc(db, "users", user.uid));
-      if (userDoc.exists() && userDoc.data().isDeactivated) {
-        await signOut(auth);
-        glassToast.error("This account has been deactivated. Contact support.");
-        return;
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        
+        // Check if account is deactivated
+        if (userData.isDeactivated) {
+          await signOut(auth);
+          glassToast.error("This account has been deactivated. Contact support.");
+          return;
+        }
+
+        // Close modal and route based on role
+        setShowLogin(false);
+        if (userData.role === "Admin") {
+          navigate("/admin");
+        } else {
+          navigate("/dashboard");
+        }
+        
+      } else {
+        // 🚀 Brand new user -> send to profile setup!
+        setShowLogin(false);
+        glassToast.info("Please complete your profile.");
+        navigate("/complete-profile");
       }
 
-      navigate("/dashboard");
     } catch (error: any) {
       if (error.code === 'auth/invalid-credential') {
         glassToast.error("Incorrect email or password.");
@@ -128,15 +147,34 @@ export default function LandingPage() {
       const result = await signInWithPopup(auth, googleProvider);
       const gUser = result.user;
 
-      // Check if account is deactivated
+      // 1. Check if user profile exists in Firestore
       const userDoc = await getDoc(doc(db, "users", gUser.uid));
-      if (userDoc.exists() && userDoc.data().isDeactivated) {
-        await signOut(auth);
-        glassToast.error("This account has been deactivated. Contact support.");
-        return;
-      }
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        
+        // Check if account is deactivated
+        if (userData.isDeactivated) {
+          await signOut(auth);
+          glassToast.error("This account has been deactivated. Contact support.");
+          return;
+        }
 
-      navigate("/dashboard");
+        // Close modal and route based on role
+        setShowLogin(false);
+        glassToast.success("Google login successful!");
+        if (userData.role === "Admin") {
+          navigate("/admin");
+        } else {
+          navigate("/dashboard");
+        }
+        
+      } else {
+        // 🚀 Brand new user -> send to profile setup!
+        setShowLogin(false);
+        glassToast.info("Please complete your profile.");
+        navigate("/complete-profile");
+      }
     } catch (error: any) {
       glassToast.error("Google login failed");
     }
