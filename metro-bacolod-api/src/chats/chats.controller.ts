@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Delete, Put, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Put, Body, Param, Query, UseGuards, Req, BadRequestException } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ChatsService } from './chats.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
 import { SendMessageDto, CreateChatDto } from './dto/chat.dto';
@@ -14,22 +15,24 @@ export class ChatsController {
     return this.chatsService.getChats(req.user.uid);
   }
 
-  // POST /chats - Get or create chat with another user
+  // POST /chats - Get or create chat with another user (OWASP A07)
   @Post()
   getOrCreateChat(@Body() body: CreateChatDto, @Req() req: any) {
     const otherUid = body.participants.find(p => p !== req.user.uid);
-    if (!otherUid) throw new Error('Must include another participant');
+    if (!otherUid) throw new BadRequestException('Must include another participant');
     return this.chatsService.getOrCreateChat(req.user.uid, otherUid);
   }
 
   // GET /chats/:id/messages - Get messages in a chat
   @Get(':id/messages')
   getMessages(@Param('id') id: string, @Req() req: any, @Query('limit') limit?: string) {
-    return this.chatsService.getMessages(id, req.user.uid, limit ? parseInt(limit) : 50);
+    const safeLimit = Math.min(Math.max(parseInt(limit || '50', 10) || 50, 1), 200);
+    return this.chatsService.getMessages(id, req.user.uid, safeLimit);
   }
 
-  // POST /chats/:id/messages - Send a message
+  // POST /chats/:id/messages - Send a message (OWASP A04: rate limit messaging)
   @Post(':id/messages')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   sendMessage(@Param('id') id: string, @Body() body: SendMessageDto, @Req() req: any) {
     return this.chatsService.sendMessage(id, req.user.uid, body);
   }

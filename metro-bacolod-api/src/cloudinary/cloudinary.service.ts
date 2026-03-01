@@ -88,13 +88,16 @@ export class CloudinaryService {
 
   /**
    * Generate a time-limited signed URL for accessing authenticated resources (OWASP A02)
+   * The expiresInSeconds parameter controls URL lifetime (default: 1 hour)
    */
   getSignedUrl(publicId: string, expiresInSeconds = 3600): string {
+    const expiresAt = Math.floor(Date.now() / 1000) + expiresInSeconds;
     return cloudinary.url(publicId, {
       sign_url: true,
       type: 'authenticated',
       secure: true,
       transformation: [{ quality: 'auto', fetch_format: 'auto' }],
+      expires_at: expiresAt,
     });
   }
 

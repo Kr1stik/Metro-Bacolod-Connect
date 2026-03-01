@@ -141,19 +141,19 @@ service cloud.firestore {
     // NOTIFICATIONS COLLECTION
     // ============================================
     match /notifications/{notifId} {
-      // Users can read their own notifications
+      // Users can read their own notifications (OWASP A01: use recipientId field)
       allow read: if isAuthenticated() && 
-        resource.data.userId == request.auth.uid;
+        resource.data.recipientId == request.auth.uid;
 
       // Authenticated users can create notifications (for others)
       allow create: if isAuthenticated();
 
       // Users can update their own notifications (mark as read)
       allow update: if isAuthenticated() && 
-        resource.data.userId == request.auth.uid;
+        resource.data.recipientId == request.auth.uid;
 
       // Users can delete their own notifications, admin can delete any
-      allow delete: if (isAuthenticated() && resource.data.userId == request.auth.uid) || isAdmin();
+      allow delete: if (isAuthenticated() && resource.data.recipientId == request.auth.uid) || isAdmin();
     }
 
     // ============================================
@@ -180,8 +180,8 @@ service cloud.firestore {
       // Only admins can read logs
       allow read: if isAdmin();
 
-      // Backend/admins can create logs, but no user can edit or delete
-      allow create: if isAuthenticated();
+      // OWASP A09: Only admins/backend can create logs (not regular users)
+      allow create: if isAdmin();
 
       // Logs cannot be updated or deleted (tamper-proof)
       allow update, delete: if false;

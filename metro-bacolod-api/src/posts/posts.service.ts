@@ -1,6 +1,15 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException, ForbiddenException } from '@nestjs/common';
 import * as admin from 'firebase-admin';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import * as sanitizeHtmlModule from 'sanitize-html';
+
+const sanitizeHtml = (sanitizeHtmlModule as any).default || sanitizeHtmlModule;
+
+/** Strip all HTML/script from user text fields (OWASP A03) */
+function sanitize(text: string | undefined): string | undefined {
+  if (!text) return text;
+  return sanitizeHtml(text, { allowedTags: [], allowedAttributes: {} });
+}
 
 @Injectable()
 export class PostsService {
@@ -9,20 +18,23 @@ export class PostsService {
     private readonly cloudinaryService: CloudinaryService,
   ) {}
 
-  // 1. CREATE POST
+  // 1. CREATE POST (OWASP A03: sanitize text fields)
   async create(createPostDto: any) {
     const collection = this.firestore.firestore().collection('posts');
-    const newDoc = await collection.add({
+    const sanitizedDto = {
       ...createPostDto,
-      // Ensure we save an array. If for some reason it's missing, save empty array.
-      images: createPostDto.images || [], 
+      title: sanitize(createPostDto.title),
+      content: sanitize(createPostDto.content),
+      location: sanitize(createPostDto.location),
+      images: createPostDto.images || [],
       likes: 0,
       likedBy: [],
       savedBy: [],
       isArchived: false,
       createdAt: new Date().toISOString(),
-    });
-    return { id: newDoc.id, ...createPostDto };
+    };
+    const newDoc = await collection.add(sanitizedDto);
+    return { id: newDoc.id, ...sanitizedDto };
   }
 
   /// UPDATED FIND ALL
@@ -56,7 +68,7 @@ export class PostsService {
     const postRef = this.firestore.firestore().collection('posts').doc(postId);
     const post = await postRef.get();
 
-    if (!post.exists) throw new Error('Post not found');
+    if (!post.exists) throw new NotFoundException('Post not found');
 
     const data = post.data();
     const likedBy = data?.likedBy || [];
@@ -79,13 +91,13 @@ export class PostsService {
     return { likes };
   }
 
-  // UPDATED: DELETE POST (Soft Delete + Cloudinary cleanup)
-  async delete(postId: string, userId: string) {
+  // UPDATED: DELETE POST (Soft Delete + Cloudinary cleanup) (OWASP A01: admin bypass)
+  async delete(postId: string, userId: string, isAdmin = false) {
     const postRef = this.firestore.firestore().collection('posts').doc(postId);
     const post = await postRef.get();
 
-    if (!post.exists) throw new Error('Post not found');
-    if (post.data()?.userId !== userId) throw new Error('Unauthorized');
+    if (!post.exists) throw new NotFoundException('Post not found');
+    if (!isAdmin && post.data()?.userId !== userId) throw new ForbiddenException('Not authorized to delete this post');
 
     // Clean up Cloudinary images
     const images: string[] = post.data()?.images || [];
@@ -100,25 +112,25 @@ export class PostsService {
     return { message: 'Post moved to trash' };
   }
 
-  // NEW: RESTORE POST (Undo)
-  async restore(postId: string, userId: string) {
+  // NEW: RESTORE POST (Undo) (OWASP A01: admin bypass)
+  async restore(postId: string, userId: string, isAdmin = false) {
     const postRef = this.firestore.firestore().collection('posts').doc(postId);
     const post = await postRef.get();
 
-    if (!post.exists) throw new Error('Post not found');
-    if (post.data()?.userId !== userId) throw new Error('Unauthorized');
+    if (!post.exists) throw new NotFoundException('Post not found');
+    if (!isAdmin && post.data()?.userId !== userId) throw new ForbiddenException('Not authorized to restore this post');
 
     await postRef.update({ isArchived: false, deletedAt: admin.firestore.FieldValue.delete() });
     return { message: 'Post restored' };
   }
 
-  // 5. UPDATE POST (handles all editable fields)
-  async update(postId: string, userId: string, updateData: any) {
+  // 5. UPDATE POST (handles all editable fields) (OWASP A01: admin bypass, A03: sanitize)
+  async update(postId: string, userId: string, updateData: any, isAdmin = false) {
     const postRef = this.firestore.firestore().collection('posts').doc(postId);
     const post = await postRef.get();
 
-    if (!post.exists) throw new Error('Post not found');
-    if (post.data()?.userId !== userId) throw new Error('Unauthorized');
+    if (!post.exists) throw new NotFoundException('Post not found');
+    if (!isAdmin && post.data()?.userId !== userId) throw new ForbiddenException('Not authorized to update this post');
 
     // Only pick allowed fields to prevent overwriting system fields
     const allowedFields = [
@@ -127,15 +139,17 @@ export class PostsService {
       'amenities', 'images', 'pinCoords',
     ];
 
-    const sanitized: Record<string, any> = {};
+    const textFields = ['title', 'content', 'location'];
+    const cleaned: Record<string, any> = {};
     for (const field of allowedFields) {
       if (updateData[field] !== undefined) {
-        sanitized[field] = updateData[field];
+        // OWASP A03: sanitize text fields
+        cleaned[field] = textFields.includes(field) ? sanitize(updateData[field]) : updateData[field];
       }
     }
 
-    sanitized.updatedAt = new Date().toISOString();
-    await postRef.update(sanitized);
+    cleaned.updatedAt = new Date().toISOString();
+    await postRef.update(cleaned);
     return { message: 'Post updated' };
   }
 

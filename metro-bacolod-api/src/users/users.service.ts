@@ -1,7 +1,10 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
 import * as admin from 'firebase-admin';
+import * as sanitizeHtmlModule from 'sanitize-html';
 import { EmailService } from '../email/email.service';
 import { SecurityLoggerService } from '../logger/security-logger.service';
+
+const sanitizeHtml = (sanitizeHtmlModule as any).default || sanitizeHtmlModule;
 
 @Injectable()
 export class UsersService {
@@ -15,15 +18,61 @@ export class UsersService {
     return admin.firestore();
   }
 
-  // Whitelist of fields allowed for user creation
+  // Whitelist of fields allowed for user creation (OWASP A01: isVerified, verificationStatus removed — server-enforced)
   private readonly CREATE_ALLOWED_FIELDS = [
     'uid', 'email', 'firstName', 'lastName', 'middleInitial', 'dob', 'gender',
-    'maritalStatus', 'mobile', 'phone', 'address', 'fullAddress', 'street', 'city', 'province', 'role',
+    'maritalStatus', 'mobile', 'phone', 'address', 'fullAddress', 'street', 'city', 'province',
     'customId', 'photoURL', 'displayName', 'description',
-    'prcLicenseNo', 'prcIdFrontUrl', 'prcIdBackUrl', 'prcOcrText',
-    'governmentIdFrontUrl', 'governmentIdBackUrl', 'governmentIdOcrText',
-    'isVerified', 'verificationStatus', 'termsAcceptedAt',
+    'prcLicenseNo', 'prcIdFrontUrl', 'prcIdBackUrl',
+    'governmentIdFrontUrl', 'governmentIdBackUrl',
+    'termsAcceptedAt',
   ];
+
+  // Safe fields to expose in public API responses (OWASP A02: strip PII)
+  private readonly PUBLIC_SAFE_FIELDS = [
+    'id', 'firstName', 'lastName', 'middleInitial', 'displayName', 'photoURL',
+    'role', 'description', 'city', 'province', 'customId',
+    'isVerified', 'verificationStatus', 'isDeactivated', 'createdAt',
+  ];
+
+  // Additional fields visible only to the user themselves or admins
+  private readonly PRIVATE_FIELDS = [
+    'email', 'dob', 'gender', 'maritalStatus', 'mobile', 'phone',
+    'address', 'fullAddress', 'street', 'prcLicenseNo',
+    'prcIdFrontUrl', 'prcIdBackUrl', 'prcOcrText',
+    'governmentIdFrontUrl', 'governmentIdBackUrl', 'governmentIdOcrText',
+    'termsAcceptedAt', 'updatedAt', 'verifiedAt', 'rejectionReason', 'deletedAt',
+  ];
+
+  /**
+   * Strip sensitive fields from user data for public responses (OWASP A02)
+   */
+  private toPublicProfile(data: Record<string, any>): Record<string, any> {
+    const result: Record<string, any> = {};
+    for (const key of this.PUBLIC_SAFE_FIELDS) {
+      if (data[key] !== undefined) result[key] = data[key];
+    }
+    return result;
+  }
+
+  /**
+   * Full profile for owner/admin views (includes private fields)
+   */
+  private toFullProfile(data: Record<string, any>): Record<string, any> {
+    const result: Record<string, any> = {};
+    const allFields = [...this.PUBLIC_SAFE_FIELDS, ...this.PRIVATE_FIELDS];
+    for (const key of allFields) {
+      if (data[key] !== undefined) result[key] = data[key];
+    }
+    return result;
+  }
+
+  /**
+   * Sanitize text input to prevent XSS (OWASP A03)
+   */
+  private sanitizeText(text: string): string {
+    return sanitizeHtml(text, { allowedTags: [], allowedAttributes: {} });
+  }
 
   // Whitelist of fields allowed for profile updates
   private readonly UPDATE_ALLOWED_FIELDS = [
@@ -42,32 +91,65 @@ export class UsersService {
     return result;
   }
 
-  // CREATE
+  // CREATE — with server-enforced defaults (OWASP A01: prevents self-verification/role escalation)
   async createUser(userData: any) {
     try {
       const sanitized = this.pickFields(userData, this.CREATE_ALLOWED_FIELDS);
+
+      // Sanitize text fields (OWASP A03)
+      if (sanitized.firstName) sanitized.firstName = this.sanitizeText(sanitized.firstName);
+      if (sanitized.lastName) sanitized.lastName = this.sanitizeText(sanitized.lastName);
+      if (sanitized.description) sanitized.description = this.sanitizeText(sanitized.description);
+      if (sanitized.displayName) sanitized.displayName = this.sanitizeText(sanitized.displayName);
+
+      // Validate and enforce role — only allow Client, Seller, Agent (OWASP A01)
+      const allowedRoles = ['Client', 'Seller', 'Agent'];
+      const role = allowedRoles.includes(userData.role) ? userData.role : 'Client';
+
       await this.db.collection('users').doc(userData.uid).set({
         ...sanitized,
+        role,                              // Server-enforced role
+        isVerified: false,                  // Always false on creation — admin must verify
+        verificationStatus: (role === 'Seller' || role === 'Agent') ? 'pending' : 'not_required',
         createdAt: new Date().toISOString(),
         isDeactivated: false,
       });
       return { message: 'User created successfully' };
     } catch (error) {
-      console.error('Error creating user:', error);
+      this.logger.error('Error creating user:', error);
       throw error;
     }
   }
 
-  // GET BY ID
-  async findOne(uid: string) {
+  // GET BY ID — returns public profile only (OWASP A02)
+  async findOne(uid: string, requesterId?: string) {
     const doc = await this.db.collection('users').doc(uid).get();
     if (!doc.exists) throw new NotFoundException('User not found');
-    return { id: doc.id, ...doc.data() };
+    const data = { id: doc.id, ...doc.data() } as Record<string, any>;
+
+    // If the requester is the owner, return full profile
+    if (requesterId && requesterId === uid) {
+      return this.toFullProfile(data);
+    }
+
+    // Check if requester is admin for full access
+    if (requesterId) {
+      try {
+        const requesterDoc = await this.db.collection('users').doc(requesterId).get();
+        if (requesterDoc.exists && requesterDoc.data()?.role === 'Admin') {
+          return this.toFullProfile(data);
+        }
+      } catch { /* fall through to public profile */ }
+    }
+
+    return this.toPublicProfile(data);
   }
 
-  // GET CURRENT USER (self)
+  // GET CURRENT USER (self) — returns full profile
   async getMe(uid: string) {
-    return this.findOne(uid);
+    const doc = await this.db.collection('users').doc(uid).get();
+    if (!doc.exists) throw new NotFoundException('User not found');
+    return this.toFullProfile({ id: doc.id, ...doc.data() } as Record<string, any>);
   }
 
   // UPDATE PROFILE (self)
@@ -93,7 +175,7 @@ export class UsersService {
         .where('isDeactivated', '==', false)
         .limit(safeLimit)
         .get();
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return snapshot.docs.map(doc => this.toPublicProfile({ id: doc.id, ...doc.data() } as Record<string, any>));
     }
 
     // Use a Firestore range query on firstName for prefix matching
@@ -118,7 +200,7 @@ export class UsersService {
       const data = doc.data();
       if (data.isDeactivated) return;
       seenIds.add(doc.id);
-      results.push({ id: doc.id, ...data });
+      results.push(this.toPublicProfile({ id: doc.id, ...data }));
     };
 
     nameSnapshot.docs.forEach(addResult);
@@ -127,15 +209,16 @@ export class UsersService {
     return results.slice(0, safeLimit);
   }
 
-  // GET PROFESSIONALS (Sellers)
+  // GET PROFESSIONALS (Sellers) — with limit cap (OWASP A01)
   async getProfessionals(limit = 50) {
+    const safeLimit = Math.min(limit, 100);
     const snapshot = await this.db.collection('users')
       .where('role', '==', 'Seller')
-      .limit(limit)
+      .limit(safeLimit)
       .get();
 
     return snapshot.docs
-      .map(doc => ({ id: doc.id, ...doc.data() }))
+      .map(doc => this.toPublicProfile({ id: doc.id, ...doc.data() } as Record<string, any>))
       .filter((u: any) => !u.isDeactivated);
   }
 
@@ -201,13 +284,14 @@ export class UsersService {
     return { message: `Role changed to ${role}` };
   }
 
-  // LIST ALL USERS (admin only)
+  // LIST ALL USERS (admin only) — admin sees full profiles, with limit cap
   async findAll(limit = 100) {
+    const safeLimit = Math.min(limit, 500);
     const snapshot = await this.db.collection('users')
-      .limit(limit)
+      .limit(safeLimit)
       .get();
 
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    return snapshot.docs.map(doc => this.toFullProfile({ id: doc.id, ...doc.data() } as Record<string, any>));
   }
 
   // DELETE USER (admin only - soft delete) — with activity logging
