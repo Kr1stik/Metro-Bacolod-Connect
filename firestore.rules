@@ -17,9 +17,11 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Check if the user is the platform admin
+    // Check if the user is an admin (role-based from users collection)
     function isAdmin() {
-      return isAuthenticated() && request.auth.token.email == 'kin3.mahinay@gmail.com';
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
     }
 
     // Check if the user's email is verified
@@ -169,6 +171,29 @@ service cloud.firestore {
 
       // Only admin can delete reports
       allow delete: if isAdmin();
+    }
+
+    // ============================================
+    // ACTIVITY LOGS COLLECTION (append-only, tamper-proof)
+    // ============================================
+    match /activityLogs/{logId} {
+      // Only admins can read logs
+      allow read: if isAdmin();
+
+      // Backend/admins can create logs, but no user can edit or delete
+      allow create: if isAuthenticated();
+
+      // Logs cannot be updated or deleted (tamper-proof)
+      allow update, delete: if false;
+    }
+
+    // ============================================
+    // EMAIL BROADCASTS COLLECTION
+    // ============================================
+    match /emailBroadcasts/{broadcastId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update, delete: if isAdmin();
     }
 
     // ============================================

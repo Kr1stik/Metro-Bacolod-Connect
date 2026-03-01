@@ -12,6 +12,7 @@ import { ChatsModule } from './chats/chats.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ReportsModule } from './reports/reports.module';
 import { EmailModule } from './email/email.module';
+import { SecurityLoggerModule } from './logger/security-logger.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { EmailModule } from './email/email.module';
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     FirebaseModule,
     EmailModule,
+    SecurityLoggerModule,
     UsersModule,
     CloudinaryModule,
     PostsModule,
