@@ -363,7 +363,7 @@ export default function Messages() {
 
       // Send notification
       await addDoc(collection(db, "notifications"), {
-        userId: otherUid,
+        recipientId: otherUid,
         message: `${user.displayName || 'Someone'} rated you ${overallRating} stars!`,
         link: '/profile',
         read: false,

@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Put, Delete, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
+import { Controller, Post, Get, Put, Delete, Body, Param, Query, UseGuards, Req, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { UsersService } from './users.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
@@ -6,17 +6,25 @@ import { AdminGuard } from '../guards/admin.guard';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto, ChangeRoleDto, DeactivateUserDto, RejectVerificationDto } from './dto/update-user.dto';
 
+/** Parse limit query param safely (OWASP A03: prevent NaN propagation) */
+function safeParseInt(value: string | undefined, defaultVal: number, max: number): number {
+  if (!value) return defaultVal;
+  const parsed = parseInt(value, 10);
+  if (isNaN(parsed) || parsed < 1) return defaultVal;
+  return Math.min(parsed, max);
+}
+
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  // POST /users/create - Create own profile
+  // POST /users/create - Create own profile (OWASP A01: UID verified server-side)
   @Post('create')
   @UseGuards(FirebaseAuthGuard)
   create(@Body() body: CreateUserDto, @Req() req: any) {
     const authenticatedUid = req.user.uid;
     if (body.uid && body.uid !== authenticatedUid) {
-      throw new Error('Cannot create profile for another user.');
+      throw new ForbiddenException('Cannot create profile for another user.');
     }
     return this.usersService.createUser({ ...body, uid: authenticatedUid });
   }
@@ -40,28 +48,28 @@ export class UsersController {
   @UseGuards(FirebaseAuthGuard)
   @Throttle({ default: { ttl: 60000, limit: 30 } })
   search(@Query('q') q: string, @Query('limit') limit?: string) {
-    return this.usersService.searchUsers(q || '', limit ? parseInt(limit) : 20);
+    return this.usersService.searchUsers(q || '', safeParseInt(limit, 20, 50));
   }
 
   // GET /users/professionals - List sellers/agents
   @Get('professionals')
   @UseGuards(FirebaseAuthGuard)
   getProfessionals(@Query('limit') limit?: string) {
-    return this.usersService.getProfessionals(limit ? parseInt(limit) : 50);
+    return this.usersService.getProfessionals(safeParseInt(limit, 50, 100));
   }
 
   // GET /users/all - Admin: list all users
   @Get('all')
   @UseGuards(FirebaseAuthGuard, AdminGuard)
   findAll(@Query('limit') limit?: string) {
-    return this.usersService.findAll(limit ? parseInt(limit) : 100);
+    return this.usersService.findAll(safeParseInt(limit, 100, 500));
   }
 
-  // GET /users/:id - Get user by ID
+  // GET /users/:id - Get user by ID (OWASP A02: returns public profile, full for owner/admin)
   @Get(':id')
   @UseGuards(FirebaseAuthGuard)
-  findOne(@Param('id') id: string) {
-    return this.usersService.findOne(id);
+  findOne(@Param('id') id: string, @Req() req: any) {
+    return this.usersService.findOne(id, req.user.uid);
   }
 
   // PUT /users/:id/role - Admin: change role (OWASP A07: revokes tokens)

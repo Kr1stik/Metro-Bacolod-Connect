@@ -268,7 +268,7 @@ export default function Dashboard() {
       await setDoc(doc(db, `users/${agentId}/reviews`, user.uid), { rating, reviewerId: user.uid, reviewerName: userData?.firstName ? `${userData.firstName} ${userData.lastName}` : (user.displayName || "User"), createdAt: new Date().toISOString() });
       glassToast.success(`Rated ${agentName} ${rating} stars!`);
       fetchAgentRating(agentId);
-      await addDoc(collection(db, "notifications"), { userId: agentId, message: `${userData?.firstName || user.displayName || 'Someone'} rated you ${rating} stars!`, link: '/profile', read: false, createdAt: new Date().toISOString() });
+      await addDoc(collection(db, "notifications"), { recipientId: agentId, message: `${userData?.firstName || user.displayName || 'Someone'} rated you ${rating} stars!`, link: '/profile', read: false, createdAt: new Date().toISOString() });
     } catch { glassToast.error("Failed to submit rating."); }
   };
 
@@ -276,15 +276,15 @@ export default function Dashboard() {
     if (!user) return;
     const unsub = onSnapshot(query(collection(db, "chats"), where("participants", "array-contains", user.uid)), (snap: any) => {
       let count = 0; snap.forEach((doc: any) => { if (doc.data().hasUnread?.[user.uid]) count++; }); setUnreadCount(count);
-    });
+    }, (err) => { console.error('Chat snapshot error:', err); });
     return () => unsub();
   }, [user]);
 
   useEffect(() => {
     if (!user) return;
-    const unsub = onSnapshot(query(collection(db, "notifications"), where("userId", "==", user.uid), orderBy("createdAt", "desc")), (snap) => {
+    const unsub = onSnapshot(query(collection(db, "notifications"), where("recipientId", "==", user.uid), orderBy("createdAt", "desc")), (snap) => {
       setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    }, (err) => { console.error('Notification snapshot error:', err); });
     return () => unsub();
   }, [user]);
 
@@ -314,7 +314,7 @@ export default function Dashboard() {
       setIsLoadingPosts(false);
       const agentIds = [...new Set(activePosts.map((p: any) => p.userId).filter(Boolean))];
       agentIds.forEach(id => fetchAgentRating(id));
-    });
+    }, (err) => { console.error('Posts snapshot error:', err); setIsLoadingPosts(false); });
     return () => unsub();
   }, [user]);
 
@@ -323,7 +323,8 @@ export default function Dashboard() {
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
-    setImageFiles(prev => [...prev, ...Array.from(e.target.files!)]);
+    const newFiles = Array.from(e.target.files);
+    setImageFiles(prev => [...prev, ...newFiles]);
     e.target.value = '';
   };
   const removeImage = (index: number) => { setImageFiles(prev => prev.filter((_, i) => i !== index)); };
@@ -431,7 +432,7 @@ export default function Dashboard() {
         const data = await response.json(); if (data.secure_url) newUrls.push(data.secure_url);
       }
       const finalImages = [...editImages, ...newUrls];
-      await updateDoc(postRef, { title: editTitle, content: editCaption, price: editPrice, location: editLocation, status: editStatus, type: editType, rooms: editRooms, bathrooms: editBathrooms, lotArea: editLotArea, floorArea: editFloorArea, yearBuilt: editYearBuilt, amenities: editAmenities.split(",").map((a) => a.trim()).filter(Boolean), images: finalImages, image: finalImages[0] });
+      await updateDoc(postRef, { title: DOMPurify.sanitize(editTitle), content: DOMPurify.sanitize(editCaption), price: editPrice, location: editLocation, status: editStatus, type: editType, rooms: editRooms, bathrooms: editBathrooms, lotArea: editLotArea, floorArea: editFloorArea, yearBuilt: editYearBuilt, amenities: editAmenities.split(",").map((a) => a.trim()).filter(Boolean), images: finalImages, image: finalImages[0] });
       glassToast.success("Listing updated!"); setEditingPostId(null);
     } catch (error) { glassToast.error("Failed to update listing"); } 
     finally { setIsUploading(false); }
@@ -510,7 +511,7 @@ export default function Dashboard() {
       if (newLiked) {
         await updateDoc(postRef, { likedBy: arrayUnion(user.uid) });
         const ownerId = selectedListing.originalPost?.userId;
-        if (ownerId && ownerId !== user.uid) await addDoc(collection(db, "notifications"), { userId: ownerId, message: `${userData?.firstName || user.displayName || 'Someone'} liked your listing "${selectedListing.title}"`, link: '/dashboard', read: false, createdAt: new Date().toISOString() });
+        if (ownerId && ownerId !== user.uid) await addDoc(collection(db, "notifications"), { recipientId: ownerId, message: `${userData?.firstName || user.displayName || 'Someone'} liked your listing "${selectedListing.title}"`, link: '/dashboard', read: false, createdAt: new Date().toISOString() });
       } else {
         await updateDoc(postRef, { likedBy: arrayRemove(user.uid) });
       }

@@ -28,8 +28,14 @@ h1 { font-size: 3.2em; line-height: 1.1; }
   box-shadow: none !important;
 }
 
-button, a, input, textarea, select {
+button, a, input:not([type="checkbox"]):not([type="radio"]), textarea, select {
   -webkit-appearance: none;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  -webkit-appearance: checkbox;
+  appearance: auto;
 }
 
 button:focus, button:active, button:focus-visible,

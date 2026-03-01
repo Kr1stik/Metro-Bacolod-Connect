@@ -2,12 +2,12 @@ import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from
 import * as admin from 'firebase-admin';
 
 /**
- * Firebase Authentication Guard
+ * Firebase Authentication Guard (OWASP A07)
  * 
  * Verifies the Firebase ID token from the Authorization header.
+ * Checks disabled status via Firebase Admin SDK (not decoded token).
+ * Checks deactivation status in Firestore.
  * Attaches the decoded token to `request.user` for downstream use.
- * 
- * Usage: @UseGuards(FirebaseAuthGuard) on controllers or routes
  */
 @Injectable()
 export class FirebaseAuthGuard implements CanActivate {
@@ -23,10 +23,27 @@ export class FirebaseAuthGuard implements CanActivate {
 
     try {
       const decodedToken = await admin.auth().verifyIdToken(token);
-      
-      // Check if the user's account is disabled in Firebase Auth
-      if (decodedToken.disabled) {
-        throw new UnauthorizedException('Account is disabled.');
+
+      // OWASP A07: Check if account is disabled via Firebase Admin SDK (not decoded token)
+      try {
+        const userRecord = await admin.auth().getUser(decodedToken.uid);
+        if (userRecord.disabled) {
+          throw new UnauthorizedException('Account is disabled.');
+        }
+      } catch (err) {
+        if (err instanceof UnauthorizedException) throw err;
+        // If we can't verify, allow through — fail-open for availability
+      }
+
+      // OWASP A01: Check if account is deactivated in Firestore
+      try {
+        const userDoc = await admin.firestore().collection('users').doc(decodedToken.uid).get();
+        if (userDoc.exists && userDoc.data()?.isDeactivated === true) {
+          throw new UnauthorizedException('Account has been deactivated.');
+        }
+      } catch (err) {
+        if (err instanceof UnauthorizedException) throw err;
+        // If Firestore check fails, allow through — user doc may not exist yet during registration
       }
 
       // Attach the decoded token to the request for controllers/services to use

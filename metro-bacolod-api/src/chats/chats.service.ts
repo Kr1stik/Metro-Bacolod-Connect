@@ -120,10 +120,11 @@ export class ChatsService {
     return { message: 'Message deleted' };
   }
 
-  // MARK AS READ
+  // MARK AS READ (OWASP A01: verify participant before updating)
   async markAsRead(chatId: string, uid: string) {
     const chatDoc = await this.db.collection('chats').doc(chatId).get();
     if (!chatDoc.exists) throw new NotFoundException('Chat not found');
+    if (!chatDoc.data()?.participants.includes(uid)) throw new ForbiddenException('Not a participant');
 
     await this.db.collection('chats').doc(chatId).update({
       [`hasUnread.${uid}`]: false,

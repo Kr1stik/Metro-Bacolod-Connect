@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import * as admin from 'firebase-admin';
 
 @Injectable()
@@ -19,10 +19,28 @@ export class NotificationsService {
     return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   }
 
-  // CREATE a notification
+  // CREATE a notification (OWASP A01: server-side sender info lookup)
   async createNotification(data: any) {
+    // Fetch sender info server-side to prevent spoofing (OWASP A01)
+    let senderName = data.senderName || '';
+    let senderAvatar = data.senderAvatar || '';
+    if (data.senderId) {
+      try {
+        const senderDoc = await this.db.collection('users').doc(data.senderId).get();
+        if (senderDoc.exists) {
+          const senderData = senderDoc.data();
+          senderName = `${senderData?.firstName || ''} ${senderData?.lastName || ''}`.trim() || senderData?.displayName || senderName;
+          senderAvatar = senderData?.photoURL || senderAvatar;
+        }
+      } catch {
+        // If lookup fails, proceed with provided data
+      }
+    }
+
     const doc = await this.db.collection('notifications').add({
       ...data,
+      senderName,
+      senderAvatar,
       isRead: false,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -36,7 +54,7 @@ export class NotificationsService {
 
     if (!doc.exists) throw new NotFoundException('Notification not found');
     if (doc.data()?.recipientId !== userId) {
-      throw new Error('Unauthorized');
+      throw new ForbiddenException('Not authorized to modify this notification');
     }
 
     await ref.update({ isRead: true });
@@ -71,14 +89,14 @@ export class NotificationsService {
     return { count: snapshot.size };
   }
 
-  // DELETE a notification
+  // DELETE a notification (OWASP A01: verify ownership)
   async deleteNotification(notificationId: string, userId: string) {
     const ref = this.db.collection('notifications').doc(notificationId);
     const doc = await ref.get();
 
     if (!doc.exists) throw new NotFoundException('Notification not found');
     if (doc.data()?.recipientId !== userId) {
-      throw new Error('Unauthorized');
+      throw new ForbiddenException('Not authorized to delete this notification');
     }
 
     await ref.delete();
