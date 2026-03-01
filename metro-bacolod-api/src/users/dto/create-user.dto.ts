@@ -23,7 +23,7 @@ export class CreateUserDto {
   address?: string;
 
   @IsOptional()
-  @IsIn(['Client', 'Seller', 'Admin'])
+  @IsIn(['Client', 'Seller', 'Agent'])
   role?: string;
 
   @IsOptional()

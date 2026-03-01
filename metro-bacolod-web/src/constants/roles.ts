@@ -2,17 +2,62 @@
 // RBAC Constants & Helpers
 // ============================================
 
-// Admin email — has both Agent + Client privileges
-export const ADMIN_EMAIL = "kin3.mahinay@gmail.com";
+import { collection, getDocs, query, where } from "firebase/firestore";
+// Admin detection queries "users" collection where role === "Admin"
+import { db } from "../firebase-config";
 
 // Role types
 export type UserRole = "Seller" | "Agent" | "Client" | "Admin";
 
+// Cache admin emails from users with role "Admin"
+let cachedAdminEmails: string[] | null = null;
+let adminCacheTimestamp = 0;
+const ADMIN_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 /**
- * Check if the user is the platform admin.
+ * Fetch admin emails from the "users" collection (role === "Admin").
+ * Results are cached for 5 minutes.
+ */
+export async function fetchAdminEmails(): Promise<string[]> {
+  const now = Date.now();
+  if (cachedAdminEmails && now - adminCacheTimestamp < ADMIN_CACHE_TTL) {
+    return cachedAdminEmails;
+  }
+  try {
+    const usersSnap = await getDocs(
+      query(collection(db, "users"), where("role", "==", "Admin"))
+    );
+
+    cachedAdminEmails = usersSnap.docs
+      .map(d => (d.data().email as string || "").toLowerCase())
+      .filter(Boolean);
+
+    adminCacheTimestamp = now;
+    return cachedAdminEmails;
+  } catch (err) {
+    console.error("Failed to fetch admin list:", err);
+    return cachedAdminEmails || [];
+  }
+}
+
+/**
+ * Check if the user is the platform admin (async).
+ * Uses the "users" collection role field.
+ */
+export async function isAdminAsync(email?: string | null): Promise<boolean> {
+  if (!email) return false;
+  const admins = await fetchAdminEmails();
+  return admins.includes(email.toLowerCase());
+}
+
+/**
+ * Synchronous admin check — uses cached data only.
+ * Call fetchAdminEmails() first to populate the cache.
  */
 export function isAdmin(email?: string | null): boolean {
-  return !!email && email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  if (!email) return false;
+  if (!cachedAdminEmails) return false;
+  return cachedAdminEmails.includes(email.toLowerCase());
 }
 
 /**

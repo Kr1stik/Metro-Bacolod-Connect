@@ -41,12 +41,21 @@ export default function Register() {
 
   // Agent-specific
   const [prcLicenseNo, setPrcLicenseNo] = useState("");
+  const [prcFrontFile, setPrcFrontFile] = useState<File | null>(null);
+  const [prcFrontPreview, setPrcFrontPreview] = useState<string>("");
+  const [prcBackFile, setPrcBackFile] = useState<File | null>(null);
+  const [prcBackPreview, setPrcBackPreview] = useState<string>("");
+  const prcFrontInputRef = useRef<HTMLInputElement>(null);
+  const prcBackInputRef = useRef<HTMLInputElement>(null);
 
-  // Seller-specific: Government ID upload
-  const [govIdFile, setGovIdFile] = useState<File | null>(null);
-  const [govIdPreview, setGovIdPreview] = useState<string>("");
+  // Seller-specific: Government ID upload (front + back)
+  const [govIdFrontFile, setGovIdFrontFile] = useState<File | null>(null);
+  const [govIdFrontPreview, setGovIdFrontPreview] = useState<string>("");
+  const [govIdBackFile, setGovIdBackFile] = useState<File | null>(null);
+  const [govIdBackPreview, setGovIdBackPreview] = useState<string>("");
   const [isUploadingId, setIsUploadingId] = useState(false);
-  const govIdInputRef = useRef<HTMLInputElement>(null);
+  const govIdFrontInputRef = useRef<HTMLInputElement>(null);
+  const govIdBackInputRef = useRef<HTMLInputElement>(null);
 
   // --- RANDOM ID GENERATOR ---
   const generateRandomId = (role: string) => {
@@ -72,7 +81,11 @@ export default function Register() {
     }
   };
 
-  const handleGovIdSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleIdFileSelect = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    setFile: (f: File | null) => void,
+    setPreview: (s: string) => void,
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 10 * 1024 * 1024) {
@@ -83,20 +96,17 @@ export default function Register() {
       glassToast.error("Only image files are allowed.");
       return;
     }
-    setGovIdFile(file);
-    setGovIdPreview(URL.createObjectURL(file));
+    setFile(file);
+    setPreview(URL.createObjectURL(file));
   };
 
-  const uploadGovId = async (): Promise<{ url: string; ocrText: string }> => {
-    if (!govIdFile) throw new Error("No government ID file selected.");
-
+  const uploadSingleImage = async (file: File): Promise<string> => {
     const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
     const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
     if (!CLOUD_NAME || !UPLOAD_PRESET) throw new Error("Missing Cloudinary config.");
 
-    // Upload to Cloudinary
     const formData = new FormData();
-    formData.append("file", govIdFile);
+    formData.append("file", file);
     formData.append("upload_preset", UPLOAD_PRESET);
     formData.append("cloud_name", CLOUD_NAME);
     
@@ -104,32 +114,26 @@ export default function Register() {
       method: "POST", body: formData,
     });
     const data = await res.json();
-    if (!data.secure_url) throw new Error("Failed to upload ID image.");
+    if (!data.secure_url) throw new Error("Failed to upload image.");
+    return data.secure_url;
+  };
 
-    // Run OCR on the uploaded image
-    let ocrText = "";
+  const runOcr = async (imageUrl: string): Promise<string> => {
     try {
       const OCR_KEY = import.meta.env.VITE_OCR_SPACE_API_KEY;
-      if (OCR_KEY) {
-        const ocrForm = new FormData();
-        ocrForm.append("url", data.secure_url);
-        ocrForm.append("apikey", OCR_KEY);
-        ocrForm.append("language", "eng");
-        ocrForm.append("isOverlayRequired", "false");
-        
-        const ocrRes = await fetch("https://api.ocr.space/parse/image", {
-          method: "POST", body: ocrForm,
-        });
-        const ocrData = await ocrRes.json();
-        if (ocrData.ParsedResults?.[0]?.ParsedText) {
-          ocrText = ocrData.ParsedResults[0].ParsedText;
-        }
-      }
-    } catch (ocrErr) {
-      console.warn("OCR extraction failed (non-blocking):", ocrErr);
+      if (!OCR_KEY) return "";
+      const ocrForm = new FormData();
+      ocrForm.append("url", imageUrl);
+      ocrForm.append("apikey", OCR_KEY);
+      ocrForm.append("language", "eng");
+      ocrForm.append("isOverlayRequired", "false");
+      const ocrRes = await fetch("https://api.ocr.space/parse/image", { method: "POST", body: ocrForm });
+      const ocrData = await ocrRes.json();
+      return ocrData.ParsedResults?.[0]?.ParsedText || "";
+    } catch {
+      console.warn("OCR extraction failed (non-blocking)");
+      return "";
     }
-
-    return { url: data.secure_url, ocrText };
   };
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -143,21 +147,45 @@ export default function Register() {
     if (selectedRole === "Agent" && !prcLicenseNo.trim()) {
       return glassToast.error("PRC License Number is required for Agents.");
     }
-    if (selectedRole === "Seller" && !govIdFile) {
-      return glassToast.error("Government-issued ID is required for Sellers.");
+    if (selectedRole === "Agent" && (!prcFrontFile || !prcBackFile)) {
+      return glassToast.error("Both front and back photos of your PRC ID are required.");
+    }
+    if (selectedRole === "Seller" && (!govIdFrontFile || !govIdBackFile)) {
+      return glassToast.error("Both front and back photos of your Government ID are required.");
     }
 
     setIsSubmitting(true);
 
     try {
-      // Upload Gov ID first if seller
-      let govIdUrl = "";
+      // Upload ID photos
+      let govIdFrontUrl = "";
+      let govIdBackUrl = "";
       let govIdOcrText = "";
-      if (selectedRole === "Seller" && govIdFile) {
+      let prcFrontUrl = "";
+      let prcBackUrl = "";
+      let prcOcrText = "";
+
+      if (selectedRole === "Seller" && govIdFrontFile && govIdBackFile) {
         setIsUploadingId(true);
-        const result = await uploadGovId();
-        govIdUrl = result.url;
-        govIdOcrText = result.ocrText;
+        const [frontUrl, backUrl] = await Promise.all([
+          uploadSingleImage(govIdFrontFile),
+          uploadSingleImage(govIdBackFile),
+        ]);
+        govIdFrontUrl = frontUrl;
+        govIdBackUrl = backUrl;
+        govIdOcrText = await runOcr(frontUrl);
+        setIsUploadingId(false);
+      }
+
+      if (selectedRole === "Agent" && prcFrontFile && prcBackFile) {
+        setIsUploadingId(true);
+        const [frontUrl, backUrl] = await Promise.all([
+          uploadSingleImage(prcFrontFile),
+          uploadSingleImage(prcBackFile),
+        ]);
+        prcFrontUrl = frontUrl;
+        prcBackUrl = backUrl;
+        prcOcrText = await runOcr(frontUrl);
         setIsUploadingId(false);
       }
 
@@ -178,7 +206,7 @@ export default function Register() {
         role: selectedRole,
         customId: customId,
         firstName, 
-        middleName: middleInitial, 
+        middleInitial: middleInitial, 
         lastName,
         dob, gender, maritalStatus, 
         mobile: fullMobile,
@@ -188,9 +216,15 @@ export default function Register() {
         isVerified: selectedRole === "Client",
         verificationStatus: selectedRole === "Client" ? "approved" : "pending",
         // Role-specific fields
-        ...(selectedRole === "Agent" ? { prcLicenseNo: prcLicenseNo.trim() } : {}),
+        ...(selectedRole === "Agent" ? { 
+          prcLicenseNo: prcLicenseNo.trim(),
+          prcIdFrontUrl: prcFrontUrl,
+          prcIdBackUrl: prcBackUrl,
+          prcOcrText: prcOcrText,
+        } : {}),
         ...(selectedRole === "Seller" ? { 
-          governmentIdUrl: govIdUrl,
+          governmentIdFrontUrl: govIdFrontUrl,
+          governmentIdBackUrl: govIdBackUrl,
           governmentIdOcrText: govIdOcrText,
         } : {}),
         termsAcceptedAt: new Date().toISOString(),
@@ -351,67 +385,109 @@ export default function Register() {
             </div>
           </section>
 
-          {/* --- SELLER: Government ID Upload --- */}
+          {/* --- SELLER: Government ID Upload (Front & Back) --- */}
           {selectedRole === "Seller" && (
             <section style={{ marginBottom: '40px', background: '#fffbeb', padding: '24px', borderRadius: '14px', border: '1px solid #fde68a' }}>
               <h4 style={{ ...sectionHeaderStyle, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <FaIdCard size={16} color="#d97706" /> Government-Issued ID *
               </h4>
               <p style={{ fontSize: '0.83rem', color: '#92400e', marginBottom: '16px', lineHeight: '1.5' }}>
-                Upload a clear photo of a valid government-issued ID (e.g. Driver's License, Passport, PhilSys ID, SSS ID).
-                This will be reviewed by our admins before you can post listings.
+                Upload clear photos of both the <strong>front</strong> and <strong>back</strong> of a valid government-issued ID 
+                (e.g. Driver's License, Passport, PhilSys ID, SSS ID). This will be reviewed by our admins before you can post listings.
               </p>
-              
-              {govIdPreview ? (
-                <div style={{ position: 'relative', display: 'inline-block', marginBottom: '12px' }}>
-                  <img src={govIdPreview} alt="Gov ID Preview" style={{ maxWidth: '300px', maxHeight: '200px', borderRadius: '10px', border: '2px solid #e5e7eb', objectFit: 'cover' }} />
-                  <button
-                    type="button"
-                    onClick={() => { setGovIdFile(null); setGovIdPreview(""); }}
-                    style={{ position: 'absolute', top: '-8px', right: '-8px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontSize: '0.7rem', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                  >
-                    ✕
-                  </button>
-                  <p style={{ fontSize: '0.78rem', color: '#10b981', fontWeight: '600', marginTop: '8px' }}>
-                    <FaCheckCircle size={11} /> {govIdFile?.name}
-                  </p>
+              <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+                {/* Front */}
+                <div style={{ flex: '1 1 200px' }}>
+                  <p style={{ fontSize: '0.82rem', fontWeight: '700', color: '#92400e', marginBottom: '8px' }}>Front Side *</p>
+                  {govIdFrontPreview ? (
+                    <div style={{ position: 'relative', display: 'inline-block', marginBottom: '12px' }}>
+                      <img src={govIdFrontPreview} alt="ID Front" style={{ maxWidth: '280px', maxHeight: '180px', borderRadius: '10px', border: '2px solid #e5e7eb', objectFit: 'cover' }} />
+                      <button type="button" onClick={() => { setGovIdFrontFile(null); setGovIdFrontPreview(""); }}
+                        style={{ position: 'absolute', top: '-8px', right: '-8px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontSize: '0.7rem', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+                      <p style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: '600', marginTop: '6px' }}><FaCheckCircle size={11} /> {govIdFrontFile?.name}</p>
+                    </div>
+                  ) : (
+                    <button type="button" onClick={() => govIdFrontInputRef.current?.click()}
+                      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 24px', borderRadius: '10px', border: '2px dashed #d97706', background: 'white', cursor: 'pointer', fontSize: '0.9rem', fontWeight: '600', color: '#92400e' }}>
+                      <FaImage size={16} /> Upload Front
+                    </button>
+                  )}
+                  <input type="file" ref={govIdFrontInputRef} hidden accept="image/*" onChange={(e) => handleIdFileSelect(e, setGovIdFrontFile, setGovIdFrontPreview)} />
                 </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => govIdInputRef.current?.click()}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 24px',
-                    borderRadius: '10px', border: '2px dashed #d97706', background: 'white',
-                    cursor: 'pointer', fontSize: '0.9rem', fontWeight: '600', color: '#92400e',
-                    transition: '0.2s',
-                  }}
-                >
-                  <FaImage size={16} /> Upload ID Photo
-                </button>
-              )}
-              <input type="file" ref={govIdInputRef} hidden accept="image/*" onChange={handleGovIdSelect} />
+                {/* Back */}
+                <div style={{ flex: '1 1 200px' }}>
+                  <p style={{ fontSize: '0.82rem', fontWeight: '700', color: '#92400e', marginBottom: '8px' }}>Back Side *</p>
+                  {govIdBackPreview ? (
+                    <div style={{ position: 'relative', display: 'inline-block', marginBottom: '12px' }}>
+                      <img src={govIdBackPreview} alt="ID Back" style={{ maxWidth: '280px', maxHeight: '180px', borderRadius: '10px', border: '2px solid #e5e7eb', objectFit: 'cover' }} />
+                      <button type="button" onClick={() => { setGovIdBackFile(null); setGovIdBackPreview(""); }}
+                        style={{ position: 'absolute', top: '-8px', right: '-8px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontSize: '0.7rem', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+                      <p style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: '600', marginTop: '6px' }}><FaCheckCircle size={11} /> {govIdBackFile?.name}</p>
+                    </div>
+                  ) : (
+                    <button type="button" onClick={() => govIdBackInputRef.current?.click()}
+                      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 24px', borderRadius: '10px', border: '2px dashed #d97706', background: 'white', cursor: 'pointer', fontSize: '0.9rem', fontWeight: '600', color: '#92400e' }}>
+                      <FaImage size={16} /> Upload Back
+                    </button>
+                  )}
+                  <input type="file" ref={govIdBackInputRef} hidden accept="image/*" onChange={(e) => handleIdFileSelect(e, setGovIdBackFile, setGovIdBackPreview)} />
+                </div>
+              </div>
             </section>
           )}
 
-          {/* --- AGENT: PRC License Number --- */}
+          {/* --- AGENT: PRC License Number + Front & Back Photo --- */}
           {selectedRole === "Agent" && (
             <section style={{ marginBottom: '40px', background: '#eff6ff', padding: '24px', borderRadius: '14px', border: '1px solid #bfdbfe' }}>
               <h4 style={{ ...sectionHeaderStyle, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <FaCertificate size={16} color="#2563eb" /> PRC License Number *
+                <FaCertificate size={16} color="#2563eb" /> PRC License Verification *
               </h4>
               <p style={{ fontSize: '0.83rem', color: '#1e40af', marginBottom: '16px', lineHeight: '1.5' }}>
-                Enter your Professional Regulation Commission (PRC) license number.
+                Enter your PRC license number and upload clear photos of both the <strong>front</strong> and <strong>back</strong> of your PRC ID card.
                 This will be verified by our admins before you can post listings.
               </p>
-              <input
-                type="text"
-                style={{ ...inputStyle, borderColor: '#93c5fd', background: 'white' }}
-                value={prcLicenseNo}
-                onChange={e => setPrcLicenseNo(e.target.value)}
-                placeholder="e.g. 0012345"
-                required
-              />
+              <div style={{ marginBottom: '16px' }}>
+                <label style={labelStyle}>PRC License Number *</label>
+                <input type="text" style={{ ...inputStyle, borderColor: '#93c5fd', background: 'white' }} value={prcLicenseNo} onChange={e => setPrcLicenseNo(e.target.value)} placeholder="e.g. 0012345" required />
+              </div>
+              <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+                {/* Front */}
+                <div style={{ flex: '1 1 200px' }}>
+                  <p style={{ fontSize: '0.82rem', fontWeight: '700', color: '#1e40af', marginBottom: '8px' }}>PRC ID — Front Side *</p>
+                  {prcFrontPreview ? (
+                    <div style={{ position: 'relative', display: 'inline-block', marginBottom: '12px' }}>
+                      <img src={prcFrontPreview} alt="PRC Front" style={{ maxWidth: '280px', maxHeight: '180px', borderRadius: '10px', border: '2px solid #e5e7eb', objectFit: 'cover' }} />
+                      <button type="button" onClick={() => { setPrcFrontFile(null); setPrcFrontPreview(""); }}
+                        style={{ position: 'absolute', top: '-8px', right: '-8px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontSize: '0.7rem', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+                      <p style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: '600', marginTop: '6px' }}><FaCheckCircle size={11} /> {prcFrontFile?.name}</p>
+                    </div>
+                  ) : (
+                    <button type="button" onClick={() => prcFrontInputRef.current?.click()}
+                      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 24px', borderRadius: '10px', border: '2px dashed #2563eb', background: 'white', cursor: 'pointer', fontSize: '0.9rem', fontWeight: '600', color: '#1e40af' }}>
+                      <FaImage size={16} /> Upload Front
+                    </button>
+                  )}
+                  <input type="file" ref={prcFrontInputRef} hidden accept="image/*" onChange={(e) => handleIdFileSelect(e, setPrcFrontFile, setPrcFrontPreview)} />
+                </div>
+                {/* Back */}
+                <div style={{ flex: '1 1 200px' }}>
+                  <p style={{ fontSize: '0.82rem', fontWeight: '700', color: '#1e40af', marginBottom: '8px' }}>PRC ID — Back Side *</p>
+                  {prcBackPreview ? (
+                    <div style={{ position: 'relative', display: 'inline-block', marginBottom: '12px' }}>
+                      <img src={prcBackPreview} alt="PRC Back" style={{ maxWidth: '280px', maxHeight: '180px', borderRadius: '10px', border: '2px solid #e5e7eb', objectFit: 'cover' }} />
+                      <button type="button" onClick={() => { setPrcBackFile(null); setPrcBackPreview(""); }}
+                        style={{ position: 'absolute', top: '-8px', right: '-8px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontSize: '0.7rem', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+                      <p style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: '600', marginTop: '6px' }}><FaCheckCircle size={11} /> {prcBackFile?.name}</p>
+                    </div>
+                  ) : (
+                    <button type="button" onClick={() => prcBackInputRef.current?.click()}
+                      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 24px', borderRadius: '10px', border: '2px dashed #2563eb', background: 'white', cursor: 'pointer', fontSize: '0.9rem', fontWeight: '600', color: '#1e40af' }}>
+                      <FaImage size={16} /> Upload Back
+                    </button>
+                  )}
+                  <input type="file" ref={prcBackInputRef} hidden accept="image/*" onChange={(e) => handleIdFileSelect(e, setPrcBackFile, setPrcBackPreview)} />
+                </div>
+              </div>
             </section>
           )}
 
@@ -420,8 +496,9 @@ export default function Register() {
             <div style={{ marginBottom: '25px', background: '#fef3c7', padding: '14px 18px', borderRadius: '10px', border: '1px solid #fde68a', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
               <FaCheckCircle size={14} style={{ color: '#d97706', marginTop: '2px', flexShrink: 0 }} />
               <p style={{ margin: 0, fontSize: '0.82rem', color: '#92400e', lineHeight: '1.4' }}>
-                <strong>Verification Required:</strong> Your account will need to be verified by an admin before you can create listings. 
-                You can still browse and message other users while your verification is pending.
+                <strong>Verification Required:</strong> Please allow up to <strong>24 hours</strong> for our admins to review and verify your submitted documents.
+                You will receive an <strong>email notification</strong> once your verification is complete.
+                In the meantime, you can still browse listings and message other users.
               </p>
             </div>
           )}
@@ -437,9 +514,9 @@ export default function Register() {
               />
               <span style={{ fontSize: '0.85rem', color: '#374151', lineHeight: '1.4' }}>
                 I agree to the{' '}
-                <span style={{ color: '#2563eb', cursor: 'pointer', fontWeight: '600' }} onClick={(e) => { e.preventDefault(); navigate('/terms-of-service'); }}>Terms of Service</span>
+                <span style={{ color: '#2563eb', cursor: 'pointer', fontWeight: '600' }} onClick={(e) => { e.preventDefault(); navigate('/terms'); }}>Terms of Service</span>
                 {' '}and{' '}
-                <span style={{ color: '#2563eb', cursor: 'pointer', fontWeight: '600' }} onClick={(e) => { e.preventDefault(); navigate('/privacy-policy'); }}>Privacy Policy</span>
+                <span style={{ color: '#2563eb', cursor: 'pointer', fontWeight: '600' }} onClick={(e) => { e.preventDefault(); navigate('/privacy'); }}>Privacy Policy</span>
               </span>
             </label>
           </div>

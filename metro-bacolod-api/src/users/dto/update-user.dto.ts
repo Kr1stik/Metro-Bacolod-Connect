@@ -59,7 +59,7 @@ export class UpdateUserDto {
 }
 
 export class ChangeRoleDto {
-  @IsIn(['Client', 'Seller', 'Admin'])
+  @IsIn(['Client', 'Seller', 'Agent'])
   role: string;
 }
 

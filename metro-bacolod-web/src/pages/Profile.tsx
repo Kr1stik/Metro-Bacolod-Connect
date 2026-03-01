@@ -22,7 +22,7 @@ import "../App.css";
 import Swal from "sweetalert2";
 import { glassToast } from "../components/GlassToast";
 import { BACOLOD_LOCATIONS } from "../constants/locations";
-import { canCreateListings, canAccessTrash, canManagePost } from "../constants/roles";
+import { canCreateListings, canAccessTrash, canManagePost, fetchAdminEmails } from "../constants/roles";
 import DOMPurify from 'dompurify';
 
 // --- Fix Leaflet default marker icons ---
@@ -241,6 +241,8 @@ export default function Profile() {
           if (userSnap.exists()) {
             setUserData(userSnap.data());
           }
+          // Populate admin cache
+          await fetchAdminEmails();
 
           const postsQuery = query(
             collection(db, "posts"),

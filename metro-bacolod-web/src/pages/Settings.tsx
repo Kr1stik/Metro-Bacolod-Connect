@@ -14,7 +14,7 @@ import "../App.css";
 import Swal from "sweetalert2";
 import { glassToast } from "../components/GlassToast";
 import { BACOLOD_LOCATIONS } from "../constants/locations";
-import { canAccessTrash } from "../constants/roles";
+import { canAccessTrash, fetchAdminEmails } from "../constants/roles";
 import { useTheme } from "../context/ThemeContext";
 
 // Removed "general" tab since those were all mocked features
@@ -62,6 +62,8 @@ export default function Settings() {
             setEditRegion(data.address || "");
             setEditDescription(data.description || "");
           }
+          // Populate admin cache
+          await fetchAdminEmails();
         } catch (err) {
           console.error("Error fetching user data:", err);
         }
