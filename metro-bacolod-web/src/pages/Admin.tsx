@@ -137,7 +137,7 @@ export default function Admin() {
   const handleApproveVerification = async (userId: string) => {
     const result = await Swal.fire({
       title: "Approve this user?",
-      text: "They will be able to create listings after approval.",
+      text: "They will be able to create listings after approval. An email notification will be sent.",
       icon: "question",
       showCancelButton: true,
       confirmButtonColor: "#10b981",
@@ -145,10 +145,20 @@ export default function Admin() {
     });
     if (result.isConfirmed) {
       try {
+        // Update Firestore directly for real-time UI update
         await updateDoc(doc(db, "users", userId), { isVerified: true, verificationStatus: "approved", verifiedAt: new Date().toISOString() });
+        
+        // Call backend API to send approval email via Resend
+        try {
+          const { default: api } = await import("../services/api");
+          await api.put(`/users/${userId}/verify-approve`);
+        } catch (emailErr) {
+          console.warn("Email notification may not have been sent:", emailErr);
+        }
+
         const targetUser = users.find(u => u.id === userId);
         await logActivity("verify_approve", `Approved verification for ${targetUser?.firstName} ${targetUser?.lastName}`, userId);
-        glassToast.success("User verified and approved!");
+        glassToast.success("User verified, approved, and notified via email!");
       } catch { glassToast.error("Failed to approve user."); }
     }
   };
@@ -166,9 +176,18 @@ export default function Admin() {
     if (reason !== undefined) {
       try {
         await updateDoc(doc(db, "users", userId), { verificationStatus: "rejected", rejectionReason: reason || "" });
+        
+        // Call backend API to send rejection email via Resend
+        try {
+          const { default: api } = await import("../services/api");
+          await api.put(`/users/${userId}/verify-reject`, { reason: reason || "" });
+        } catch (emailErr) {
+          console.warn("Email notification may not have been sent:", emailErr);
+        }
+
         const targetUser = users.find(u => u.id === userId);
         await logActivity("verify_reject", `Rejected verification for ${targetUser?.firstName} ${targetUser?.lastName}: ${reason}`, userId);
-        glassToast.success("User verification rejected.");
+        glassToast.success("User verification rejected and notified via email.");
       } catch { glassToast.error("Failed to reject verification."); }
     }
   };

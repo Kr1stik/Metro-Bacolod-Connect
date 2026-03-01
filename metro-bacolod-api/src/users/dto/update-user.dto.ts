@@ -67,3 +67,9 @@ export class DeactivateUserDto {
   @IsBoolean()
   isDeactivated: boolean;
 }
+
+export class RejectVerificationDto {
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}

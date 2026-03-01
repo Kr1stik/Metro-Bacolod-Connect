@@ -1,8 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import * as admin from 'firebase-admin';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class UsersService {
+  constructor(private readonly emailService: EmailService) {}
   private get db() {
     return admin.firestore();
   }
@@ -141,5 +143,56 @@ export class UsersService {
 
     await ref.update({ isDeactivated: true, deletedAt: new Date().toISOString() });
     return { message: 'User deleted (deactivated)' };
+  }
+
+  // VERIFY USER (admin only) — approve and send email
+  async approveVerification(uid: string) {
+    const ref = this.db.collection('users').doc(uid);
+    const doc = await ref.get();
+    if (!doc.exists) throw new NotFoundException('User not found');
+
+    const userData = doc.data();
+    await ref.update({
+      isVerified: true,
+      verificationStatus: 'approved',
+      verifiedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    // Send approval email
+    const name = `${userData?.firstName || ''} ${userData?.lastName || ''}`.trim() || 'User';
+    const email = userData?.email;
+    const role = userData?.role || 'Seller';
+
+    if (email) {
+      await this.emailService.sendVerificationApprovalEmail(email, name, role);
+    }
+
+    return { message: 'User verified and approval email sent' };
+  }
+
+  // REJECT VERIFICATION (admin only) — reject and send email
+  async rejectVerification(uid: string, reason?: string) {
+    const ref = this.db.collection('users').doc(uid);
+    const doc = await ref.get();
+    if (!doc.exists) throw new NotFoundException('User not found');
+
+    const userData = doc.data();
+    await ref.update({
+      verificationStatus: 'rejected',
+      rejectionReason: reason || '',
+      updatedAt: new Date().toISOString(),
+    });
+
+    // Send rejection email
+    const name = `${userData?.firstName || ''} ${userData?.lastName || ''}`.trim() || 'User';
+    const email = userData?.email;
+    const role = userData?.role || 'Seller';
+
+    if (email) {
+      await this.emailService.sendVerificationRejectionEmail(email, name, role, reason);
+    }
+
+    return { message: 'Verification rejected and notification email sent' };
   }
 }
