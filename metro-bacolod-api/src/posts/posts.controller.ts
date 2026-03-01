@@ -20,7 +20,7 @@ export class PostsController {
 
   @Post('create')
   @UseGuards(FirebaseAuthGuard)
-  @UseInterceptors(FilesInterceptor('images', 10)) 
+  @UseInterceptors(FilesInterceptor('images', 10, { limits: { fileSize: 10 * 1024 * 1024 } })) 
   async create(@UploadedFiles() files: Array<Express.Multer.File>, @Body() body: CreatePostDto, @Req() req: any) {
     const imageUrls: string[] = [];
 

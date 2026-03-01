@@ -7,11 +7,39 @@ export class UsersService {
     return admin.firestore();
   }
 
+  // Whitelist of fields allowed for user creation
+  private readonly CREATE_ALLOWED_FIELDS = [
+    'uid', 'email', 'firstName', 'lastName', 'middleInitial', 'dob', 'gender',
+    'maritalStatus', 'mobile', 'phone', 'address', 'fullAddress', 'street', 'city', 'province', 'role',
+    'customId', 'photoURL', 'displayName', 'description',
+    'prcLicenseNo', 'prcIdFrontUrl', 'prcIdBackUrl', 'prcOcrText',
+    'governmentIdFrontUrl', 'governmentIdBackUrl', 'governmentIdOcrText',
+    'isVerified', 'verificationStatus', 'termsAcceptedAt',
+  ];
+
+  // Whitelist of fields allowed for profile updates
+  private readonly UPDATE_ALLOWED_FIELDS = [
+    'firstName', 'lastName', 'middleInitial', 'dob', 'gender', 'maritalStatus',
+    'mobile', 'phone', 'address', 'fullAddress', 'street', 'city', 'province', 'photoURL', 'description',
+    'prcLicenseNo',
+  ];
+
+  private pickFields(data: any, allowedFields: string[]): Record<string, any> {
+    const result: Record<string, any> = {};
+    for (const key of allowedFields) {
+      if (data[key] !== undefined) {
+        result[key] = data[key];
+      }
+    }
+    return result;
+  }
+
   // CREATE
   async createUser(userData: any) {
     try {
+      const sanitized = this.pickFields(userData, this.CREATE_ALLOWED_FIELDS);
       await this.db.collection('users').doc(userData.uid).set({
-        ...userData,
+        ...sanitized,
         createdAt: new Date().toISOString(),
         isDeactivated: false,
       });
@@ -40,7 +68,8 @@ export class UsersService {
     const doc = await ref.get();
     if (!doc.exists) throw new NotFoundException('User not found');
 
-    await ref.update({ ...updateData, updatedAt: new Date().toISOString() });
+    const sanitized = this.pickFields(updateData, this.UPDATE_ALLOWED_FIELDS);
+    await ref.update({ ...sanitized, updatedAt: new Date().toISOString() });
     return { message: 'Profile updated successfully' };
   }
 

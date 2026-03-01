@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase-config";
 import { collection, query, where, getDocs, doc, updateDoc, deleteDoc, getDoc } from "firebase/firestore";
 import { FaArrowLeft, FaTrashRestore, FaTimes, FaHome, FaTrash, FaUser, FaEnvelope, FaCalendarAlt, FaFilter } from "react-icons/fa";
-import { canAccessTrash, canManagePost } from "../constants/roles";
+import { canAccessTrash, canManagePost, fetchAdminEmails } from "../constants/roles";
 import Swal from 'sweetalert2';
 import { glassToast } from '../components/GlassToast';
 import "../App.css";
@@ -24,6 +24,7 @@ export default function Archive() {
       }
 
       // RBAC: Only Agents and Admin can access Trash
+      await fetchAdminEmails();
       const userSnap = await getDoc(doc(db, "users", user.uid));
       const userData = userSnap.exists() ? userSnap.data() : null;
       if (!canAccessTrash(userData?.role, user.email)) {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import api from './services/api';
 import { Routes, Route } from 'react-router-dom';
 import Register from "./pages/Register";
@@ -15,6 +15,7 @@ import Services from "./pages/Services";
 import Resources from "./pages/Resources";
 import Messages from "./pages/Messages";
 import ProtectedRoute from "./components/ProtectedRoute";
+import { AdminRoute } from "./components/ProtectedRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
 import NotFound from "./pages/NotFound";
 import { ThemeProvider } from "./context/ThemeContext";
@@ -27,18 +28,13 @@ import ResetPassword from "./pages/ResetPassword";
 import { Analytics } from "@vercel/analytics/react";
 
 function App() {
-  const [ , setMessage] = useState<string>('Connecting...');
-
   useEffect(() => {
-    // This function runs when the page loads
+    // Health-check: verify backend connectivity on load
     const checkConnection = async () => {
       try {
-        // We call the backend route here
-        const response = await api.get('/'); 
-        setMessage(response.data); 
+        await api.get('/');
       } catch (error) {
         console.error("Connection Error:", error);
-        setMessage('Error: Could not connect to backend.');
       }
     };
 
@@ -97,7 +93,7 @@ function App() {
         />
         <Route 
           path="/admin" 
-          element={<ProtectedRoute><Admin /></ProtectedRoute>} 
+          element={<AdminRoute><Admin /></AdminRoute>} 
         />
         <Route path="/reset-password" element={<ResetPassword />} />
 

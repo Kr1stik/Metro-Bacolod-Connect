@@ -22,7 +22,7 @@ import "../App.css";
 import Swal from 'sweetalert2';
 import { glassToast } from '../components/GlassToast';
 import { BACOLOD_LOCATIONS } from "../constants/locations";
-import { canCreateListings, canAccessTrash, canManagePost, isAdmin, requiresVerification } from "../constants/roles";
+import { canCreateListings, canAccessTrash, canManagePost, isAdmin, requiresVerification, fetchAdminEmails } from "../constants/roles";
 import DOMPurify from 'dompurify';
 
 const RatingStars = ({ rating }: { rating: number }) => {
@@ -215,6 +215,8 @@ export default function Dashboard() {
           const userDocRef = doc(db, "users", currentUser.uid);
           const userSnap = await getDoc(userDocRef);
           if (userSnap.exists()) setUserData(userSnap.data());
+          // Populate admin cache so isAdmin() works synchronously
+          await fetchAdminEmails();
         } catch (err) { console.error(err); }
       }
     });
