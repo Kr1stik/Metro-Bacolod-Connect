@@ -5278,3 +5278,126 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     display: none !important; 
   }
 }
+
+/* =======================================================
+   FINAL FIX: PERFECT INLINE ALIGNMENT (NO DISAPPEARING IMAGES)
+   ======================================================= */
+.glass-listing-card {
+  display: grid !important;
+  grid-template-columns: 1fr 48% !important; /* Left Text, Right Image/Btn */
+  grid-template-rows: 1fr auto !important;   /* Top stretches, Bottom locks */
+  padding: 24px !important;
+  gap: 16px 24px !important; 
+  min-height: 280px !important;
+}
+
+/* "Deletes" the structural wrapper divs so grid can precisely control the inner elements */
+.glass-card-content, 
+.glass-card-right {
+  display: contents !important; 
+}
+
+/* 1. TOP-LEFT: The Title & Description */
+.glass-card-content > div:first-child {
+  grid-column: 1 / 2 !important;
+  grid-row: 1 / 2 !important;
+  align-self: start !important;
+}
+
+/* 2. TOP-RIGHT: The Image Container */
+.glass-card-image {
+  grid-column: 2 / 3 !important;
+  grid-row: 1 / 2 !important;
+  align-self: stretch !important; /* Forces the container to stretch vertically */
+  display: flex !important; /* Safe way to handle child images inside a grid */
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 180px !important;
+  margin: 0 !important; 
+}
+
+/* 2B. The Image Itself */
+.glass-card-image img {
+  position: static !important; /* 🔥 REMOVES absolute positioning so it doesn't disappear! */
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important; 
+  border-radius: 14px !important;
+  display: block !important;
+}
+
+/* 3. BOTTOM-LEFT: Agent Info (LOCKED INLINE) */
+.glass-card-footer {
+  grid-column: 1 / 2 !important;
+  grid-row: 2 / 3 !important; 
+  align-self: end !important; 
+  margin: 0 !important;
+}
+
+/* 4. BOTTOM-RIGHT: Inquire Button (LOCKED INLINE) */
+.glass-inquire-btn {
+  grid-column: 2 / 3 !important;
+  grid-row: 2 / 3 !important; 
+  align-self: end !important; 
+  margin: 0 !important;
+  width: 100% !important;
+}
+
+/* Adjust the 3-dots menu for the new grid layout */
+.glass-card-actions {
+  top: 34px !important;
+  right: 34px !important;
+}
+
+/* UNCROPPED MODAL IMAGE (Cinematic View) */
+.listing-modal-carousel {
+  background: #050505 !important;
+}
+
+.listing-modal-carousel-img {
+  object-fit: contain !important; 
+}
+
+@media (min-width: 641px) {
+  .listing-modal-carousel {
+    height: 480px !important; 
+  }
+}
+
+/* MOBILE VIEW GRID FIX */
+@media (max-width: 768px) {
+  .glass-listing-card {
+    grid-template-columns: 1fr 130px !important; 
+    padding: 16px !important;
+    gap: 12px 16px !important;
+    min-height: auto !important;
+  }
+  
+  .glass-card-image {
+    min-height: 120px !important;
+  }
+  
+  .glass-inquire-btn {
+    font-size: 0.72rem !important;
+    padding: 10px 4px !important;
+  }
+  
+  .glass-card-actions {
+    top: 24px !important;
+    right: 24px !important;
+  }
+}
+
+/* =======================================================
+   FIX: PREVENT LONG TEXT FROM CRUSHING THE IMAGE
+   ======================================================= */
+/* 1. Stops the left grid column from expanding infinitely */
+.glass-card-content > div:first-child {
+  min-width: 0 !important; 
+}
+
+/* 2. Forces long words/links without spaces to wrap to the next line */
+.glass-card-desc {
+  word-break: break-word !important; 
+  overflow-wrap: break-word !important;
+}
