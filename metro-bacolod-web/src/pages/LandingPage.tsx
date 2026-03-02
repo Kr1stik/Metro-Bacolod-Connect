@@ -4,7 +4,7 @@ import { signInWithEmailAndPassword, signInWithPopup, signOut, sendPasswordReset
 import { auth, googleProvider, db } from "../firebase-config";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { FcGoogle } from "react-icons/fc";
-import { FaTimes } from "react-icons/fa";
+import { FaTimes, FaChevronDown } from "react-icons/fa";
 import logo from "../assets/MBC Logo.png";
 import mbcVid from "../assets/MBC_Vid_Logo3d.mp4";
 import Antigravity from "../components/Antigravity"; 
@@ -259,7 +259,7 @@ export default function LandingPage() {
       </nav>
 
       {/* HERO */}
-      <section className="landing-hero" style={{ minHeight: '100vh', width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', padding: '80px 20px 0', position: 'relative' }}>
+      <section className="landing-hero" style={{ minHeight: '110vh', width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', padding: '80px 20px 0', position: 'relative' }}>
         <Antigravity count={300} color="#1d1d1f" particleSize={0.6} />
         <h1 style={{ fontSize: 'clamp(2.5rem, 6vw, 6rem)', fontWeight: '700', color: '#1d1d1f', lineHeight: '1.1', marginBottom: '30px', letterSpacing: '-2px', zIndex: 2 }}>
            <TextType 
@@ -277,6 +277,36 @@ export default function LandingPage() {
             {['Connect', 'Verify', 'Close'].map(tag => (
               <span key={tag} style={{ background: 'rgba(255,255,255,0.45)', backdropFilter: 'blur(20px)', color: '#374151', padding: '8px 24px', borderRadius: '25px', fontSize: '0.85rem', fontWeight: '600', opacity: 0, border: '1px solid rgba(255,255,255,0.5)' }}>{tag}</span>
             ))}
+          </div>
+        )}
+
+        {/* CTA Button with rotating border */}
+        {showTags && (
+          <div className="cta-rotating-border" style={{ marginTop: '210px', zIndex: 2 }}>
+            <button
+              onClick={() => navigate('/register')}
+              className="cta-find-home"
+            >
+              Find Your Next Home
+            </button>
+          </div>
+        )}
+
+        {/* Scroll down arrow */}
+        {showTags && (
+          <div
+            onClick={() => window.scrollTo({ top: window.innerHeight, behavior: 'smooth' })}
+            style={{
+              position: 'absolute',
+              bottom: '80px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 2,
+              cursor: 'pointer',
+              animation: 'bounceArrow 2s infinite',
+            }}
+          >
+            <FaChevronDown style={{ fontSize: '1.4rem', color: '#1d1d1f', opacity: 0.5 }} />
           </div>
         )}
       </section>
