@@ -21,6 +21,7 @@ export default function LandingPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showTags, setShowTags] = useState(false);
+  const [navScrolled, setNavScrolled] = useState(false);
   
   // --- NEW: Forgot Password State ---
   const [isForgotPassword, setIsForgotPassword] = useState(false);
@@ -31,6 +32,7 @@ export default function LandingPage() {
   const dotRef = useRef<HTMLDivElement>(null);
   const progressLineRef = useRef<HTMLDivElement>(null);
   const tagsRef = useRef<HTMLDivElement>(null);
+  const heroRef = useRef<HTMLElement>(null);
 
   const handleTypingComplete = () => {
     setShowTags(true);
@@ -83,6 +85,18 @@ export default function LandingPage() {
       tl.kill();
       ScrollTrigger.getAll().forEach(st => st.kill());
     };
+  }, []);
+
+  // Navbar morph on scroll past hero
+  useEffect(() => {
+    const hero = heroRef.current;
+    if (!hero) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setNavScrolled(!entry.isIntersecting),
+      { threshold: 0.05 }
+    );
+    observer.observe(hero);
+    return () => observer.disconnect();
   }, []);
 
   const closeLogin = () => {
@@ -242,24 +256,26 @@ export default function LandingPage() {
       <div className="info-blob info-blob-2" />
       <div className="info-blob info-blob-3" />
 
-      {/* NAVBAR */}
-      <nav className="landing-nav" style={{ position: 'fixed', top: 0, left: 0, width: '100%', padding: '20px 5%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 50, background: 'transparent' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '50px' }}>
-            <img src={logo} alt="Logo" style={{ width: '50px', height: 'auto' }} />
-            <div className="nav-links" style={{ display: 'flex', gap: '30px' }}>
-                {['Properties', 'Professionals', 'Services', 'Resources'].map((item) => (
-                    <a key={item} href={`/${item.toLowerCase()}`} className="nav-link-item" style={{ color: '#1d1d1f', fontWeight: '600', fontSize: '0.9rem', opacity: 0.7, transition: '0.2s', textDecoration: 'none', position: 'relative' }}>{item}</a>
-                ))}
-            </div>
-        </div>
-        <div className="nav-buttons" style={{ display: 'flex', gap: '15px' }}>
-            <button onClick={() => setShowLogin(true)} className="hero-btn hero-btn-outline" style={{ background: 'transparent', border: '1px solid #1d1d1f', color: '#1d1d1f', padding: '12px 35px', fontSize: '0.9rem', fontWeight: '700', borderRadius: '50px', cursor: 'pointer', transition: 'all 0.3s ease' }}>LOGIN</button>
-            <button onClick={() => navigate('/register')} className="hero-btn hero-btn-filled" style={{ background: '#1d1d1f', color: 'white', padding: '12px 35px', fontSize: '0.9rem', fontWeight: '700', borderRadius: '50px', border: 'none', cursor: 'pointer', boxShadow: '0 4px 14px 0 rgba(0,0,0,0.25)', transition: 'all 0.3s ease' }}>CREATE ACCOUNT</button>
+      {/* NAVBAR — Floating Island */}
+      <nav className={`floating-nav${navScrolled ? ' floating-nav--scrolled' : ''}`}>
+        <div className="floating-nav__inner">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '50px' }}>
+              <img src={logo} alt="Logo" style={{ width: '40px', height: 'auto' }} />
+              <div className="nav-links" style={{ display: 'flex', gap: '30px' }}>
+                  {['Properties', 'Professionals', 'Services', 'Resources'].map((item) => (
+                      <a key={item} href={`/${item.toLowerCase()}`} className="nav-link-item floating-nav__link" style={{ textDecoration: 'none', position: 'relative' }}>{item}</a>
+                  ))}
+              </div>
+          </div>
+          <div className="nav-buttons" style={{ display: 'flex', gap: '12px' }}>
+              <button onClick={() => setShowLogin(true)} className="floating-nav__btn floating-nav__btn--outline">LOGIN</button>
+              <button onClick={() => navigate('/register')} className="floating-nav__btn floating-nav__btn--filled">CREATE ACCOUNT</button>
+          </div>
         </div>
       </nav>
 
       {/* HERO */}
-      <section className="landing-hero" style={{ minHeight: '110vh', width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', padding: '80px 20px 0', position: 'relative' }}>
+      <section ref={heroRef} className="landing-hero" style={{ minHeight: '110vh', width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', padding: '80px 20px 0', position: 'relative' }}>
         <Antigravity count={300} color="#1d1d1f" particleSize={0.6} />
         <h1 style={{ fontSize: 'clamp(2.5rem, 6vw, 6rem)', fontWeight: '700', color: '#1d1d1f', lineHeight: '1.1', marginBottom: '30px', letterSpacing: '-2px', zIndex: 2 }}>
            <TextType 
