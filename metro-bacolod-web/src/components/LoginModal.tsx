@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { signInWithEmailAndPassword, signInWithPopup, signOut, sendPasswordResetEmail } from 'firebase/auth';
+import { signInWithEmailAndPassword, signInWithPopup, signOut, sendPasswordResetEmail, getMultiFactorResolver, TotpMultiFactorGenerator } from 'firebase/auth';
 import { auth, googleProvider, db } from '../firebase-config';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { FcGoogle } from 'react-icons/fc';
 import { FaTimes } from 'react-icons/fa';
 import { glassToast } from './GlassToast';
@@ -37,22 +37,69 @@ export default function LoginModal({ onClose }: LoginModalProps) {
       }
       onClose();
       navigate('/dashboard');
-    } catch {
-      glassToast.error('Login failed. Check your credentials.');
+    } catch (error: any) {
+      if (error.code === 'auth/multi-factor-auth-required') {
+        try {
+          const resolver = getMultiFactorResolver(auth, error);
+          const totpHint = resolver.hints.find((h: any) => h.factorId === TotpMultiFactorGenerator.FACTOR_ID);
+          if (!totpHint) { glassToast.error('Unsupported 2FA method.'); return; }
+          const Swal = (await import('sweetalert2')).default;
+          const { value: code } = await Swal.fire({
+            title: 'Two-Factor Authentication',
+            html: '<p style="color:#6b7280;font-size:0.85rem;">Enter the 6-digit code from your authenticator app.</p>',
+            input: 'text', inputPlaceholder: '000000',
+            inputAttributes: { maxlength: '6', pattern: '[0-9]*', inputmode: 'numeric', autocomplete: 'one-time-code' },
+            showCancelButton: true, confirmButtonColor: '#111827', confirmButtonText: 'Verify',
+            inputValidator: (val) => { if (!val || val.length !== 6 || !/^\d{6}$/.test(val)) return 'Enter a valid 6-digit code'; },
+          });
+          if (!code) return;
+          const assertion = TotpMultiFactorGenerator.assertionForSignIn(totpHint.uid, code);
+          await resolver.resolveSignIn(assertion);
+          onClose();
+          navigate('/dashboard');
+        } catch (mfaError: any) {
+          glassToast.error(mfaError.code === 'auth/invalid-verification-code' ? 'Invalid code.' : 'Verification failed.');
+        }
+      } else {
+        glassToast.error('Login failed. Check your credentials.');
+      }
     }
   };
 
   const handleGoogleLogin = async () => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
-      const userDoc = await getDoc(doc(db, 'users', result.user.uid));
-      if (userDoc.exists() && userDoc.data()?.isDeactivated) {
-        await signOut(auth);
-        glassToast.error('Your account has been deactivated. Contact support.');
-        return;
+      const gUser = result.user;
+      const userDocRef = doc(db, 'users', gUser.uid);
+      const userDocSnap = await getDoc(userDocRef);
+
+      if (userDocSnap.exists()) {
+        if (userDocSnap.data()?.isDeactivated) {
+          await signOut(auth);
+          glassToast.error('Your account has been deactivated. Contact support.');
+          return;
+        }
+        if (!userDocSnap.data()?.role) {
+          onClose();
+          navigate('/complete-profile');
+          return;
+        }
+        onClose();
+        navigate('/dashboard');
+      } else {
+        // New Google user — create a minimal doc so Admin dashboard auto-updates
+        const nameParts = (gUser.displayName || '').split(' ');
+        await setDoc(userDocRef, {
+          uid: gUser.uid,
+          email: gUser.email,
+          firstName: nameParts[0] || '',
+          lastName: nameParts.slice(1).join(' ') || '',
+          photoURL: gUser.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(gUser.displayName || 'U')}&rounded=true`,
+          createdAt: new Date().toISOString(),
+        });
+        onClose();
+        navigate('/complete-profile');
       }
-      onClose();
-      navigate('/dashboard');
     } catch {
       glassToast.error('Google sign-in failed.');
     }

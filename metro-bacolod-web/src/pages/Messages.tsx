@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase-config";
 import { collection, query, where, onSnapshot, addDoc, orderBy, serverTimestamp, doc, updateDoc, deleteDoc, getDoc, setDoc, getDocs } from "firebase/firestore";
-import { FaSearch, FaEnvelope, FaPaperPlane, FaArrowLeft, FaImage, FaSpinner, FaTrash, FaStar } from "react-icons/fa";
+import { FaSearch, FaEnvelope, FaPaperPlane, FaArrowLeft, FaImage, FaSpinner, FaTrash, FaStar, FaCheck, FaCheckDouble } from "react-icons/fa";
 import { SkeletonList } from "../components/SkeletonLoader";
 import logo from "../assets/MBC Logo.png";
 import { glassToast } from "../components/GlassToast";
@@ -30,6 +30,13 @@ export default function Messages() {
   // Online presence state
   const [otherUserLastSeen, setOtherUserLastSeen] = useState<Date | null>(null);
   const [onlineStatuses, setOnlineStatuses] = useState<Record<string, Date>>({});
+
+  // Typing indicator state
+  const [isOtherTyping, setIsOtherTyping] = useState(false);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Read receipt state (lastRead timestamp per user from active chat)
+  const [otherLastRead, setOtherLastRead] = useState<any>(null);
 
   const isUserOnline = (lastSeen: Date | null) => {
     if (!lastSeen) return false;
@@ -148,16 +155,64 @@ export default function Messages() {
     return () => clearInterval(interval);
   }, [activeChat, user]);
 
-  // 3. Mark as read
+  // 3. Mark as read + update lastRead
   useEffect(() => {
     if (!activeChat || !user) return;
     const currentChat = chats.find(c => c.id === activeChat.id);
     if (currentChat?.hasUnread?.[user.uid]) {
       updateDoc(doc(db, "chats", activeChat.id), {
-        [`hasUnread.${user.uid}`]: false
+        [`hasUnread.${user.uid}`]: false,
+        [`lastRead.${user.uid}`]: serverTimestamp(),
       });
     }
   }, [chats, activeChat, user]);
+
+  // 3b. Listen for typing & lastRead from active chat doc (real-time)
+  useEffect(() => {
+    if (!activeChat || !user) {
+      setIsOtherTyping(false);
+      setOtherLastRead(null);
+      return;
+    }
+    const unsub = onSnapshot(doc(db, "chats", activeChat.id), (snap) => {
+      const data = snap.data();
+      if (!data) return;
+      const otherUid = data.participants?.find((uid: string) => uid !== user.uid);
+      if (!otherUid) return;
+
+      // Typing indicator — check if other user's typing timestamp is recent (< 5 seconds)
+      const typingTs = data.typing?.[otherUid];
+      if (typingTs) {
+        const ts = typingTs.toDate ? typingTs.toDate() : new Date(typingTs);
+        setIsOtherTyping(Date.now() - ts.getTime() < 5000);
+      } else {
+        setIsOtherTyping(false);
+      }
+
+      // Read receipt — other user's lastRead timestamp
+      const lr = data.lastRead?.[otherUid];
+      setOtherLastRead(lr || null);
+    });
+    return () => unsub();
+  }, [activeChat, user]);
+
+  // 3c. Handle typing status updates (debounced)
+  const handleTyping = () => {
+    if (!activeChat || !user) return;
+    // Update typing status in Firestore
+    updateDoc(doc(db, "chats", activeChat.id), {
+      [`typing.${user.uid}`]: serverTimestamp(),
+    }).catch(() => {});
+
+    // Clear previous timeout and set new one to stop typing after 3 seconds
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      if (!activeChat || !user) return;
+      updateDoc(doc(db, "chats", activeChat.id), {
+        [`typing.${user.uid}`]: null,
+      }).catch(() => {});
+    }, 3000);
+  };
 
   // 4. Handle Image Upload
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -212,6 +267,12 @@ export default function Messages() {
     
     const text = newMessage;
     setNewMessage(""); 
+    
+    // Clear typing indicator
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    updateDoc(doc(db, "chats", activeChat.id), {
+      [`typing.${user.uid}`]: null,
+    }).catch(() => {});
     
     try {
       await addDoc(collection(db, `chats/${activeChat.id}/messages`), {
@@ -502,13 +563,32 @@ export default function Messages() {
                           )}
                         </div>
                         </div>
-                        <span style={{ fontSize: '0.65rem', color: '#9ca3af', marginTop: '2px', padding: '0 5px' }}>
+                        <span style={{ fontSize: '0.65rem', color: '#9ca3af', marginTop: '2px', padding: '0 5px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                             {formatTime(msg.createdAt)}
+                            {isMe && (() => {
+                              // Read receipt logic: check if other user read after this message was sent
+                              const msgTime = msg.createdAt?.toDate ? msg.createdAt.toDate() : (msg.createdAt ? new Date(msg.createdAt) : null);
+                              const otherReadTime = otherLastRead?.toDate ? otherLastRead.toDate() : (otherLastRead ? new Date(otherLastRead) : null);
+                              if (msgTime && otherReadTime && otherReadTime >= msgTime) {
+                                return <FaCheckDouble size={10} style={{ color: '#3b82f6' }} title="Read" />;
+                              }
+                              return <FaCheck size={10} style={{ color: '#9ca3af' }} title="Delivered" />;
+                            })()}
                         </span>
                       </div>
                     </div>
                   );
                 })}
+                {/* Typing indicator */}
+                {isOtherTyping && (
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', marginTop: '4px' }}>
+                    <div className="msg-bubble-received" style={{ padding: '10px 16px', borderRadius: '16px', borderBottomLeftRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span className="typing-dot" style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#9ca3af', animation: 'typingBounce 1.4s infinite ease-in-out', animationDelay: '0s' }} />
+                      <span className="typing-dot" style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#9ca3af', animation: 'typingBounce 1.4s infinite ease-in-out', animationDelay: '0.2s' }} />
+                      <span className="typing-dot" style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#9ca3af', animation: 'typingBounce 1.4s infinite ease-in-out', animationDelay: '0.4s' }} />
+                    </div>
+                  </div>
+                )}
                 <div ref={messagesEndRef} />
               </div>
 
@@ -521,7 +601,7 @@ export default function Messages() {
                     {isUploading ? <FaSpinner className="spin" size={22} /> : <FaImage size={22} />}
                   </button>
                   
-                  <input type="text" placeholder="Type a message..." value={newMessage} onChange={(e) => setNewMessage(e.target.value)} className="msg-input-field" style={{ flex: 1, padding: '12px 18px', borderRadius: '50px', outline: 'none' }} />
+                  <input type="text" placeholder="Type a message..." value={newMessage} onChange={(e) => { setNewMessage(e.target.value); handleTyping(); }} className="msg-input-field" style={{ flex: 1, padding: '12px 18px', borderRadius: '50px', outline: 'none' }} />
                   <button type="submit" disabled={!newMessage.trim() && !isUploading} className="msg-send-btn" style={{ border: 'none', width: '44px', height: '44px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}><FaPaperPlane size={14} /></button>
                 </form>
               </div>
@@ -533,6 +613,10 @@ export default function Messages() {
       </div>
 
       <style>{`
+        @keyframes typingBounce {
+          0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+          30% { transform: translateY(-4px); opacity: 1; }
+        }
         @media (max-width: 768px) {
           .chat-sidebar-mobile { width: 100% !important; display: ${activeChat ? 'none' : 'flex'} !important; }
           .chat-window-mobile { display: ${activeChat ? 'flex' : 'none'} !important; }
