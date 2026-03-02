@@ -6,7 +6,7 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { FcGoogle } from "react-icons/fc";
 import { FaTimes, FaChevronDown } from "react-icons/fa";
 import logo from "../assets/MBC Logo.png";
-import mbcVid from "../assets/MBC_Vid_Logo3d.mp4";
+import mbcLogoNoBg from "../assets/MBC Logo No Background (1).png";
 import Antigravity from "../components/Antigravity"; 
 import TextType from "../components/TextType"; 
 import ScrollFloat from "../components/ScrollFloat";
@@ -415,13 +415,10 @@ export default function LandingPage() {
              </div>
           </div>
           <div className="about-image" style={{ flex: 1, minWidth: '300px', display: 'flex', justifyContent: 'center' }}>
-             <video
-               src={mbcVid}
-               autoPlay
-               loop
-               muted
-               playsInline
-               style={{ width: '100%', maxWidth: '500px', height: '400px', objectFit: 'cover', borderRadius: '20px' }}
+             <img
+               src={mbcLogoNoBg}
+               alt="Metro Bacolod Connect Logo"
+               style={{ width: '100%', maxWidth: '420px', height: '420px', objectFit: 'contain' }}
              />
           </div>
       </section>
