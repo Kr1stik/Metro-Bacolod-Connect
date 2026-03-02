@@ -128,7 +128,20 @@ export class ChatsService {
 
     await this.db.collection('chats').doc(chatId).update({
       [`hasUnread.${uid}`]: false,
+      [`lastRead.${uid}`]: admin.firestore.FieldValue.serverTimestamp(),
     });
     return { message: 'Marked as read' };
+  }
+
+  // SET TYPING STATUS
+  async setTypingStatus(chatId: string, uid: string, isTyping: boolean) {
+    const chatDoc = await this.db.collection('chats').doc(chatId).get();
+    if (!chatDoc.exists) throw new NotFoundException('Chat not found');
+    if (!chatDoc.data()?.participants.includes(uid)) throw new ForbiddenException('Not a participant');
+
+    await this.db.collection('chats').doc(chatId).update({
+      [`typing.${uid}`]: isTyping ? admin.firestore.FieldValue.serverTimestamp() : admin.firestore.FieldValue.delete(),
+    });
+    return { message: isTyping ? 'Typing' : 'Stopped typing' };
   }
 }

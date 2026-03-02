@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { signInWithEmailAndPassword, signInWithPopup, signOut, sendPasswordResetEmail } from "firebase/auth";
+import { signInWithEmailAndPassword, signInWithPopup, signOut, sendPasswordResetEmail, getMultiFactorResolver, TotpMultiFactorGenerator } from "firebase/auth";
 import { auth, googleProvider, db } from "../firebase-config";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { FcGoogle } from "react-icons/fc";
 import { FaTimes } from "react-icons/fa";
 import logo from "../assets/MBC Logo.png";
@@ -134,7 +134,33 @@ export default function LandingPage() {
       }
 
     } catch (error: any) {
-      if (error.code === 'auth/invalid-credential') {
+      if (error.code === 'auth/multi-factor-auth-required') {
+        // Handle 2FA challenge
+        try {
+          const resolver = getMultiFactorResolver(auth, error);
+          const totpHint = resolver.hints.find((h: any) => h.factorId === TotpMultiFactorGenerator.FACTOR_ID);
+          if (!totpHint) { glassToast.error("Unsupported 2FA method."); return; }
+
+          const { value: code } = await import('sweetalert2').then(m => m.default.fire({
+            title: 'Two-Factor Authentication',
+            html: '<p style="color:#6b7280;font-size:0.85rem;">Enter the 6-digit code from your authenticator app.</p>',
+            input: 'text',
+            inputPlaceholder: '000000',
+            inputAttributes: { maxlength: '6', pattern: '[0-9]*', inputmode: 'numeric', autocomplete: 'one-time-code' },
+            showCancelButton: true,
+            confirmButtonColor: '#111827',
+            confirmButtonText: 'Verify',
+            inputValidator: (val) => { if (!val || val.length !== 6 || !/^\d{6}$/.test(val)) return 'Enter a valid 6-digit code'; },
+          }));
+          if (!code) return;
+
+          const assertion = TotpMultiFactorGenerator.assertionForSignIn(totpHint.uid, code);
+          await resolver.resolveSignIn(assertion);
+          navigate("/dashboard");
+        } catch (mfaError: any) {
+          glassToast.error(mfaError.code === 'auth/invalid-verification-code' ? 'Invalid verification code.' : 'Verification failed.');
+        }
+      } else if (error.code === 'auth/invalid-credential') {
         glassToast.error("Incorrect email or password.");
       } else {
         glassToast.error("Login failed. Please try again.");
@@ -147,32 +173,42 @@ export default function LandingPage() {
       const result = await signInWithPopup(auth, googleProvider);
       const gUser = result.user;
 
-      // 1. Check if user profile exists in Firestore
-      const userDoc = await getDoc(doc(db, "users", gUser.uid));
-      
+      // Check if user doc exists
+      const userDocRef = doc(db, "users", gUser.uid);
+      const userDoc = await getDoc(userDocRef);
+
       if (userDoc.exists()) {
-        const userData = userDoc.data();
-        
-        // Check if account is deactivated
-        if (userData.isDeactivated) {
+        // Existing user — check if deactivated
+        if (userDoc.data().isDeactivated) {
           await signOut(auth);
           glassToast.error("This account has been deactivated. Contact support.");
           return;
         }
 
-        // Close modal and route based on role
-        setShowLogin(false);
-        glassToast.success("Google login successful!");
-        if (userData.role === "Admin") {
+        // Existing user with no role yet → send to complete profile
+        if (!userDoc.data().role) {
+          navigate("/complete-profile");
+          return;
+        }
+
+        if (userDoc.data().role === "Admin") {
           navigate("/admin");
         } else {
           navigate("/dashboard");
         }
-        
       } else {
-        // 🚀 Brand new user -> send to profile setup!
-        setShowLogin(false);
-        glassToast.info("Please complete your profile.");
+        // New Google user — create a minimal user doc so Admin dashboard sees them immediately
+        const nameParts = (gUser.displayName || "").split(" ");
+        await setDoc(userDocRef, {
+          uid: gUser.uid,
+          email: gUser.email,
+          firstName: nameParts[0] || "",
+          lastName: nameParts.slice(1).join(" ") || "",
+          photoURL: gUser.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(gUser.displayName || "U")}&rounded=true`,
+          createdAt: new Date().toISOString(),
+        });
+
+        // Redirect to complete-profile to finish setup (role selection, etc.)
         navigate("/complete-profile");
       }
     } catch (error: any) {

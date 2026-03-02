@@ -27,6 +27,10 @@ export default function CompleteProfile() {
   const [prcLicenseNo, setPrcLicenseNo] = useState("");
   const province = "Negros Occidental";
 
+  // Privacy toggles for Seller/Agent contact info visibility
+  const [showPhone, setShowPhone] = useState(true);
+  const [showEmail, setShowEmail] = useState(true);
+
   // Agent: PRC ID upload (front + back)
   const [prcFrontFile, setPrcFrontFile] = useState<File | null>(null);
   const [prcFrontPreview, setPrcFrontPreview] = useState<string>("");
@@ -102,16 +106,20 @@ export default function CompleteProfile() {
 
   const runOcr = async (imageUrl: string): Promise<string> => {
     try {
-      const OCR_KEY = import.meta.env.VITE_OCR_SPACE_API_KEY;
-      if (!OCR_KEY) return "";
-      const ocrForm = new FormData();
-      ocrForm.append("url", imageUrl);
-      ocrForm.append("apikey", OCR_KEY);
-      ocrForm.append("language", "eng");
-      ocrForm.append("isOverlayRequired", "false");
-      const ocrRes = await fetch("https://api.ocr.space/parse/image", { method: "POST", body: ocrForm });
-      const ocrData = await ocrRes.json();
-      return ocrData.ParsedResults?.[0]?.ParsedText || "";
+      const currentUser = auth.currentUser;
+      if (!currentUser) return "";
+      const idToken = await currentUser.getIdToken();
+      const API_URL = import.meta.env.VITE_API_URL || 'https://metro-bacolod-connect.onrender.com';
+      const res = await fetch(`${API_URL}/ocr/extract`, {
+        method: "POST",
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ imageUrl }),
+      });
+      const data = await res.json();
+      return data.text || "";
     } catch { console.warn("OCR extraction failed (non-blocking)"); return ""; }
   };
 
@@ -177,6 +185,8 @@ export default function CompleteProfile() {
         fullAddress: { street, city, province, zipCode: "6100" },
         isVerified: selectedRole === "Client",
         verificationStatus: selectedRole === "Client" ? "approved" : "pending",
+        showPhone: selectedRole === "Client" ? true : showPhone,
+        showEmail: selectedRole === "Client" ? true : showEmail,
         ...(selectedRole === "Agent" ? { 
           prcLicenseNo: prcLicenseNo.trim(),
           prcIdFrontUrl: prcFrontUrl,
@@ -374,6 +384,30 @@ export default function CompleteProfile() {
                   )}
                   <input type="file" ref={prcBackInputRef} hidden accept="image/*" onChange={(e) => handleIdFileSelect(e, setPrcBackFile, setPrcBackPreview)} />
                 </div>
+              </div>
+            </section>
+          )}
+
+          {/* --- Privacy Settings for Seller/Agent --- */}
+          {(selectedRole === "Seller" || selectedRole === "Agent") && (
+            <section style={{ marginBottom: '40px', background: '#f0fdf4', padding: '24px', borderRadius: '14px', border: '1px solid #bbf7d0' }}>
+              <h4 style={{ ...sectionHeaderStyle, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FaUser size={16} color="#16a34a" /> Contact Info Privacy
+              </h4>
+              <p style={{ fontSize: '0.83rem', color: '#166534', marginBottom: '16px', lineHeight: '1.5' }}>
+                Choose whether to show your contact information on your public profile. Other users will still be able to message you.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={showPhone} onChange={(e) => setShowPhone(e.target.checked)}
+                    style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#16a34a' }} />
+                  <span style={{ fontSize: '0.9rem', fontWeight: '600', color: '#374151' }}>Show my phone number on my profile</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={showEmail} onChange={(e) => setShowEmail(e.target.checked)}
+                    style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#16a34a' }} />
+                  <span style={{ fontSize: '0.9rem', fontWeight: '600', color: '#374151' }}>Show my email address on my profile</span>
+                </label>
               </div>
             </section>
           )}

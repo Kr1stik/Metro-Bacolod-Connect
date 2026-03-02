@@ -11,6 +11,7 @@ import { PostsModule } from './posts/posts.module';
 import { ChatsModule } from './chats/chats.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ReportsModule } from './reports/reports.module';
+import { OcrModule } from './ocr/ocr.module';
 import { EmailModule } from './email/email.module';
 import { SecurityLoggerModule } from './logger/security-logger.module';
 import { RequestLoggerMiddleware } from './middleware/request-logger.middleware';
@@ -28,6 +29,7 @@ import { RequestLoggerMiddleware } from './middleware/request-logger.middleware'
     ChatsModule,
     NotificationsModule,
     ReportsModule,
+    OcrModule,
   ],
   controllers: [AppController],
   providers: [

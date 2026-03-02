@@ -891,10 +891,18 @@ export default function Profile() {
               {profileData?.address || "Bacolod"}
             </p>
             <p className="profile-info-line">
-              <strong>Number:</strong> {profileData?.mobile || "—"}
+              <strong>Number:</strong> {
+                isViewingOther && profileData?.showPhone === false
+                  ? "Hidden"
+                  : (profileData?.mobile || "—")
+              }
             </p>
             <p className="profile-info-line">
-              <strong>Email:</strong> {profileUser?.email || "—"}
+              <strong>Email:</strong> {
+                isViewingOther && profileData?.showEmail === false
+                  ? "Hidden"
+                  : (profileUser?.email || profileData?.email || "—")
+              }
             </p>
           </div>
           <p className="profile-bio">

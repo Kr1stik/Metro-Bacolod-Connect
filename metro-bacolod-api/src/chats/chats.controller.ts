@@ -3,6 +3,12 @@ import { Throttle } from '@nestjs/throttler';
 import { ChatsService } from './chats.service';
 import { FirebaseAuthGuard } from '../guards/firebase-auth.guard';
 import { SendMessageDto, CreateChatDto } from './dto/chat.dto';
+import { IsBoolean } from 'class-validator';
+
+class TypingStatusDto {
+  @IsBoolean()
+  isTyping: boolean;
+}
 
 @Controller('chats')
 @UseGuards(FirebaseAuthGuard)
@@ -47,5 +53,12 @@ export class ChatsController {
   @Put(':id/read')
   markAsRead(@Param('id') id: string, @Req() req: any) {
     return this.chatsService.markAsRead(id, req.user.uid);
+  }
+
+  // PUT /chats/:id/typing - Set typing status
+  @Put(':id/typing')
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
+  setTypingStatus(@Param('id') id: string, @Body() body: TypingStatusDto, @Req() req: any) {
+    return this.chatsService.setTypingStatus(id, req.user.uid, body.isTyping);
   }
 }

@@ -2,12 +2,12 @@ import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase-config";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { signOut, updatePassword, EmailAuthProvider, reauthenticateWithCredential, updateProfile } from "firebase/auth";
+import { signOut, updatePassword, EmailAuthProvider, reauthenticateWithCredential, updateProfile, multiFactor, TotpMultiFactorGenerator, TotpSecret } from "firebase/auth";
 import {
   FaSearch, FaUser, FaCog, FaSignOutAlt,
   FaTrash, FaHome, FaPalette, FaKey,
   FaDesktop, FaCamera, FaChevronRight, FaCheck, FaExclamationTriangle,
-  FaLock, FaUserSlash, FaTrashAlt, FaSun, FaMoon
+  FaLock, FaUserSlash, FaTrashAlt, FaSun, FaMoon, FaShieldAlt
 } from "react-icons/fa";
 import logo from "../assets/MBC Logo.png";
 import "../App.css";
@@ -40,6 +40,14 @@ export default function Settings() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const profilePicInputRef = useRef<HTMLInputElement>(null);
 
+  // Privacy settings
+  const [editShowPhone, setEditShowPhone] = useState(true);
+  const [editShowEmail, setEditShowEmail] = useState(true);
+
+  // 2FA state
+  const [is2FAEnabled, setIs2FAEnabled] = useState(false);
+  const [is2FALoading, setIs2FALoading] = useState(false);
+
   // --- AUTH CHECK ---
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
@@ -61,7 +69,12 @@ export default function Settings() {
             setEditPhone(data.mobile || ""); 
             setEditRegion(data.address || "");
             setEditDescription(data.description || "");
+            setEditShowPhone(data.showPhone !== false);
+            setEditShowEmail(data.showEmail !== false);
           }
+          // Check 2FA enrollment status
+          const mfaUser = multiFactor(currentUser);
+          setIs2FAEnabled(mfaUser.enrolledFactors.length > 0);
           // Populate admin cache
           await fetchAdminEmails();
         } catch (err) {
@@ -235,6 +248,8 @@ export default function Settings() {
         mobile: editPhone,
         address: editRegion,
         description: editDescription,
+        showPhone: editShowPhone,
+        showEmail: editShowEmail,
       });
       
       setUserData((prev: any) => ({ 
@@ -244,7 +259,9 @@ export default function Settings() {
         username: editUsername, 
         mobile: editPhone,
         address: editRegion,
-        description: editDescription, 
+        description: editDescription,
+        showPhone: editShowPhone,
+        showEmail: editShowEmail,
       }));
       
       glassToast.success("Profile updated!");
@@ -317,6 +334,117 @@ export default function Settings() {
       } catch (err) {
         glassToast.error("Failed to deactivate account.");
       }
+    }
+  };
+
+  // --- 2FA HANDLERS ---
+  const handleEnable2FA = async () => {
+    if (!user) return;
+    setIs2FALoading(true);
+    try {
+      // Re-authenticate first for security
+      const { value: password } = await Swal.fire({
+        title: 'Verify Identity',
+        html: '<p style="color:#6b7280;font-size:0.85rem;">Enter your password to enable Two-Factor Authentication.</p>',
+        input: 'password',
+        inputPlaceholder: 'Enter your password',
+        showCancelButton: true,
+        confirmButtonColor: '#111827',
+        confirmButtonText: 'Continue',
+      });
+      if (!password) { setIs2FALoading(false); return; }
+
+      const credential = EmailAuthProvider.credential(user.email!, password);
+      await reauthenticateWithCredential(user, credential);
+
+      // Generate TOTP secret
+      const mfaSession = await multiFactor(user).getSession();
+      const totpSecret = await TotpMultiFactorGenerator.generateSecret(mfaSession);
+      
+      // Generate QR code URL for authenticator apps
+      const totpUri = totpSecret.generateQrCodeUrl(user.email!, 'Metro Bacolod Connect');
+
+      // Show QR code to user and ask for verification code
+      const { value: verificationCode } = await Swal.fire({
+        title: '<span style="font-weight:700;">Set Up 2FA</span>',
+        html: `
+          <div style="text-align:center;">
+            <p style="color:#6b7280;font-size:0.85rem;margin-bottom:15px;">
+              Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)
+            </p>
+            <div style="display:flex;justify-content:center;margin-bottom:15px;">
+              <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(totpUri)}" 
+                alt="QR Code" style="border-radius:12px;border:2px solid #e5e7eb;" />
+            </div>
+            <p style="font-size:0.75rem;color:#9ca3af;margin-bottom:15px;">
+              Or enter this key manually: <strong style="font-family:monospace;color:#374151;letter-spacing:1px;user-select:all;">${totpSecret.secretKey}</strong>
+            </p>
+            <label style="display:block;font-size:0.8rem;font-weight:600;color:#374151;margin-bottom:5px;text-align:left;">
+              Enter the 6-digit code from your app:
+            </label>
+          </div>
+        `,
+        input: 'text',
+        inputPlaceholder: '000000',
+        inputAttributes: { maxlength: '6', pattern: '[0-9]*', inputmode: 'numeric', autocomplete: 'one-time-code' },
+        showCancelButton: true,
+        confirmButtonColor: '#111827',
+        confirmButtonText: 'Verify & Enable',
+        inputValidator: (val) => {
+          if (!val || val.length !== 6 || !/^\d{6}$/.test(val)) return 'Please enter a valid 6-digit code';
+        },
+        width: '420px',
+      });
+
+      if (!verificationCode) { setIs2FALoading(false); return; }
+
+      // Verify and enroll
+      const multiFactorAssertion = TotpMultiFactorGenerator.assertionForEnrollment(totpSecret, verificationCode);
+      await multiFactor(user).enroll(multiFactorAssertion, 'Authenticator App');
+
+      setIs2FAEnabled(true);
+      glassToast.success('Two-Factor Authentication enabled!');
+    } catch (err: any) {
+      console.error('2FA enrollment error:', err);
+      if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        glassToast.error('Incorrect password.');
+      } else if (err.code === 'auth/invalid-verification-code') {
+        glassToast.error('Invalid verification code. Please try again.');
+      } else {
+        glassToast.error(err.message || 'Failed to enable 2FA.');
+      }
+    } finally {
+      setIs2FALoading(false);
+    }
+  };
+
+  const handleDisable2FA = async () => {
+    if (!user) return;
+    const result = await Swal.fire({
+      title: 'Disable 2FA?',
+      text: 'This will remove Two-Factor Authentication from your account, making it less secure.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Yes, disable 2FA',
+    });
+    if (!result.isConfirmed) return;
+
+    setIs2FALoading(true);
+    try {
+      const mfaUser = multiFactor(user);
+      const enrolledFactors = mfaUser.enrolledFactors;
+      if (enrolledFactors.length > 0) {
+        await mfaUser.unenroll(enrolledFactors[0]);
+      }
+      setIs2FAEnabled(false);
+      glassToast.success('Two-Factor Authentication disabled.');
+    } catch (err: any) {
+      console.error('2FA unenroll error:', err);
+      glassToast.error(err.message || 'Failed to disable 2FA.');
+    } finally {
+      setIs2FALoading(false);
     }
   };
 
@@ -442,6 +570,27 @@ export default function Settings() {
             />
             <span className="settings-field-hint">{editDescription.length}/500 characters</span>
           </div>
+
+          {/* Privacy Toggles (Seller/Agent) */}
+          {(userRole === "Seller" || userRole === "Agent") && (
+            <div className="settings-field" style={{ background: '#f0fdf4', padding: '16px', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
+              <label style={{ fontWeight: '700', marginBottom: '10px', display: 'block' }}>Contact Info Privacy</label>
+              <span className="settings-field-hint" style={{ marginBottom: '12px', display: 'block' }}>Control what visitors see on your profile.</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={editShowPhone} onChange={(e) => setEditShowPhone(e.target.checked)}
+                    style={{ width: '16px', height: '16px', accentColor: '#16a34a' }} />
+                  <span style={{ fontSize: '0.88rem' }}>Show phone number on profile</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={editShowEmail} onChange={(e) => setEditShowEmail(e.target.checked)}
+                    style={{ width: '16px', height: '16px', accentColor: '#16a34a' }} />
+                  <span style={{ fontSize: '0.88rem' }}>Show email address on profile</span>
+                </label>
+              </div>
+            </div>
+          )}
+
           <button className="settings-btn-primary" onClick={handleSaveProfile} style={{ marginTop: 8 }}>
             Save Profile
           </button>
@@ -464,6 +613,26 @@ export default function Settings() {
               </div>
             </div>
             <FaChevronRight className="settings-chevron" />
+          </div>
+          <div className="settings-divider" />
+          <div className="settings-action-item" onClick={is2FALoading ? undefined : (is2FAEnabled ? handleDisable2FA : handleEnable2FA)} style={{ cursor: is2FALoading ? 'wait' : 'pointer' }}>
+            <div className="settings-action-item-left">
+              <FaShieldAlt className="settings-action-icon" style={{ color: is2FAEnabled ? '#16a34a' : '#6b7280' }} />
+              <div>
+                <span className="settings-action-title">Two-Factor Authentication</span>
+                <span className="settings-action-desc">
+                  {is2FALoading ? 'Processing...' : is2FAEnabled ? (
+                    <span style={{ color: '#16a34a', fontWeight: '600' }}>Enabled — using Authenticator App</span>
+                  ) : (
+                    'Add an extra layer of security with an authenticator app'
+                  )}
+                </span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {is2FAEnabled && <span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#16a34a', background: '#f0fdf4', padding: '3px 10px', borderRadius: '20px', border: '1px solid #bbf7d0' }}>ON</span>}
+              <FaChevronRight className="settings-chevron" />
+            </div>
           </div>
         </div>
       </div>
