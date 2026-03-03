@@ -12,7 +12,7 @@ import {
   FaChevronLeft, FaChevronRight, FaBed, FaBath, FaRulerCombined,
   FaCalendarAlt, FaPhoneAlt, FaHeart, FaRegHeart,
   FaMap, FaCalculator, FaBell, FaBookmark, FaRegBookmark, FaFlag,
-  FaFacebookF, FaTwitter, FaInstagram
+  FaFacebookF, FaTwitter, FaInstagram, FaBars
 } from "react-icons/fa";
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -22,7 +22,7 @@ import "../App.css";
 import Swal from 'sweetalert2';
 import { glassToast } from '../components/GlassToast';
 import { BACOLOD_LOCATIONS } from "../constants/locations";
-import { canCreateListings, canAccessTrash, canManagePost, isAdmin, requiresVerification, fetchAdminEmails } from "../constants/roles";
+import { canCreateListings, canAccessTrash, canManagePost, isAdmin } from "../constants/roles";
 import DOMPurify from 'dompurify';
 
 const RatingStars = ({ rating }: { rating: number }) => {
@@ -79,16 +79,11 @@ async function compressImage(file: File, maxWidth = 1920, quality = 0.8): Promis
         if (!ctx) throw new Error("Canvas failed");
         ctx.drawImage(img, 0, 0, width, height);
         canvas.toBlob((blob) => {
-          if (!blob) {
-            resolve(file);
-          } else {
-            resolve(new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' }));
-          }
+          if (!blob) resolve(file);
+          else resolve(new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' }));
           URL.revokeObjectURL(img.src);
         }, 'image/jpeg', quality);
-      } catch (e) {
-        resolve(file); 
-      }
+      } catch (e) { resolve(file); }
     };
     img.onerror = () => resolve(file);
     img.src = URL.createObjectURL(file);
@@ -107,7 +102,6 @@ function calculateMortgage(propertyPrice: number, downPaymentPercent: number, an
   return { monthlyPayment, totalPayment, totalInterest, principal, downPayment };
 }
 
-// 🔥 BUG FIX: Safely parse numbers without crashing if data is weird
 function parsePriceToNumber(priceStr: any): number {
   if (!priceStr) return 0;
   const str = String(priceStr).toLowerCase().trim();
@@ -120,7 +114,6 @@ function parsePriceToNumber(priceStr: any): number {
   return num;
 }
 
-// 🔥 BUG FIX: Safely format price for display
 function formatPriceDisplay(price: any): string {
   if (!price) return 'Contact for price';
   const num = parsePriceToNumber(price);
@@ -215,8 +208,6 @@ export default function Dashboard() {
           const userDocRef = doc(db, "users", currentUser.uid);
           const userSnap = await getDoc(userDocRef);
           if (userSnap.exists()) setUserData(userSnap.data());
-          // Populate admin cache so isAdmin() works synchronously
-          await fetchAdminEmails();
         } catch (err) { console.error(err); }
       }
     });
@@ -268,7 +259,7 @@ export default function Dashboard() {
       await setDoc(doc(db, `users/${agentId}/reviews`, user.uid), { rating, reviewerId: user.uid, reviewerName: userData?.firstName ? `${userData.firstName} ${userData.lastName}` : (user.displayName || "User"), createdAt: new Date().toISOString() });
       glassToast.success(`Rated ${agentName} ${rating} stars!`);
       fetchAgentRating(agentId);
-      await addDoc(collection(db, "notifications"), { recipientId: agentId, message: `${userData?.firstName || user.displayName || 'Someone'} rated you ${rating} stars!`, link: '/profile', read: false, createdAt: new Date().toISOString() });
+      await addDoc(collection(db, "notifications"), { userId: agentId, message: `${userData?.firstName || user.displayName || 'Someone'} rated you ${rating} stars!`, link: '/profile', read: false, createdAt: new Date().toISOString() });
     } catch { glassToast.error("Failed to submit rating."); }
   };
 
@@ -276,15 +267,15 @@ export default function Dashboard() {
     if (!user) return;
     const unsub = onSnapshot(query(collection(db, "chats"), where("participants", "array-contains", user.uid)), (snap: any) => {
       let count = 0; snap.forEach((doc: any) => { if (doc.data().hasUnread?.[user.uid]) count++; }); setUnreadCount(count);
-    }, (err) => { console.error('Chat snapshot error:', err); });
+    });
     return () => unsub();
   }, [user]);
 
   useEffect(() => {
     if (!user) return;
-    const unsub = onSnapshot(query(collection(db, "notifications"), where("recipientId", "==", user.uid), orderBy("createdAt", "desc")), (snap) => {
+    const unsub = onSnapshot(query(collection(db, "notifications"), where("userId", "==", user.uid), orderBy("createdAt", "desc")), (snap) => {
       setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    }, (err) => { console.error('Notification snapshot error:', err); });
+    });
     return () => unsub();
   }, [user]);
 
@@ -314,7 +305,7 @@ export default function Dashboard() {
       setIsLoadingPosts(false);
       const agentIds = [...new Set(activePosts.map((p: any) => p.userId).filter(Boolean))];
       agentIds.forEach(id => fetchAgentRating(id));
-    }, (err) => { console.error('Posts snapshot error:', err); setIsLoadingPosts(false); });
+    });
     return () => unsub();
   }, [user]);
 
@@ -323,8 +314,7 @@ export default function Dashboard() {
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
-    const newFiles = Array.from(e.target.files);
-    setImageFiles(prev => [...prev, ...newFiles]);
+    setImageFiles(prev => [...prev, ...Array.from(e.target.files!)]);
     e.target.value = '';
   };
   const removeImage = (index: number) => { setImageFiles(prev => prev.filter((_, i) => i !== index)); };
@@ -336,11 +326,9 @@ export default function Dashboard() {
     setImageFiles([]); setListingPinCoords(null); setCreateMapStyle('street');
   };
 
+  // 🔥 NESTJS BACKEND UPLOAD INTEGRATION (OPTION B)
   const handleCreateListing = async () => {
-    if (!canCreateListings(userData?.role, user?.email)) return glassToast.error("Only sellers and agents can create listings.");
-    if (requiresVerification(userData?.role) && !userData?.isVerified) {
-      return glassToast.error("Your account is pending verification. An admin must verify your identity before you can post listings.");
-    }
+    if (!canCreateListings(userData?.role, user?.email)) return glassToast.error("Only agents can create listings.");
     if (!listingTitle.trim() || !listingLocation || !listingPrice.trim() || imageFiles.length === 0 || !listingPinCoords) {
       return glassToast.warning("Please fill all required fields and pin the location.");
     }
@@ -348,64 +336,63 @@ export default function Dashboard() {
     setIsUploading(true);
 
     try {
-      const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-      const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+      const idToken = await user.getIdToken(true);
+      const formData = new FormData();
       
-      if (!CLOUD_NAME || !UPLOAD_PRESET) {
-        throw new Error("Missing Cloudinary configuration in .env");
-      }
-
-      const uploadPromises = imageFiles.map(async (file) => {
-        const compressed = await compressImage(file);
-        const formData = new FormData();
-        formData.append("file", compressed);
-        formData.append("upload_preset", UPLOAD_PRESET);
-        formData.append("cloud_name", CLOUD_NAME);
-        const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, { method: "POST", body: formData });
-        if (!response.ok) throw new Error(`Failed to upload image`);
-        const data = await response.json();
-        return data.secure_url;
-      });
-
-      const imageUrls = await Promise.all(uploadPromises);
-      const amenitiesArray = listingAmenities.split(",").map((a) => a.trim()).filter((a) => a.length > 0);
       const safeTitle = DOMPurify.sanitize(listingTitle);
       const safeDescription = DOMPurify.sanitize(listingDescription);
 
-      await addDoc(collection(db, "posts"), {
-        userId: user.uid, 
-        userName: userData?.firstName ? `${userData.firstName} ${userData.lastName}` : (user.displayName || "Metro User"),
-        userAvatar: user.photoURL, 
-        userCustomId: userData?.customId || "USER", 
-        userRole: userData?.role || "Client", 
-        userPhone: userData?.mobile || "N/A",
-        title: safeTitle, 
-        content: safeDescription, 
-        location: listingLocation, 
-        price: listingPrice, 
-        status: listingStatus, 
-        type: listingType,
-        rooms: parseInt(listingRooms) || 0, 
-        bathrooms: parseInt(listingBathrooms) || 0, 
-        lotArea: listingLotArea || "N/A", 
-        floorArea: listingFloorArea || "N/A",
-        yearBuilt: parseInt(listingYearBuilt) || 0, 
-        amenities: amenitiesArray, 
-        images: imageUrls, 
-        image: imageUrls[0], 
-        pinCoords: listingPinCoords,
-        createdAt: new Date().toISOString(), 
-        likes: 0, 
-        likedBy: [], 
-        savedBy: [], 
-        isArchived: false,
+      formData.append('title', safeTitle || "Untitled");
+      formData.append('content', safeDescription || "No description");
+      formData.append('location', listingLocation || "Bacolod");
+      formData.append('price', listingPrice || "0");
+      formData.append('status', listingStatus || "For Sale"); 
+      formData.append('type', listingType || "House & Lot");
+      formData.append('rooms', listingRooms || '0');
+      formData.append('bathrooms', listingBathrooms || '0');
+      formData.append('lotArea', listingLotArea || 'N/A');
+      formData.append('floorArea', listingFloorArea || 'N/A');
+      formData.append('yearBuilt', listingYearBuilt || '0');
+      
+      const amenitiesArray = listingAmenities.split(",").map((a) => a.trim()).filter((a) => a.length > 0);
+      formData.append('amenities', JSON.stringify(amenitiesArray));
+      formData.append('pinCoords', JSON.stringify(listingPinCoords || BACOLOD_CENTER));
+      
+      formData.append('userName', userData?.firstName ? `${userData.firstName} ${userData.lastName}` : (user.displayName || "Metro User"));
+      formData.append('userAvatar', user.photoURL || "");
+      formData.append('userCustomId', userData?.customId || "USER");
+      formData.append('userRole', userData?.role || "Client");
+      formData.append('userPhone', userData?.mobile || "N/A");
+
+      const uploadPromises = imageFiles.map(async (file) => {
+        const compressed = await compressImage(file);
+        formData.append('images', compressed); 
+      });
+      await Promise.all(uploadPromises);
+
+      const API_URL = import.meta.env.VITE_API_URL || 'https://metro-bacolod-connect.onrender.com';
+      
+      const response = await fetch(`${API_URL}/posts/create`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${idToken}` },
+        body: formData,
       });
 
-      glassToast.success("Listing published!"); resetCreateForm(); setShowCreateModal(false);
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.message || "Backend rejected the upload.");
+      }
+
+      glassToast.success("Listing published successfully!"); 
+      resetCreateForm(); 
+      setShowCreateModal(false);
+
     } catch (error: any) { 
-      glassToast.error(error.message || "Failed to publish listing."); 
-    } 
-    finally { setIsUploading(false); }
+      console.error("🔥 [CRITICAL] Upload Failure:", error);
+      glassToast.error(error.message || "Failed to contact backend API."); 
+    } finally { 
+      setIsUploading(false); 
+    }
   };
 
   const startEdit = (post: any) => { setEditingPostId(post.id); setEditTitle(post.title || ''); setEditCaption(post.content || ''); setEditPrice(post.price?.toString() || ''); setEditLocation(post.location || ''); setEditStatus(post.status || 'For Sale'); setEditType(post.type || 'House & Lot'); setEditRooms(post.rooms?.toString() || ''); setEditBathrooms(post.bathrooms?.toString() || ''); setEditLotArea(post.lotArea || ''); setEditFloorArea(post.floorArea || ''); setEditYearBuilt(post.yearBuilt?.toString() || ''); setEditAmenities(Array.isArray(post.amenities) ? post.amenities.join(', ') : post.amenities || ''); setEditImages(post.images || [post.image]); setNewEditFiles([]); setActiveDropdown(null); };
@@ -423,16 +410,27 @@ export default function Dashboard() {
       if (!postSnap.exists() || !canManagePost(user?.uid, postSnap.data()?.userId, user?.email, userData?.role)) {
         glassToast.error("You don't have permission to edit this post."); setIsUploading(false); return;
       }
-      const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-      const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+      
+      const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || "dg6kzqq5n";
+      const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || "jdj7tsar";
       const newUrls: string[] = [];
-      for (const file of newEditFiles) {
-        const formData = new FormData(); formData.append("file", file); formData.append("upload_preset", UPLOAD_PRESET); formData.append("cloud_name", CLOUD_NAME);
-        const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, { method: "POST", body: formData });
-        const data = await response.json(); if (data.secure_url) newUrls.push(data.secure_url);
+      
+      if(newEditFiles.length > 0) {
+        for (const file of newEditFiles) {
+          const formData = new FormData(); formData.append("file", file); formData.append("upload_preset", UPLOAD_PRESET); formData.append("cloud_name", CLOUD_NAME);
+          const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, { method: "POST", body: formData });
+          const data = await response.json(); if (data.secure_url) newUrls.push(data.secure_url);
+        }
       }
+
       const finalImages = [...editImages, ...newUrls];
-      await updateDoc(postRef, { title: DOMPurify.sanitize(editTitle), content: DOMPurify.sanitize(editCaption), price: editPrice, location: editLocation, status: editStatus, type: editType, rooms: editRooms, bathrooms: editBathrooms, lotArea: editLotArea, floorArea: editFloorArea, yearBuilt: editYearBuilt, amenities: editAmenities.split(",").map((a) => a.trim()).filter(Boolean), images: finalImages, image: finalImages[0] });
+      
+      const safeTitle = DOMPurify.sanitize(editTitle);
+      const safeCaption = DOMPurify.sanitize(editCaption);
+      const amenitiesArray = editAmenities.split(",").map((a) => a.trim()).filter((a) => a.length > 0);
+
+      await updateDoc(postRef, { title: safeTitle, content: safeCaption, price: editPrice, location: editLocation, status: editStatus, type: editType, rooms: parseInt(editRooms) || 0, bathrooms: parseInt(editBathrooms) || 0, lotArea: editLotArea || "N/A", floorArea: editFloorArea || "N/A", yearBuilt: parseInt(editYearBuilt) || 0, amenities: amenitiesArray, images: finalImages, image: finalImages[0] });
+      
       glassToast.success("Listing updated!"); setEditingPostId(null);
     } catch (error) { glassToast.error("Failed to update listing"); } 
     finally { setIsUploading(false); }
@@ -511,7 +509,7 @@ export default function Dashboard() {
       if (newLiked) {
         await updateDoc(postRef, { likedBy: arrayUnion(user.uid) });
         const ownerId = selectedListing.originalPost?.userId;
-        if (ownerId && ownerId !== user.uid) await addDoc(collection(db, "notifications"), { recipientId: ownerId, message: `${userData?.firstName || user.displayName || 'Someone'} liked your listing "${selectedListing.title}"`, link: '/dashboard', read: false, createdAt: new Date().toISOString() });
+        if (ownerId && ownerId !== user.uid) await addDoc(collection(db, "notifications"), { userId: ownerId, message: `${userData?.firstName || user.displayName || 'Someone'} liked your listing "${selectedListing.title}"`, link: '/dashboard', read: false, createdAt: new Date().toISOString() });
       } else {
         await updateDoc(postRef, { likedBy: arrayRemove(user.uid) });
       }
@@ -538,25 +536,12 @@ export default function Dashboard() {
     } catch { /* proceed if check fails */ }
     const { value: reason } = await Swal.fire({
       title: 'Report Listing', input: 'select', inputOptions: { 'misleading': 'Misleading Information', 'inappropriate': 'Inappropriate Content', 'scam': 'Suspected Scam', 'duplicate': 'Duplicate Listing', 'other': 'Other' },
-      inputPlaceholder: 'Select a reason', showCancelButton: true, confirmButtonColor: '#111827', confirmButtonText: 'Next',
+      inputPlaceholder: 'Select a reason', showCancelButton: true, confirmButtonColor: '#111827', confirmButtonText: 'Submit Report',
       inputValidator: (value) => { if (!value) return 'Please select a reason.'; },
     });
     if (!reason) return;
-    // Step 2: Ask for description/proof
-    const { value: description } = await Swal.fire({
-      title: 'Provide Details',
-      html: '<p style="font-size:0.85rem;color:#6b7280;margin-bottom:10px">Please describe why you are reporting this listing. Include any evidence or context that supports your report.</p>',
-      input: 'textarea',
-      inputPlaceholder: 'e.g. The listing photos appear to be from a different property. The price is suspiciously low compared to market value...',
-      inputAttributes: { 'aria-label': 'Description', style: 'min-height:120px' },
-      showCancelButton: true,
-      confirmButtonColor: '#111827',
-      confirmButtonText: 'Submit Report',
-      inputValidator: (value) => { if (!value || !value.trim()) return 'Please provide a description for your report.'; },
-    });
-    if (!description) return;
     try {
-      await addDoc(collection(db, "reports"), { postId: listing.id, postTitle: listing.title, reportedBy: user.uid, reporterName: userData?.firstName ? `${userData.firstName} ${userData.lastName}` : user.displayName, reason, description: description.trim(), status: 'pending', createdAt: new Date().toISOString() });
+      await addDoc(collection(db, "reports"), { postId: listing.id, postTitle: listing.title, reportedBy: user.uid, reporterName: userData?.firstName ? `${userData.firstName} ${userData.lastName}` : user.displayName, reason, status: 'pending', createdAt: new Date().toISOString() });
       glassToast.success("Report submitted. We'll review it shortly.");
     } catch { glassToast.error("Failed to submit report."); }
   };
@@ -605,48 +590,97 @@ export default function Dashboard() {
             )}
           </div>
         </div>
-        <div className="dash-nav-right" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <div onClick={() => navigate('/messages')} style={{ cursor: 'pointer', color: '#4b5563', display: 'flex', alignItems: 'center', transition: '0.2s', position: 'relative' }} title="Messages" className="desktop-msg-icon">
-            <FaEnvelope size={22} />
-            {unreadCount > 0 && <span style={{ position: 'absolute', top: '-5px', right: '-8px', background: '#ef4444', color: 'white', fontSize: '0.65rem', fontWeight: 'bold', width: '18px', height: '18px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white' }}>{unreadCount}</span>}
-          </div>
+        
+        {/* REFACTORED RIGHT NAVBAR WITH MOBILE HAMBURGER MENU */}
+        <div className="dash-nav-right" style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+          <style>{`
+            @media (max-width: 768px) {
+              .dash-nav-right-desktop { display: none !important; }
+              .dash-nav-right-mobile { display: flex !important; align-items: center; }
+              .mobile-dropdown-item { display: flex !important; }
+              .desktop-dropdown-item { display: none !important; } /* 🔥 ADD THIS LINE */
+            }
+            @media (min-width: 769px) {
+              .dash-nav-right-mobile { display: none !important; }
+              .mobile-dropdown-item { display: none !important; }
+            }
+          `}</style>
 
-          <div onClick={() => setShowNotifications(!showNotifications)} style={{ cursor: 'pointer', color: '#4b5563', display: 'flex', alignItems: 'center', transition: '0.2s', position: 'relative' }} title="Notifications" className="desktop-msg-icon">
-            <FaBell size={22} />
-            {unreadNotifCount > 0 && <span style={{ position: 'absolute', top: '-5px', right: '-8px', background: '#ef4444', color: 'white', fontSize: '0.65rem', fontWeight: 'bold', width: '18px', height: '18px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white' }}>{unreadNotifCount}</span>}
-            {showNotifications && (
-              <div onClick={(e) => e.stopPropagation()} className="notif-dropdown">
-                <div className="notif-dropdown-header">Notifications</div>
-                {notifications.length === 0 ? ( <div className="notif-dropdown-empty">No notifications yet</div> ) : (
-                  notifications.slice(0, 20).map((n: any) => (
-                    <div key={n.id} onClick={() => { markNotificationRead(n.id); if (n.link) navigate(n.link); setShowNotifications(false); }} className={`notif-dropdown-item ${n.read ? '' : 'notif-unread'}`}>
-                      <p className="notif-dropdown-msg" style={{ fontWeight: n.read ? '400' : '600' }}>{n.message}</p>
-                      <span className="notif-dropdown-time">{n.createdAt ? new Date(n.createdAt).toLocaleString() : ''}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="dash-user-trigger" onClick={() => setIsDropdownOpen(!isDropdownOpen)}>
-            <div className="dash-user-text">
-              <span className="dash-user-name">{userData?.firstName ? `${userData.firstName} ${userData.lastName}` : (user?.displayName || 'Loading...')}</span>
-              <span className="dash-user-role">{userData?.role || 'Client'}</span>
+          {/* DESKTOP VIEW */}
+          <div className="dash-nav-right-desktop" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+            <div onClick={() => navigate('/messages')} style={{ cursor: 'pointer', color: '#4b5563', display: 'flex', alignItems: 'center', transition: '0.2s', position: 'relative' }} title="Messages" className="desktop-msg-icon">
+              <FaEnvelope size={22} />
+              {unreadCount > 0 && <span style={{ position: 'absolute', top: '-5px', right: '-8px', background: '#ef4444', color: 'white', fontSize: '0.65rem', fontWeight: 'bold', width: '18px', height: '18px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white' }}>{unreadCount}</span>}
             </div>
-            <img src={user?.photoURL || 'https://ui-avatars.com/api/?name=User&background=e5e7eb&color=9ca3af&rounded=true'} alt="avatar" className="dash-avatar" />
+
+            <div onClick={() => { setShowNotifications(!showNotifications); setIsDropdownOpen(false); }} style={{ cursor: 'pointer', color: '#4b5563', display: 'flex', alignItems: 'center', transition: '0.2s', position: 'relative' }} title="Notifications" className="desktop-msg-icon">
+              <FaBell size={22} />
+              {unreadNotifCount > 0 && <span style={{ position: 'absolute', top: '-5px', right: '-8px', background: '#ef4444', color: 'white', fontSize: '0.65rem', fontWeight: 'bold', width: '18px', height: '18px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white' }}>{unreadNotifCount}</span>}
+            </div>
+
+            <div className="dash-user-trigger" onClick={() => { setIsDropdownOpen(!isDropdownOpen); setShowNotifications(false); }}>
+              <div className="dash-user-text">
+                <span className="dash-user-name">{userData?.firstName ? `${userData.firstName} ${userData.lastName}` : (user?.displayName || 'Loading...')}</span>
+                <span className="dash-user-role">{userData?.role || 'Client'}</span>
+              </div>
+              <img src={user?.photoURL || 'https://ui-avatars.com/api/?name=User&background=e5e7eb&color=9ca3af&rounded=true'} alt="avatar" className="dash-avatar" />
+            </div>
           </div>
+
+          {/* MOBILE VIEW (Hamburger Menu) */}
+          <div className="dash-nav-right-mobile">
+            <div onClick={() => { setIsDropdownOpen(!isDropdownOpen); setShowNotifications(false); }} style={{ cursor: 'pointer', color: '#111827', fontSize: '1.5rem', display: 'flex', alignItems: 'center', position: 'relative', padding: '8px' }}>
+              <FaBars />
+              {(unreadCount > 0 || unreadNotifCount > 0) && <span style={{ position: 'absolute', top: '4px', right: '4px', background: '#ef4444', width: '10px', height: '10px', borderRadius: '50%', border: '2px solid white' }}></span>}
+            </div>
+          </div>
+
+          {/* SHARED COMPREHENSIVE DROPDOWN MENU */}
+          {/* SHARED COMPREHENSIVE DROPDOWN MENU */}
           {isDropdownOpen && (
-            <div className="dash-dropdown">
-              <div className="dash-dropdown-item" onClick={() => { navigate('/profile'); setIsDropdownOpen(false); }}><FaUser /> Profile</div>
+            <div className="dash-dropdown" style={{ top: '58px', right: '0' }}>
+              
+              {/* NOTIFICATIONS (Mobile Only - since desktop has its own button) */}
+              <div className="dash-dropdown-item mobile-dropdown-item" onClick={() => { setShowNotifications(!showNotifications); setIsDropdownOpen(false); }}>
+                <FaBell /> Notifications
+                {unreadNotifCount > 0 && <span style={{ background: '#ef4444', color: 'white', fontSize: '0.65rem', fontWeight: 'bold', padding: '2px 6px', borderRadius: '10px', marginLeft: 'auto' }}>{unreadNotifCount} new</span>}
+              </div>
+              <div className="dash-dropdown-divider mobile-dropdown-item" />
+
+              {/* PROFILE & TRASH (Desktop Only - because mobile has them in the bottom nav) */}
+              <div className="dash-dropdown-item desktop-dropdown-item" onClick={() => { navigate('/profile'); setIsDropdownOpen(false); }}><FaUser /> Profile</div>
+              {canAccessTrash(userData?.role, user?.email) && ( <div className="dash-dropdown-item desktop-dropdown-item" onClick={() => { navigate('/archive'); setIsDropdownOpen(false); }}><FaTrash /> Trash</div> )}
+              
+              {/* SETTINGS & ADMIN (Both Desktop and Mobile) */}
               <div className="dash-dropdown-item" onClick={() => { navigate('/settings'); setIsDropdownOpen(false); }}><FaCog /> Settings</div>
-              {canAccessTrash(userData?.role, user?.email) && ( <div className="dash-dropdown-item" onClick={() => { navigate('/archive'); setIsDropdownOpen(false); }}><FaTrash /> Trash</div> )}
-              {isAdmin(user?.email) && ( <div className="dash-dropdown-item" onClick={() => { navigate('/admin'); setIsDropdownOpen(false); }}><FaCog /> Admin Panel</div> )}
+              {isAdmin(userData?.role) && ( <div className="dash-dropdown-item" onClick={() => { navigate('/admin'); setIsDropdownOpen(false); }}><FaCog /> Admin Panel</div> )}
+              
               <div className="dash-dropdown-divider" />
+              
+              {/* LOGOUT (Both Desktop and Mobile) */}
               <div className="dash-dropdown-item dash-dropdown-logout" onClick={handleLogout}><FaSignOutAlt /> Logout</div>
             </div>
           )}
+
+          {/* NOTIFICATIONS POPUP */}
+          {showNotifications && (
+            <div onClick={(e) => e.stopPropagation()} className="notif-dropdown" style={{ top: '58px', right: '0' }}>
+              <div className="notif-dropdown-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Notifications</span>
+                <FaTimes style={{ cursor: 'pointer', color: '#9ca3af' }} onClick={() => setShowNotifications(false)} />
+              </div>
+              {notifications.length === 0 ? ( <div className="notif-dropdown-empty">No notifications yet</div> ) : (
+                notifications.slice(0, 20).map((n: any) => (
+                  <div key={n.id} onClick={() => { markNotificationRead(n.id); if (n.link) navigate(n.link); setShowNotifications(false); }} className={`notif-dropdown-item ${n.read ? '' : 'notif-unread'}`}>
+                    <p className="notif-dropdown-msg" style={{ fontWeight: n.read ? '400' : '600' }}>{n.message}</p>
+                    <span className="notif-dropdown-time">{n.createdAt ? new Date(n.createdAt).toLocaleString() : ''}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
+
       </nav>
 
       {/* ========== MAIN CONTENT ========== */}

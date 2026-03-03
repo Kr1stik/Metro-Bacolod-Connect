@@ -1,10 +1,9 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase-config";
-import { collection, query, where, onSnapshot, addDoc, orderBy, serverTimestamp, doc, updateDoc, deleteDoc, getDoc, setDoc, getDocs } from "firebase/firestore";
-import { FaSearch, FaEnvelope, FaPaperPlane, FaArrowLeft, FaImage, FaSpinner, FaTrash, FaStar, FaCheck, FaCheckDouble } from "react-icons/fa";
+import { collection, query, where, onSnapshot, addDoc, orderBy, serverTimestamp, doc, updateDoc, deleteDoc, getDoc, getDocs, setDoc } from "firebase/firestore";
+import { FaSearch, FaEnvelope, FaPaperPlane, FaImage, FaSpinner, FaTrash, FaStar, FaCheck, FaCheckDouble, FaChevronLeft } from "react-icons/fa";
 import { SkeletonList } from "../components/SkeletonLoader";
-import logo from "../assets/MBC Logo.png";
 import { glassToast } from "../components/GlassToast";
 import Swal from "sweetalert2";
 import DOMPurify from "dompurify";
@@ -12,6 +11,7 @@ import DOMPurify from "dompurify";
 export default function Messages() {
   const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
+  const [userData, setUserData] = useState<any>(null);
   const [chats, setChats] = useState<any[]>([]);
   const [isLoadingChats, setIsLoadingChats] = useState(true);
   const [activeChat, setActiveChat] = useState<any>(null);
@@ -35,7 +35,7 @@ export default function Messages() {
   const [isOtherTyping, setIsOtherTyping] = useState(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Read receipt state (lastRead timestamp per user from active chat)
+  // Read receipt state
   const [otherLastRead, setOtherLastRead] = useState<any>(null);
 
   const isUserOnline = (lastSeen: Date | null) => {
@@ -54,7 +54,6 @@ export default function Messages() {
     return `Last seen ${lastSeen.toLocaleDateString()}`;
   };
 
-  // Time formatters
   const formatTime = (date: any) => {
     if (!date) return "";
     const d = date.toDate ? date.toDate() : new Date(date);
@@ -69,13 +68,17 @@ export default function Messages() {
 
   // 1. Auth & Fetch Chats
   useEffect(() => {
-    const unsubscribeAuth = auth.onAuthStateChanged((currentUser) => {
+    const unsubscribeAuth = auth.onAuthStateChanged(async (currentUser) => {
       if (!currentUser) {
         navigate("/");
       } else {
         setUser(currentUser);
+        try {
+          const snap = await getDoc(doc(db, "users", currentUser.uid));
+          if (snap.exists()) setUserData(snap.data());
+        } catch(e) { console.error(e); }
+
         const q = query(collection(db, "chats"), where("participants", "array-contains", currentUser.uid));
-        
         const unsubChats = onSnapshot(q, (snapshot) => {
           const fetchedChats = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
           fetchedChats.sort((a: any, b: any) => (b.updatedAt?.toMillis?.() || 0) - (a.updatedAt?.toMillis?.() || 0));
@@ -100,18 +103,16 @@ export default function Messages() {
     return () => unsubMessages();
   }, [activeChat]);
 
-  // 2b. Update own lastSeen periodically
+  // Update own lastSeen periodically
   useEffect(() => {
     if (!user) return;
-    const updateLastSeen = () => {
-      updateDoc(doc(db, "users", user.uid), { lastSeen: serverTimestamp() }).catch(() => {});
-    };
+    const updateLastSeen = () => { updateDoc(doc(db, "users", user.uid), { lastSeen: serverTimestamp() }).catch(() => {}); };
     updateLastSeen();
-    const interval = setInterval(updateLastSeen, 2 * 60 * 1000); // every 2 minutes
+    const interval = setInterval(updateLastSeen, 2 * 60 * 1000); 
     return () => clearInterval(interval);
   }, [user]);
 
-  // 2b2. Fetch all chat participants' online status
+  // Fetch all chat participants' online status
   useEffect(() => {
     if (!user || chats.length === 0) return;
     const fetchStatuses = async () => {
@@ -121,41 +122,35 @@ export default function Messages() {
         try {
           const snap = await getDoc(doc(db, "users", uid));
           const data = snap.data();
-          if (data?.lastSeen) {
-            statuses[uid] = data.lastSeen.toDate ? data.lastSeen.toDate() : new Date(data.lastSeen);
-          }
-        } catch { /* ignore */ }
+          if (data?.lastSeen) statuses[uid] = data.lastSeen.toDate ? data.lastSeen.toDate() : new Date(data.lastSeen);
+        } catch { }
       }));
       setOnlineStatuses(statuses);
     };
     fetchStatuses();
-    const interval = setInterval(fetchStatuses, 60 * 1000); // every minute
+    const interval = setInterval(fetchStatuses, 60 * 1000); 
     return () => clearInterval(interval);
   }, [user, chats]);
 
-  // 2c. Fetch other user's lastSeen when activeChat changes
+  // Fetch other user's lastSeen when activeChat changes
   useEffect(() => {
     if (!activeChat || !user) { setOtherUserLastSeen(null); return; }
     const otherUid = activeChat.participants.find((uid: string) => uid !== user.uid);
     if (!otherUid) return;
 
-    // Poll the other user's lastSeen every 30 seconds
     const fetchLastSeen = async () => {
       try {
         const snap = await getDoc(doc(db, "users", otherUid));
         const data = snap.data();
-        if (data?.lastSeen) {
-          const d = data.lastSeen.toDate ? data.lastSeen.toDate() : new Date(data.lastSeen);
-          setOtherUserLastSeen(d);
-        }
-      } catch { /* ignore */ }
+        if (data?.lastSeen) setOtherUserLastSeen(data.lastSeen.toDate ? data.lastSeen.toDate() : new Date(data.lastSeen));
+      } catch { }
     };
     fetchLastSeen();
     const interval = setInterval(fetchLastSeen, 30 * 1000);
     return () => clearInterval(interval);
   }, [activeChat, user]);
 
-  // 3. Mark as read + update lastRead
+  // Mark as read + update lastRead
   useEffect(() => {
     if (!activeChat || !user) return;
     const currentChat = chats.find(c => c.id === activeChat.id);
@@ -167,54 +162,36 @@ export default function Messages() {
     }
   }, [chats, activeChat, user]);
 
-  // 3b. Listen for typing & lastRead from active chat doc (real-time)
+  // Listen for typing & lastRead from active chat doc
   useEffect(() => {
-    if (!activeChat || !user) {
-      setIsOtherTyping(false);
-      setOtherLastRead(null);
-      return;
-    }
+    if (!activeChat || !user) { setIsOtherTyping(false); setOtherLastRead(null); return; }
     const unsub = onSnapshot(doc(db, "chats", activeChat.id), (snap) => {
       const data = snap.data();
       if (!data) return;
       const otherUid = data.participants?.find((uid: string) => uid !== user.uid);
       if (!otherUid) return;
 
-      // Typing indicator — check if other user's typing timestamp is recent (< 5 seconds)
       const typingTs = data.typing?.[otherUid];
       if (typingTs) {
         const ts = typingTs.toDate ? typingTs.toDate() : new Date(typingTs);
         setIsOtherTyping(Date.now() - ts.getTime() < 5000);
-      } else {
-        setIsOtherTyping(false);
-      }
+      } else setIsOtherTyping(false);
 
-      // Read receipt — other user's lastRead timestamp
-      const lr = data.lastRead?.[otherUid];
-      setOtherLastRead(lr || null);
+      setOtherLastRead(data.lastRead?.[otherUid] || null);
     });
     return () => unsub();
   }, [activeChat, user]);
 
-  // 3c. Handle typing status updates (debounced)
   const handleTyping = () => {
     if (!activeChat || !user) return;
-    // Update typing status in Firestore
-    updateDoc(doc(db, "chats", activeChat.id), {
-      [`typing.${user.uid}`]: serverTimestamp(),
-    }).catch(() => {});
-
-    // Clear previous timeout and set new one to stop typing after 3 seconds
+    updateDoc(doc(db, "chats", activeChat.id), { [`typing.${user.uid}`]: serverTimestamp() }).catch(() => {});
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(() => {
       if (!activeChat || !user) return;
-      updateDoc(doc(db, "chats", activeChat.id), {
-        [`typing.${user.uid}`]: null,
-      }).catch(() => {});
+      updateDoc(doc(db, "chats", activeChat.id), { [`typing.${user.uid}`]: null }).catch(() => {});
     }, 3000);
   };
 
-  // 4. Handle Image Upload
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !activeChat || !user) return;
@@ -224,43 +201,22 @@ export default function Messages() {
       const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
       const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
-      if (!CLOUD_NAME || !UPLOAD_PRESET) {
-        throw new Error("Missing Cloudinary configuration in .env");
-      }
-
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("upload_preset", UPLOAD_PRESET);
+      formData.append("upload_preset", UPLOAD_PRESET!);
 
-      const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
-        method: "POST",
-        body: formData
-      });
+      const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, { method: "POST", body: formData });
       const data = await response.json();
 
       if (data.secure_url) {
-        await addDoc(collection(db, `chats/${activeChat.id}/messages`), {
-          imageUrl: data.secure_url,
-          senderId: user.uid,
-          createdAt: serverTimestamp()
-        });
-
+        await addDoc(collection(db, `chats/${activeChat.id}/messages`), { imageUrl: data.secure_url, senderId: user.uid, createdAt: serverTimestamp() });
         const otherUid = activeChat.participants.find((uid: string) => uid !== user.uid);
-        await updateDoc(doc(db, "chats", activeChat.id), { 
-          lastMessage: "📷 Sent an image", 
-          updatedAt: serverTimestamp(),
-          [`hasUnread.${otherUid}`]: true 
-        });
+        await updateDoc(doc(db, "chats", activeChat.id), { lastMessage: "📷 Sent an image", updatedAt: serverTimestamp(), [`hasUnread.${otherUid}`]: true });
       }
-    } catch (error) {
-      glassToast.error("Failed to upload image");
-    } finally {
-      setIsUploading(false);
-      if (imageInputRef.current) imageInputRef.current.value = ""; // Reset input
-    }
+    } catch { glassToast.error("Failed to upload image"); } 
+    finally { setIsUploading(false); if (imageInputRef.current) imageInputRef.current.value = ""; }
   };
 
-  // 5. Handle Text Message
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !activeChat || !user) return;
@@ -268,28 +224,14 @@ export default function Messages() {
     const text = newMessage;
     setNewMessage(""); 
     
-    // Clear typing indicator
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    updateDoc(doc(db, "chats", activeChat.id), {
-      [`typing.${user.uid}`]: null,
-    }).catch(() => {});
+    updateDoc(doc(db, "chats", activeChat.id), { [`typing.${user.uid}`]: null }).catch(() => {});
     
     try {
-      await addDoc(collection(db, `chats/${activeChat.id}/messages`), {
-        text: text,
-        senderId: user.uid,
-        createdAt: serverTimestamp()
-      });
-      
+      await addDoc(collection(db, `chats/${activeChat.id}/messages`), { text: text, senderId: user.uid, createdAt: serverTimestamp() });
       const otherUid = activeChat.participants.find((uid: string) => uid !== user.uid);
-      await updateDoc(doc(db, "chats", activeChat.id), { 
-        lastMessage: text, 
-        updatedAt: serverTimestamp(),
-        [`hasUnread.${otherUid}`]: true 
-      });
-    } catch (error) {
-      glassToast.error("Failed to send message");
-    }
+      await updateDoc(doc(db, "chats", activeChat.id), { lastMessage: text, updatedAt: serverTimestamp(), [`hasUnread.${otherUid}`]: true });
+    } catch { glassToast.error("Failed to send message"); }
   };
 
   const handleDeleteMessage = async (messageId: string) => {
@@ -297,9 +239,7 @@ export default function Messages() {
     try {
       await deleteDoc(doc(db, `chats/${activeChat.id}/messages`, messageId));
       glassToast.success("Message deleted");
-    } catch {
-      glassToast.error("Failed to delete message");
-    }
+    } catch { glassToast.error("Failed to delete message"); }
   };
 
   const getOtherUser = (chat: any) => {
@@ -307,7 +247,6 @@ export default function Messages() {
     return chat.users[otherUid] || { name: "Unknown User", avatar: "https://ui-avatars.com/api/?name=U" };
   };
 
-  // --- Rate Agent ---
   const RATING_CATEGORIES = ['Responsiveness', 'Negotiation Skills', 'Market Knowledge', 'Professionalism', 'Process Guidance', 'Closing Support'];
 
   const handleRateAgent = async () => {
@@ -316,25 +255,19 @@ export default function Messages() {
     if (!otherUid) return;
     const otherUser = getOtherUser(activeChat);
 
-    // Check if the other user is a seller/agent
     try {
       const otherUserDoc = await getDoc(doc(db, "users", otherUid));
-      const otherRole = otherUserDoc.data()?.role;
-      if (!otherRole || otherRole === 'Client') {
+      if (!otherUserDoc.data()?.role || otherUserDoc.data()?.role === 'Client') {
         glassToast.info("You can only rate sellers/agents.");
         return;
       }
-    } catch { /* proceed */ }
+    } catch { }
 
-    // Check for existing review
     let existingRating: Record<string, number> = {};
     try {
       const existingReview = await getDoc(doc(db, `users/${otherUid}/reviews`, user.uid));
-      if (existingReview.exists()) {
-        const data = existingReview.data();
-        existingRating = data?.categories || {};
-      }
-    } catch { /* no existing */ }
+      if (existingReview.exists()) existingRating = existingReview.data()?.categories || {};
+    } catch { }
 
     const categoriesHtml = RATING_CATEGORIES.map((cat, idx) => {
       const existing = existingRating[cat] || 0;
@@ -351,11 +284,9 @@ export default function Messages() {
     const { value: ratings } = await Swal.fire({
       title: `Rate ${otherUser.name}`,
       html: `<div style="text-align:left;margin-top:8px;">${categoriesHtml}</div><p id="rate-avg" style="font-size:0.8rem;color:#6b7280;margin-top:12px;">Overall: Select ratings above</p>`,
-      showCancelButton: true, confirmButtonText: 'Submit Rating', confirmButtonColor: '#111827',
-      width: '420px',
+      showCancelButton: true, confirmButtonText: 'Submit Rating', confirmButtonColor: '#111827', width: '420px',
       didOpen: () => {
         const selected: Record<number, number> = {};
-        // Init existing
         RATING_CATEGORIES.forEach((_, idx) => { if (existingRating[RATING_CATEGORIES[idx]]) selected[idx] = existingRating[RATING_CATEGORIES[idx]]; });
         const allStars = document.querySelectorAll('.rate-star');
         const avgLabel = document.getElementById('rate-avg');
@@ -368,22 +299,12 @@ export default function Messages() {
         updateAvg();
         allStars.forEach((s: any) => {
           s.addEventListener('click', () => {
-            const cat = parseInt(s.dataset.cat);
-            const val = parseInt(s.dataset.val);
-            selected[cat] = val;
-            // Update star colors for this category
-            allStars.forEach((st: any) => {
-              if (parseInt(st.dataset.cat) === cat) {
-                st.style.color = parseInt(st.dataset.val) <= val ? '#f59e0b' : '#9ca3af';
-              }
-            });
-            updateAvg();
-            (Swal.getConfirmButton() as any).dataset.ratings = JSON.stringify(selected);
+            const cat = parseInt(s.dataset.cat); const val = parseInt(s.dataset.val); selected[cat] = val;
+            allStars.forEach((st: any) => { if (parseInt(st.dataset.cat) === cat) st.style.color = parseInt(st.dataset.val) <= val ? '#f59e0b' : '#9ca3af'; });
+            updateAvg(); (Swal.getConfirmButton() as any).dataset.ratings = JSON.stringify(selected);
           });
         });
-        if (Object.keys(selected).length > 0) {
-          (Swal.getConfirmButton() as any).dataset.ratings = JSON.stringify(selected);
-        }
+        if (Object.keys(selected).length > 0) (Swal.getConfirmButton() as any).dataset.ratings = JSON.stringify(selected);
       },
       preConfirm: () => {
         const raw = (Swal.getConfirmButton() as any)?.dataset?.ratings;
@@ -397,43 +318,23 @@ export default function Messages() {
     if (!ratings) return;
 
     try {
-      // Convert index-based ratings to category-name-based
       const categories: Record<string, number> = {};
-      Object.entries(ratings).forEach(([idx, val]) => {
-        categories[RATING_CATEGORIES[parseInt(idx)]] = val as number;
-      });
+      Object.entries(ratings).forEach(([idx, val]) => { categories[RATING_CATEGORIES[parseInt(idx)]] = val as number; });
       const values = Object.values(categories);
       const overallRating = Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10;
 
-      await setDoc(doc(db, `users/${otherUid}/reviews`, user.uid), {
-        rating: overallRating,
-        categories,
-        reviewerId: user.uid,
-        reviewerName: user.displayName || 'User',
-        createdAt: new Date().toISOString()
-      });
+      await setDoc(doc(db, `users/${otherUid}/reviews`, user.uid), { rating: overallRating, categories, reviewerId: user.uid, reviewerName: user.displayName || 'User', createdAt: new Date().toISOString() });
 
-      // Update cached agentRating on user doc
       const allReviews = await getDocs(collection(db, `users/${otherUid}/reviews`));
-      let total = 0;
-      allReviews.forEach(d => { total += d.data().rating || 0; });
+      let total = 0; allReviews.forEach(d => { total += d.data().rating || 0; });
       const newAvg = Math.round((total / allReviews.size) * 10) / 10;
       await updateDoc(doc(db, "users", otherUid), { agentRating: newAvg });
 
       glassToast.success(`Rated ${otherUser.name} ${overallRating} stars!`);
-
-      // Send notification
-      await addDoc(collection(db, "notifications"), {
-        recipientId: otherUid,
-        message: `${user.displayName || 'Someone'} rated you ${overallRating} stars!`,
-        link: '/profile',
-        read: false,
-        createdAt: new Date().toISOString()
-      });
+      await addDoc(collection(db, "notifications"), { recipientId: otherUid, message: `${user.displayName || 'Someone'} rated you ${overallRating} stars!`, link: '/profile', read: false, createdAt: new Date().toISOString() });
     } catch { glassToast.error("Failed to submit rating."); }
   };
 
-  // --- Search Logic ---
   const filteredChats = chats.filter(chat => {
     if (!searchQuery.trim()) return true;
     const otherUser = getOtherUser(chat);
@@ -442,45 +343,35 @@ export default function Messages() {
 
   return (
     <div className="dashboard-revamp" style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      {/* NAVBAR */}
-      <nav className="dash-nav" style={{ flexShrink: 0, zIndex: 100 }}>
-        <div className="dash-nav-left" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+      
+      {/* SUPER MINIMAL TOP NAV (Hidden on Mobile when inside a chat) */}
+      <nav className={`dash-nav ${activeChat ? 'mobile-hide-nav' : ''}`} style={{ flexShrink: 0, zIndex: 100, padding: '0 20px', display: 'flex', justifyContent: 'flex-start', borderBottom: '1px solid #e5e7eb' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <button 
-            onClick={() => activeChat ? setActiveChat(null) : navigate('/dashboard')} 
-            className="msg-back-btn"
-            style={{ background: '#f3f4f6', border: 'none', padding: '10px 15px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', fontWeight: '600', color: '#374151' }}
+            onClick={() => navigate('/dashboard')} 
+            style={{ background: '#f3f4f6', border: '1px solid #e5e7eb', padding: '10px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', color: '#111827', width: '40px', height: '40px', transition: 'all 0.2s ease' }}
           >
-            <FaArrowLeft /> {activeChat ? 'Back to Inbox' : 'Back to Listings'}
+            <FaChevronLeft />
           </button>
-          <img src={logo} alt="MBC Logo" className="dash-logo" onClick={() => navigate("/dashboard")} style={{ cursor: "pointer", marginLeft: '10px' }} />
-          <h2 style={{ fontSize: '1.2rem', margin: 0, display: 'none' }} className="desktop-title msg-title">Messages</h2>
-        </div>
-        <div className="dash-nav-right">
-          <div className="dash-user-trigger" onClick={() => navigate("/profile")}>
-            <img src={user?.photoURL || "https://ui-avatars.com/api/?name=User"} alt="avatar" className="dash-avatar" />
-          </div>
+          <h2 style={{ fontSize: '1.2rem', margin: 0, fontWeight: 700, color: '#111827' }}>
+            Messages
+          </h2>
         </div>
       </nav>
 
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', padding: '80px 20px 20px 20px', gap: '16px', maxWidth: '1400px', margin: '0 auto', width: '100%' }}>
+      {/* MAIN CONTAINER */}
+      <div className={`messages-container ${activeChat ? 'in-chat' : ''}`} style={{ display: 'flex', flex: 1, overflow: 'hidden', padding: '90px 20px 20px 20px', gap: '16px', maxWidth: '1400px', margin: '0 auto', width: '100%' }}>
         
         {/* LEFT SIDEBAR */}
-        <div style={{ width: '350px', background: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(12px)', borderRadius: '20px', border: '1px solid #e5e7eb', display: activeChat ? 'none' : 'flex', flexDirection: 'column' }} className="chat-sidebar-mobile">
+        <div className="chat-sidebar-mobile" style={{ width: '350px', background: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(12px)', borderRadius: '20px', border: '1px solid #e5e7eb', display: activeChat ? 'none' : 'flex', flexDirection: 'column' }}>
           <div className="msg-search-area" style={{ padding: '16px', borderBottom: '1px solid #e5e7eb' }}>
-            <div className="dash-search-wrapper" style={{ margin: 0 }}>
-              <FaSearch className="dash-search-icon" />
-              <input 
-                type="text" 
-                placeholder="Search conversations..." 
-                className="dash-search-input" 
-                value={searchQuery} 
-                onChange={(e) => setSearchQuery(e.target.value)} 
-              />
+            <div className="dash-search-wrapper" style={{ margin: 0, width: '100%', display: 'flex' }}>
+              <FaSearch className="dash-search-icon" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
+              <input type="text" placeholder="Search conversations..." className="dash-search-input" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ width: '100%', paddingLeft: '40px' }} />
             </div>
           </div>
           
           <div style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>
-            {/* --- FIX: Rendering filteredChats instead of chats --- */}
             {isLoadingChats ? (
               <div style={{ padding: '10px' }}><SkeletonList rows={5} /></div>
             ) : filteredChats.length === 0 ? (
@@ -503,7 +394,7 @@ export default function Messages() {
                         <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', fontWeight: isUnread ? '800' : '500' }}>{otherUser.name}</h4>
                         {isUnread && <div style={{ width: '10px', height: '10px', background: '#2563eb', borderRadius: '50%' }}></div>}
                       </div>
-                      <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: isUnread ? '600' : 'normal', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                      <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: isUnread ? '600' : 'normal', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', color: '#6b7280' }}>
                         {chat.lastMessage || "Started a conversation"}
                       </p>
                     </div>
@@ -514,12 +405,19 @@ export default function Messages() {
           </div>
         </div>
 
-        {/* RIGHT PANEL */}
-        <div style={{ flex: 1, background: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(12px)', borderRadius: '20px', border: '1px solid #e5e7eb', display: !activeChat ? 'none' : 'flex', flexDirection: 'column' }} className="chat-window-mobile">
+        {/* RIGHT PANEL (Active Chat) */}
+        <div className="chat-window-mobile" style={{ flex: 1, background: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(12px)', borderRadius: '20px', border: '1px solid #e5e7eb', display: !activeChat ? 'none' : 'flex', flexDirection: 'column' }}>
           {activeChat ? (
             <>
-              <div className="msg-chat-header" style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: '12px', borderRadius: '20px 20px 0 0' }}>
-                <button className="chat-back-btn" onClick={() => setActiveChat(null)} style={{ background: 'transparent', border: 'none', fontSize: '1.2rem', cursor: 'pointer', display: 'none' }}><FaArrowLeft /></button>
+              {/* CHAT WINDOW HEADER (Includes Mobile Back Button) */}
+              <div className="msg-chat-header" style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: '12px', borderRadius: '20px 20px 0 0', background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)' }}>
+                <button 
+                  className="mobile-chat-back-btn" 
+                  onClick={() => setActiveChat(null)} 
+                  style={{ background: 'none', border: 'none', fontSize: '1.2rem', color: '#111827', cursor: 'pointer', paddingRight: '4px', display: 'none' }}
+                >
+                  <FaChevronLeft />
+                </button>
                 <img src={getOtherUser(activeChat).avatar} alt="avatar" style={{ width: '40px', height: '40px', borderRadius: '50%' }} />
                 <div style={{ flex: 1 }}>
                     <h3 style={{ margin: 0, fontSize: '1rem' }}>{getOtherUser(activeChat).name}</h3>
@@ -539,21 +437,12 @@ export default function Messages() {
                   return (
                     <div key={msg.id}>
                       {showDate && (
-                        <div style={{ textAlign: 'center', margin: '12px 0', fontSize: '0.72rem', color: '#9ca3af' }}>
-                            {formatDateSeparator(msg.createdAt)}
-                        </div>
+                        <div style={{ textAlign: 'center', margin: '12px 0', fontSize: '0.72rem', color: '#9ca3af' }}>{formatDateSeparator(msg.createdAt)}</div>
                       )}
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexDirection: isMe ? 'row' : 'row-reverse' }}>
                           {isMe && (
-                            <button
-                              onClick={() => handleDeleteMessage(msg.id)}
-                              className="msg-delete-btn"
-                              style={{ background: 'none', border: 'none', color: '#d1d5db', cursor: 'pointer', padding: '4px', borderRadius: '4px', opacity: 0, transition: '0.2s' }}
-                              title="Delete message"
-                            >
-                              <FaTrash size={11} />
-                            </button>
+                            <button onClick={() => handleDeleteMessage(msg.id)} className="msg-delete-btn" style={{ background: 'none', border: 'none', color: '#d1d5db', cursor: 'pointer', padding: '4px', borderRadius: '4px', opacity: 0, transition: '0.2s' }} title="Delete message"><FaTrash size={11} /></button>
                           )}
                           <div className={isMe ? 'msg-bubble-sent' : 'msg-bubble-received'} style={{ maxWidth: '100%', padding: msg.imageUrl ? '8px' : '12px 16px', borderRadius: '16px', borderBottomRightRadius: isMe ? '4px' : '16px', borderBottomLeftRadius: isMe ? '16px' : '4px' }}>
                           {msg.imageUrl ? (
@@ -566,12 +455,9 @@ export default function Messages() {
                         <span style={{ fontSize: '0.65rem', color: '#9ca3af', marginTop: '2px', padding: '0 5px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                             {formatTime(msg.createdAt)}
                             {isMe && (() => {
-                              // Read receipt logic: check if other user read after this message was sent
                               const msgTime = msg.createdAt?.toDate ? msg.createdAt.toDate() : (msg.createdAt ? new Date(msg.createdAt) : null);
                               const otherReadTime = otherLastRead?.toDate ? otherLastRead.toDate() : (otherLastRead ? new Date(otherLastRead) : null);
-                              if (msgTime && otherReadTime && otherReadTime >= msgTime) {
-                                return <FaCheckDouble size={10} style={{ color: '#3b82f6' }} title="Read" />;
-                              }
+                              if (msgTime && otherReadTime && otherReadTime >= msgTime) return <FaCheckDouble size={10} style={{ color: '#3b82f6' }} title="Read" />;
                               return <FaCheck size={10} style={{ color: '#9ca3af' }} title="Delivered" />;
                             })()}
                         </span>
@@ -579,7 +465,6 @@ export default function Messages() {
                     </div>
                   );
                 })}
-                {/* Typing indicator */}
                 {isOtherTyping && (
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', marginTop: '4px' }}>
                     <div className="msg-bubble-received" style={{ padding: '10px 16px', borderRadius: '16px', borderBottomLeftRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -592,34 +477,66 @@ export default function Messages() {
                 <div ref={messagesEndRef} />
               </div>
 
-              <div className="msg-input-area" style={{ padding: '14px 20px', borderTop: '1px solid #e5e7eb', borderRadius: '0 0 20px 20px' }}>
+              <div className="msg-input-area" style={{ padding: '14px 20px', borderTop: '1px solid #e5e7eb', borderRadius: '0 0 20px 20px', background: 'white' }}>
                 <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                  
-                  {/* Image Upload Button */}
                   <input type="file" ref={imageInputRef} hidden accept="image/*" onChange={handleImageSelect} />
                   <button type="button" onClick={() => imageInputRef.current?.click()} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer' }}>
                     {isUploading ? <FaSpinner className="spin" size={22} /> : <FaImage size={22} />}
                   </button>
-                  
-                  <input type="text" placeholder="Type a message..." value={newMessage} onChange={(e) => { setNewMessage(e.target.value); handleTyping(); }} className="msg-input-field" style={{ flex: 1, padding: '12px 18px', borderRadius: '50px', outline: 'none' }} />
-                  <button type="submit" disabled={!newMessage.trim() && !isUploading} className="msg-send-btn" style={{ border: 'none', width: '44px', height: '44px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}><FaPaperPlane size={14} /></button>
+                  <input type="text" placeholder="Type a message..." value={newMessage} onChange={(e) => { setNewMessage(e.target.value); handleTyping(); }} className="msg-input-field" style={{ flex: 1, padding: '12px 18px', borderRadius: '50px', outline: 'none', border: '1px solid #e5e7eb', background: '#f9fafb' }} />
+                  <button type="submit" disabled={!newMessage.trim() && !isUploading} className="msg-send-btn" style={{ border: 'none', width: '44px', height: '44px', borderRadius: '50%', background: '#111827', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}><FaPaperPlane size={14} /></button>
                 </form>
               </div>
             </>
           ) : (
-            <div className="msg-empty-state" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}><FaEnvelope size={48} style={{ marginBottom: '15px', opacity: 0.5 }} /><p>Select a conversation</p></div>
+            <div className="msg-empty-state" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}><FaEnvelope size={48} style={{ marginBottom: '15px', opacity: 0.5, color: '#9ca3af' }} /><p style={{ color: '#6b7280', fontWeight: 500 }}>Select a conversation to start chatting</p></div>
           )}
         </div>
       </div>
 
+      {/* CSS OVERRIDES FOR PERFECT MOBILE RESPONSIVENESS */}
       <style>{`
         @keyframes typingBounce {
           0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
           30% { transform: translateY(-4px); opacity: 1; }
         }
         @media (max-width: 768px) {
-          .chat-sidebar-mobile { width: 100% !important; display: ${activeChat ? 'none' : 'flex'} !important; }
-          .chat-window-mobile { display: ${activeChat ? 'flex' : 'none'} !important; }
+          .mobile-hide-nav { display: none !important; }
+          .mobile-chat-back-btn { display: block !important; }
+
+          .messages-container.in-chat { 
+            padding: 0 !important; /* Full screen when inside active chat */
+            gap: 0 !important; 
+          }
+          .messages-container:not(.in-chat) { 
+            padding: 70px 0 0 0 !important; /* Proper padding for inbox view */
+            gap: 0 !important; 
+          }
+          .chat-sidebar-mobile { 
+            width: 100% !important; 
+            display: ${activeChat ? 'none' : 'flex'} !important; 
+            border: none !important; 
+            border-radius: 0 !important; 
+            background: transparent !important; 
+          }
+          .chat-window-mobile { 
+            display: ${activeChat ? 'flex' : 'none'} !important; 
+            border: none !important; 
+            border-radius: 0 !important; 
+            background: transparent !important; 
+          }
+          .msg-chat-header { 
+            border-radius: 0 !important; 
+            padding: 12px 16px !important; 
+          }
+          .msg-input-area { 
+            border-radius: 0 !important; 
+            padding: 12px 16px !important; 
+          }
+          .msg-chat-item { 
+            border-radius: 0 !important; 
+            border-bottom: 1px solid #f3f4f6; 
+          }
         }
       `}</style>
     </div>

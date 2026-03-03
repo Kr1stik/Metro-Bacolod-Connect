@@ -778,87 +778,91 @@ export default function Profile() {
 
       <nav className="dash-nav">
         <div className="dash-nav-left">
-          <img
-            src={logo}
-            alt="MBC Logo"
-            className="dash-logo"
-            onClick={() => navigate("/dashboard")}
-          />
-          <div className="dash-search-wrapper">
-            <FaSearch className="dash-search-icon" />
-            <input
-              type="text"
-              className="dash-search-input"
-              placeholder="Search in Metro Bacolod Connect"
-            />
-          </div>
+          <img src={logo} alt="MBC" className="dash-logo" onClick={() => navigate("/dashboard")} style={{ cursor: 'pointer' }} />
         </div>
-        <div className="dash-nav-right" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+        
+        <div className="dash-nav-right" style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
           
-          <div 
-            onClick={() => navigate('/messages')} 
-            style={{ cursor: 'pointer', color: '#4b5563', display: 'flex', alignItems: 'center', transition: '0.2s' }} 
-            title="Messages"
-            className="desktop-msg-icon"
-          >
-            <FaEnvelope size={22} />
+          {/* 🔥 ANIMATED HAMBURGER CSS & PROFILE MOBILE FIXES */}
+          <style>{`
+            @media (max-width: 768px) {
+              .dash-nav-right-desktop { display: none !important; }
+              .dash-nav-right-mobile { display: flex !important; align-items: center; }
+              .mobile-dropdown-item { display: flex !important; }
+              .desktop-dropdown-item { display: none !important; }
+              
+              /* Profile Mobile Layout Fixes */
+              .profile-content { padding: 90px 16px 100px 16px !important; gap: 24px !important; flex-direction: column !important; }
+              .profile-sidebar { width: 100% !important; align-items: center !important; text-align: center !important; }
+              .profile-avatar-wrapper { width: 130px !important; height: 130px !important; margin: 0 auto !important; }
+              .profile-info { align-items: center !important; }
+              .profile-posts-heading { text-align: center !important; font-size: 1.4rem !important; }
+              .profile-tabs { justify-content: center !important; width: 100% !important; flex-wrap: wrap !important; }
+              .profile-posts-grid { grid-template-columns: 1fr !important; }
+            }
+            @media (min-width: 769px) {
+              .dash-nav-right-mobile { display: none !important; }
+              .mobile-dropdown-item { display: none !important; }
+            }
+
+            /* ANIMATED HAMBURGER MENU */
+            .anim-hamburger {
+              width: 24px;
+              height: 18px;
+              display: flex;
+              flex-direction: column;
+              justify-content: space-between;
+              cursor: pointer;
+              z-index: 201; /* Keeps it above the dropdown */
+            }
+            .anim-hamburger span {
+              width: 100%;
+              height: 2.5px;
+              background-color: #111827;
+              border-radius: 4px;
+              transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+            /* The 'X' Morphing State */
+            .anim-hamburger.open span:nth-child(1) { transform: translateY(7.5px) rotate(45deg); }
+            .anim-hamburger.open span:nth-child(2) { opacity: 0; transform: scale(0); }
+            .anim-hamburger.open span:nth-child(3) { transform: translateY(-8px) rotate(-45deg); }
+          `}</style>
+
+          {/* DESKTOP VIEW */}
+          <div className="dash-nav-right-desktop" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+            <div onClick={() => navigate('/messages')} style={{ cursor: 'pointer', color: '#4b5563', display: 'flex', alignItems: 'center', transition: '0.2s', position: 'relative' }} title="Messages">
+              <FaEnvelope size={22} />
+              {/* Add unread count badge here if available in Profile.tsx */}
+            </div>
+
+            <div className="dash-user-trigger" onClick={() => setIsDropdownOpen(!isDropdownOpen)}>
+              <div className="dash-user-text">
+                <span className="dash-user-name">{userData?.firstName ? `${userData.firstName} ${userData.lastName}` : (user?.displayName || 'Loading...')}</span>
+                <span className="dash-user-role">{userData?.role || 'Client'}</span>
+              </div>
+              <img src={user?.photoURL || 'https://ui-avatars.com/api/?name=User&background=e5e7eb&color=9ca3af&rounded=true'} alt="avatar" className="dash-avatar" />
+            </div>
           </div>
 
-          <div
-            className="dash-user-trigger"
-            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-          >
-            <div className="dash-user-text">
-              <span className="dash-user-name">{navDisplayName}</span>
-              <span className="dash-user-role">{userRole}</span>
+          {/* MOBILE VIEW (Animated Hamburger Menu) */}
+          <div className="dash-nav-right-mobile">
+            <div 
+              className={`anim-hamburger ${isDropdownOpen ? 'open' : ''}`} 
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            >
+              <span></span>
+              <span></span>
+              <span></span>
             </div>
-            <img
-              src={
-                user?.photoURL ||
-                "https://ui-avatars.com/api/?name=User&background=e5e7eb&color=9ca3af&rounded=true"
-              }
-              alt="avatar"
-              className="dash-avatar"
-            />
           </div>
+
+          {/* SHARED DROPDOWN MENU */}
           {isDropdownOpen && (
-            <div className="dash-dropdown">
-              <div
-                className="dash-dropdown-item"
-                onClick={() => {
-                  navigate("/profile");
-                  setIsDropdownOpen(false);
-                }}
-              >
-                <FaUser /> Profile
-              </div>
-              <div
-                className="dash-dropdown-item"
-                onClick={() => {
-                  navigate("/settings");
-                  setIsDropdownOpen(false);
-                }}
-              >
-                <FaCog /> Settings
-              </div>
-              {canAccessTrash(userData?.role, user?.email) && (
-                <div
-                  className="dash-dropdown-item"
-                  onClick={() => {
-                    navigate("/archive");
-                    setIsDropdownOpen(false);
-                  }}
-                >
-                  <FaTrash /> Trash
-                </div>
-              )}
+            <div className="dash-dropdown" style={{ top: '58px', right: '0' }}>
+              <div className="dash-dropdown-item desktop-dropdown-item" onClick={() => { navigate('/dashboard'); setIsDropdownOpen(false); }}><FaHome /> Dashboard</div>
+              <div className="dash-dropdown-item" onClick={() => { navigate('/settings'); setIsDropdownOpen(false); }}><FaCog /> Settings</div>
               <div className="dash-dropdown-divider" />
-              <div
-                className="dash-dropdown-item dash-dropdown-logout"
-                onClick={handleLogout}
-              >
-                <FaSignOutAlt /> Logout
-              </div>
+              <div className="dash-dropdown-item dash-dropdown-logout" onClick={handleLogout}><FaSignOutAlt /> Logout</div>
             </div>
           )}
         </div>
@@ -1548,6 +1552,10 @@ export default function Profile() {
         const hasValidationError = !!(downPaymentError || rateError || termError || propertyPrice <= 0);
         const mortgage = !hasValidationError && propertyPrice > 0 ? calculateMortgage(propertyPrice, mortgageDownPayment, mortgageRate, mortgageTerm) : null;
         
+        function handleRateAgent(userId: any, agentName: any): void {
+          throw new Error("Function not implemented.");
+        }
+
         return (
           <div className="listing-modal-overlay" onClick={closeListingModal}>
             <div className="listing-modal" onClick={(e) => e.stopPropagation()}>

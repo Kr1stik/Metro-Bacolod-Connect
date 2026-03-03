@@ -5627,3 +5627,24 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .cta-rotating-border {
   transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
+
+/* =======================================================
+   FIX: PROFILE TABS OVERLAPPING ON MOBILE
+   ======================================================= */
+@media (max-width: 640px) {
+  .profile-tabs {
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    justify-content: flex-start !important;
+    padding-bottom: 6px !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  .profile-tabs::-webkit-scrollbar {
+    display: none; /* Hides scrollbar for a clean look */
+  }
+  .profile-tab {
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    font-size: 0.8rem !important;
+  }
+}

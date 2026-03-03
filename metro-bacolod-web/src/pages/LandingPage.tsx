@@ -423,70 +423,139 @@ export default function LandingPage() {
           </div>
       </section>
 
-      {/* LOGIN MODAL */}
+      {/* =========================================
+          PREMIUM CENTERED LOGIN MODAL (GLASSMORPHISM)
+          ========================================= */}
       {showLogin && (
-        <div className="modal-overlay">
-          <div className="modal-card" onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <h2 style={{ margin: 0 }}>{isForgotPassword ? "Reset Password" : "Welcome Back"}</h2>
-              <FaTimes style={{ cursor: 'pointer' }} onClick={closeLogin} />
+        <div 
+          className="modal-overlay" 
+          onClick={(e) => {
+            if (e.target === e.currentTarget) { setShowLogin(false); setIsForgotPassword(false); }
+          }}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.4)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px',
+            animation: 'fadeIn 0.3s ease'
+          }}
+        >
+          <style>{`
+            @keyframes modalPopIn {
+              0% { opacity: 0; transform: scale(0.95) translateY(10px); }
+              100% { opacity: 1; transform: scale(1) translateY(0); }
+            }
+            @keyframes fadeIn {
+              0% { opacity: 0; }
+              100% { opacity: 1; }
+            }
+            .premium-input {
+              width: 100%; padding: 14px 16px; border-radius: 14px; border: 1.5px solid #e5e7eb;
+              background: #f9fafb; font-size: 0.95rem; color: #111827; outline: none; transition: all 0.2s ease;
+              font-family: 'Google Sans', sans-serif;
+            }
+            .premium-input:focus {
+              border-color: #111827; background: #ffffff; box-shadow: 0 0 0 4px rgba(17, 24, 39, 0.08);
+            }
+            .premium-btn-primary {
+              width: 100%; padding: 15px; border-radius: 14px; background: #111827; color: white;
+              font-size: 0.95rem; font-weight: 700; font-family: 'Google Sans', sans-serif; border: none;
+              cursor: pointer; transition: all 0.2s ease; box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+            }
+            .premium-btn-primary:hover {
+              background: #1f2937; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+            }
+            .premium-btn-google {
+              width: 100%; padding: 14px; border-radius: 14px; background: white; color: #374151;
+              font-size: 0.95rem; font-weight: 600; font-family: 'Google Sans', sans-serif; border: 1.5px solid #e5e7eb;
+              cursor: pointer; transition: all 0.2s ease; display: flex; alignItems: center; justifyContent: center; gap: 10px;
+            }
+            .premium-btn-google:hover {
+              background: #f9fafb; border-color: #d1d5db; transform: translateY(-1px);
+            }
+            .link-text { color: #6b7280; font-size: 0.85rem; font-weight: 500; cursor: pointer; transition: color 0.2s; }
+            .link-text:hover { color: #111827; }
+            .link-text-bold { color: #111827; font-weight: 700; cursor: pointer; transition: opacity 0.2s; }
+            .link-text-bold:hover { opacity: 0.7; }
+          `}</style>
+
+          <div 
+            className="modal-card"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(30px)', WebkitBackdropFilter: 'blur(30px)',
+              padding: '40px 36px', borderRadius: '28px', width: '100%', maxWidth: '420px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255,255,255,0.5) inset',
+              animation: 'modalPopIn 0.35s cubic-bezier(0.16, 1, 0.3, 1)', position: 'relative', textAlign: 'left'
+            }}
+          >
+            {/* Close Button */}
+            <button 
+              onClick={() => { setShowLogin(false); setIsForgotPassword(false); }}
+              style={{ position: 'absolute', top: '20px', right: '20px', background: '#f3f4f6', border: 'none', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#6b7280', transition: '0.2s' }}
+              onMouseOver={(e) => { e.currentTarget.style.background = '#e5e7eb'; e.currentTarget.style.color = '#111827'; }}
+              onMouseOut={(e) => { e.currentTarget.style.background = '#f3f4f6'; e.currentTarget.style.color = '#6b7280'; }}
+            >
+              <FaTimes size={14} />
+            </button>
+
+            {/* Header */}
+            <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+              <img src={logo} alt="MBC Logo" style={{ width: '56px', height: '56px', objectFit: 'contain', marginBottom: '16px' }} />
+              <h2 style={{ fontSize: '1.6rem', fontWeight: 700, margin: '0 0 8px 0', color: '#111827', fontFamily: "'Google Sans', sans-serif", letterSpacing: '-0.5px' }}>
+                {isForgotPassword ? "Reset Password" : "Welcome Back"}
+              </h2>
+              <p style={{ fontSize: '0.95rem', color: '#6b7280', margin: 0, lineHeight: '1.5' }}>
+                {isForgotPassword ? "Enter your email to receive a reset link." : "Please enter your details to sign in."}
+              </p>
             </div>
-            
-            {/* Conditional Rendering: Password Reset Form vs Normal Login Form */}
+
             {isForgotPassword ? (
-              <form onSubmit={handleForgotPassword}>
-                <p style={{ fontSize: '0.9rem', color: '#6b7280', marginBottom: '15px' }}>
-                  Enter your email address and we will send you a link to reset your password.
-                </p>
-                <input 
-                  required 
-                  type="email" 
-                  placeholder="Email Address" 
-                  value={email} 
-                  onChange={e => setEmail(e.target.value)} 
-                  style={{ width: '100%', padding: '12px', marginBottom: '20px', borderRadius: '8px', border: '1px solid #ddd' }} 
-                />
-                <button type="submit" className="primary-btn" style={{ width: '100%', marginBottom: '15px', background: 'black', color: 'white' }}>
-                  Send Reset Link
-                </button>
-                <p style={{ textAlign: 'center', marginTop: '10px', fontSize: '0.9rem' }}>
-                  <span style={{ color: '#2563eb', cursor: 'pointer', fontWeight: '600' }} onClick={() => setIsForgotPassword(false)}>
-                    Back to Login
-                  </span>
-                </p>
+              // --- FORGOT PASSWORD VIEW ---
+              <form onSubmit={handleForgotPassword} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>Email Address</label>
+                  <input type="email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="premium-input" required />
+                </div>
+                <button type="submit" className="premium-btn-primary" style={{ marginTop: '8px' }}>Send Reset Link</button>
+                <div style={{ textAlign: 'center', marginTop: '8px' }}>
+                  <span className="link-text" onClick={() => setIsForgotPassword(false)}>← Back to Sign In</span>
+                </div>
               </form>
             ) : (
-              <>
-                <form onSubmit={handleLogin}>
-                    <input required type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '10px', borderRadius: '8px', border: '1px solid #ddd' }} />
-                    <input required type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '10px', borderRadius: '8px', border: '1px solid #ddd' }} />
-                    
-                    {/* Forgot Password Link */}
-                    <div style={{ textAlign: 'right', marginBottom: '20px' }}>
-                      <span 
-                        style={{ color: '#2563eb', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' }} 
-                        onClick={() => setIsForgotPassword(true)}
-                      >
-                        Forgot Password?
-                      </span>
-                    </div>
-
-                    <button type="submit" className="primary-btn" style={{ width: '100%', marginBottom: '15px', background: 'black', color: 'white' }}>
-                        Sign In
-                    </button>
-                </form>
-
-                <button type="button" className="primary-btn" style={{ width: '100%', background: 'white', color: 'black', border: '1px solid #ddd', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }} onClick={handleGoogleLogin}>
-                    <FcGoogle size={20} /> Sign in with Google
-                </button>
+              // --- LOGIN VIEW ---
+              <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>Email Address</label>
+                  <input type="email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="premium-input" required />
+                </div>
                 
-                <p style={{ marginTop: '20px', fontSize: '0.9rem', textAlign: 'center' }}>
-                    No account? 
-                    <span style={{ color: '#2563eb', cursor: 'pointer', fontWeight: '600', marginLeft: '5px' }} onClick={() => { setShowLogin(false); navigate('/register'); }}>
-                      Create Account
-                    </span>
-                </p>
-              </>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#374151' }}>Password</label>
+                    <span className="link-text" onClick={() => setIsForgotPassword(true)}>Forgot password?</span>
+                  </div>
+                  <input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="premium-input" required />
+                </div>
+
+                <button type="submit" className="premium-btn-primary" style={{ marginTop: '8px' }}>Sign In</button>
+
+                {/* Divider */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '8px 0' }}>
+                  <div style={{ flex: 1, height: '1px', background: '#e5e7eb' }}></div>
+                  <span style={{ fontSize: '0.75rem', color: '#9ca3af', fontWeight: 700, letterSpacing: '0.5px' }}>OR</span>
+                  <div style={{ flex: 1, height: '1px', background: '#e5e7eb' }}></div>
+                </div>
+
+                <button type="button" onClick={handleGoogleLogin} className="premium-btn-google">
+                  <FcGoogle size={20} /> Continue with Google
+                </button>
+
+                {/* Sign Up Redirect */}
+                <div style={{ textAlign: 'center', marginTop: '12px' }}>
+                  <span style={{ fontSize: '0.9rem', color: '#6b7280' }}>
+                    Don't have an account? <span className="link-text-bold" onClick={() => { setShowLogin(false); navigate('/register'); }}>Sign up</span>
+                  </span>
+                </div>
+              </form>
             )}
           </div>
         </div>
