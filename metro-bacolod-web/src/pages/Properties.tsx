@@ -14,31 +14,31 @@ const PROPERTY_CATEGORIES = [
     icon: <FaHome size={28} />,
     title: "Residential Lots",
     description: "Prime residential lots in well-planned subdivisions across Metro Bacolod. Ideal for building your dream home with secure land titles and complete development permits.",
-    image: "https://images.pexels.com/photos/440731/pexels-photo-440731.jpeg?auto=compress&cs=tinysrgb&w=600",
+    image: "/images/residential_lots.jpeg",
   },
   {
     icon: <FaBuilding size={28} />,
     title: "House and Lot",
     description: "Move-in ready homes and pre-selling house and lot packages. Choose from modern single-detached, duplex, and townhouse designs in top communities.",
-    image: "https://images.pexels.com/photos/1396122/pexels-photo-1396122.jpeg?auto=compress&cs=tinysrgb&w=600",
+    image: "/images/House_and_Lot.jpeg",
   },
   {
     icon: <FaCity size={28} />,
     title: "Condominiums",
     description: "Premium condo units in the heart of Bacolod City. Enjoy resort-style amenities, security, and a convenient urban lifestyle close to everything you need.",
-    image: "https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=600",
+    image: "/images/condominiums.jpeg",
   },
   {
     icon: <FaWarehouse size={28} />,
     title: "Commercial Properties",
     description: "Strategically located commercial spaces for retail, office, and food establishments. High-traffic areas with excellent visibility and foot traffic.",
-    image: "https://images.pexels.com/photos/443383/pexels-photo-443383.jpeg?auto=compress&cs=tinysrgb&w=600",
+    image: "/images/commercial_properties.jpeg",
   },
   {
     icon: <FaTree size={28} />,
     title: "Agricultural Land",
     description: "Fertile agricultural land suitable for farming, agri-business, or long-term investment. Available in various sizes across Negros Occidental.",
-    image: "https://images.pexels.com/photos/259588/pexels-photo-259588.jpeg?auto=compress&cs=tinysrgb&w=600",
+    image: "/images/agricultural_land.jpeg",
   },
 ];
 

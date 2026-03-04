@@ -17,6 +17,7 @@ body {
   min-height: 100vh; 
   overflow-y: scroll; /* 🔥 This forces the scrollbar track to always be visible, permanently stopping the navigation from jumping! */
 }
+
 a { font-weight: 500; color: #646cff; text-decoration: inherit; }
 a:hover { color: #535bf2; }
 h1 { font-size: 3.2em; line-height: 1.1; }
