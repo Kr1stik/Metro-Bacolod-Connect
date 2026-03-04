@@ -355,7 +355,7 @@ export default function LandingPage() {
           <div className="timeline-row timeline-row-right" style={{ display: 'flex', justifyContent: 'flex-end', paddingLeft: '55%', marginBottom: '80px', position: 'relative' }}>
             <div className="timeline-card" style={{ textAlign: 'center', maxWidth: '380px' }}>
               <img src="https://images.pexels.com/photos/3013440/pexels-photo-3013440.jpeg?auto=compress&cs=tinysrgb&w=800" alt="Green grass field landscape" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '20px', marginBottom: '20px', border: '2px solid #3f3f3f', display: 'block' }} />
-              <span className="explore-btn" onClick={() => setShowLogin(true)} style={{ display: 'inline-block', padding: '6px 24px', border: '2px solid #333', borderRadius: '50px', fontSize: '1rem', fontWeight: '700', color: '#1d1d1f', marginBottom: '12px', cursor: 'pointer', transition: 'all 0.3s ease' }}>View Lands</span>
+              <span className="explore-btn" onClick={() => setShowLogin(true)} style={{ display: 'inline-block', padding: '6px 24px', border: '2px solid #333', borderRadius: '50px', fontSize: '1rem', fontWeight: '700', color: '#1d1d1f', marginBottom: '12px', cursor: 'pointer', transition: 'all 0.3s ease' }}>Claim Your Piece of Bacolod</span>
               <p style={{ fontSize: '0.9rem', color: 'rgba(0,0,0,0.5)', lineHeight: '1.6', marginTop: '8px' }}>
                 Discover available lots in prime locations. Browse land options with complete details to help you choose the perfect place to build or invest.
               </p>
@@ -366,7 +366,7 @@ export default function LandingPage() {
           <div className="timeline-row timeline-row-left" style={{ display: 'flex', justifyContent: 'flex-start', paddingRight: '55%', marginBottom: '80px', position: 'relative' }}>
             <div className="timeline-card" style={{ textAlign: 'center', maxWidth: '380px' }}>
               <img src="https://images.pexels.com/photos/9203777/pexels-photo-9203777.jpeg?auto=compress&cs=tinysrgb&w=800" alt="Aerial shot of a neighborhood" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '20px', marginBottom: '20px', border: '2px solid #3f3f3f', display: 'block' }} />
-              <span className="explore-btn" onClick={() => setShowLogin(true)} style={{ display: 'inline-block', padding: '6px 24px', border: '2px solid #333', borderRadius: '50px', fontSize: '1rem', fontWeight: '700', color: '#1d1d1f', marginBottom: '12px', cursor: 'pointer', transition: 'all 0.3s ease' }}>See Homes</span>
+              <span className="explore-btn" onClick={() => setShowLogin(true)} style={{ display: 'inline-block', padding: '6px 24px', border: '2px solid #333', borderRadius: '50px', fontSize: '1rem', fontWeight: '700', color: '#1d1d1f', marginBottom: '12px', cursor: 'pointer', transition: 'all 0.3s ease' }}>Step Into Your Future</span>
               <p style={{ fontSize: '0.9rem', color: 'rgba(0,0,0,0.5)', lineHeight: '1.6', marginTop: '8px' }}>
                 Explore ready-to-move and pre-selling homes. View layouts, photos, and features to find a home that fits your lifestyle and budget.
               </p>
@@ -377,7 +377,7 @@ export default function LandingPage() {
           <div className="timeline-row timeline-row-right" style={{ display: 'flex', justifyContent: 'flex-end', paddingLeft: '55%', position: 'relative' }}>
             <div className="timeline-card" style={{ textAlign: 'center', maxWidth: '380px' }}>
               <img src="https://images.pexels.com/photos/8112163/pexels-photo-8112163.jpeg?auto=compress&cs=tinysrgb&w=800" alt="Smiling agent holding keys with clients" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '20px', marginBottom: '20px', border: '2px solid #3f3f3f', display: 'block' }} />
-              <span className="explore-btn" onClick={() => setShowLogin(true)} style={{ display: 'inline-block', padding: '6px 24px', border: '2px solid #333', borderRadius: '50px', fontSize: '1rem', fontWeight: '700', color: '#1d1d1f', marginBottom: '12px', cursor: 'pointer', transition: 'all 0.3s ease' }}>Contact Agents</span>
+              <span className="explore-btn" onClick={() => setShowLogin(true)} style={{ display: 'inline-block', padding: '6px 24px', border: '2px solid #333', borderRadius: '50px', fontSize: '1rem', fontWeight: '700', color: '#1d1d1f', marginBottom: '12px', cursor: 'pointer', transition: 'all 0.3s ease' }}>Meet Your Real Estate Partner</span>
               <p style={{ fontSize: '0.9rem', color: 'rgba(0,0,0,0.5)', lineHeight: '1.6', marginTop: '8px' }}>
                 Connect with trusted property agents for expert guidance. Get answers, schedule visits, and receive help every step of the way.
               </p>
