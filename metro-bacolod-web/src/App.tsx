@@ -26,6 +26,7 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import "./dark-mode.css";
 import ResetPassword from "./pages/ResetPassword";
 import VerifySuccess from './pages/VerifySuccess';
+import AuthHandler from './pages/AuthHandler';
 import { Analytics } from "@vercel/analytics/react";
 
 function App() {
@@ -100,6 +101,7 @@ function App() {
 
         <Route path="/verify-success" element={<VerifySuccess />} />
 
+        <Route path="/auth-handler" element={<AuthHandler />} />
         {/* ========================================== */}
         {/* CATCH-ALL 404 ROUTE                        */}
         {/* ========================================== */}
