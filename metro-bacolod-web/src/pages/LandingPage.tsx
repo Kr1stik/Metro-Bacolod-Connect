@@ -580,8 +580,8 @@ export default function LandingPage() {
           </div>
           <div>
             <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '15px' }}>Contact</h3>
-            <p style={{ fontSize: '0.9rem', color: '#ccc', marginBottom: '10px' }}>Email: info@metrobacolodconnect.com</p>
-            <p style={{ fontSize: '0.9rem', color: '#ccc' }}>Phone: +63 (0)XX-XXX-XXXX</p>
+            <p style={{ fontSize: '0.9rem', color: '#ccc', marginBottom: '10px' }}>Email: cosdevsph@outlook.ph</p>
+            <p style={{ fontSize: '0.9rem', color: '#ccc' }}>Phone: (+63) 9085608811</p>
           </div>
         </div>
         <div style={{ borderTop: '1px solid #333', paddingTop: '30px', textAlign: 'center' }}>
