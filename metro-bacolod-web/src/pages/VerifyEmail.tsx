@@ -3,8 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { auth } from "../firebase-config";
 import { sendEmailVerification, signOut, onAuthStateChanged } from "firebase/auth";
 import { glassToast } from '../components/GlassToast';
+import { FaEnvelopeOpenText, FaExclamationTriangle, FaSearch } from "react-icons/fa";
 import logo from "../assets/MBC Logo.png"; 
-// Removed FaEnvelopeOpenText import as it's no longer needed
 
 export default function VerifyEmail() {
   const [isSending, setIsSending] = useState(false);
@@ -20,6 +20,7 @@ export default function VerifyEmail() {
     return () => unsub();
   }, [navigate]);
 
+  // Auto-polling: Check every 3 seconds if the user clicked the link
   useEffect(() => {
     if (!authReady) return;
     const interval = setInterval(async () => {
@@ -41,7 +42,7 @@ export default function VerifyEmail() {
     try {
       if (auth.currentUser) {
         await sendEmailVerification(auth.currentUser);
-        glassToast.success("New verification link sent!");
+        glassToast.success("New verification link sent! Check your inbox.");
       }
     } catch (error: any) {
       glassToast.error("Too many requests. Please wait a moment.");
@@ -56,91 +57,105 @@ export default function VerifyEmail() {
   };
 
   return (
-    <div style={{ 
-      position: 'fixed',
-      inset: 0, 
-      width: '100vw', 
-      height: '100vh', 
-      display: 'flex', 
-      flexDirection: 'column', 
-      alignItems: 'center', 
-      justifyContent: 'center', 
-      background: '#f3f4f6', 
-      fontFamily: "'Inter', sans-serif",
-      zIndex: 9999 
-    }}>
+    <div className="dashboard-revamp" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', position: 'relative', overflow: 'hidden' }}>
+      
+      {/* Ambient Background Blobs */}
+      <div className="profile-blob profile-blob-1" />
+      <div className="profile-blob profile-blob-2" />
+
+      {/* Glassmorphism Card */}
       <div style={{ 
-        background: 'white', 
+        background: 'rgba(255,255,255,0.7)', 
+        backdropFilter: 'blur(20px)', 
+        WebkitBackdropFilter: 'blur(20px)', 
         padding: '50px 40px', 
-        borderRadius: '16px', 
-        boxShadow: '0 10px 30px rgba(0,0,0,0.08)', 
+        borderRadius: '24px', 
+        width: '100%', 
         maxWidth: '500px', 
-        width: '90%', 
-        textAlign: 'center',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center'
+        border: '1px solid rgba(255,255,255,0.5)', 
+        boxShadow: '0 20px 40px rgba(0,0,0,0.1)', 
+        zIndex: 10, 
+        textAlign: 'center' 
       }}>
         
-        {/* UPDATED MAIN VISUAL: Your Logo inside the circle */}
-        <div style={{ 
-            background: '#eff6ff', // Keep light blue background for contrast
-            padding: '30px', 
-            borderRadius: '50%', 
-            marginBottom: '25px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-        }}>
-            <img src={logo} alt="MBC Logo" style={{ width: '80px', height: 'auto' }} />
+        <img src={logo} alt="Logo" style={{ width: '70px', marginBottom: '15px' }} />
+        <br/>
+        <FaEnvelopeOpenText size={48} color="#111827" style={{ marginBottom: '20px' }} />
+        
+        <h2 style={{ fontSize: '1.8rem', fontWeight: '800', color: '#111827', margin: '0 0 10px 0' }}>Check Your Email</h2>
+        
+        <p style={{ color: '#374151', fontSize: '0.95rem', lineHeight: '1.6', marginBottom: '20px' }}>
+          We sent a verification link to:<br/>
+          <strong style={{ color: '#111827', fontSize: '1.05rem' }}>{auth.currentUser?.email}</strong>
+        </p>
+
+        {/* Clear Instructions Box */}
+        <div style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid #d1d5db', padding: '16px', borderRadius: '12px', textAlign: 'left', marginBottom: '16px' }}>
+          <h4 style={{ margin: '0 0 8px 0', fontSize: '0.9rem', color: '#111827', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <FaSearch color="#6b7280" /> What to look for:
+          </h4>
+          <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '0.85rem', color: '#374151', lineHeight: '1.6' }}>
+            <li>Open your email app.</li>
+            <li>Look for an email from <strong>noreply@metro-bacolod-connect</strong>.</li>
+            <li>The subject will say: <strong>"Verify your email for Metro Bacolod Connect"</strong>.</li>
+            <li>Click the long link inside the email to finish setting up your account!</li>
+          </ul>
         </div>
 
-        <h2 style={{ fontSize: '1.6rem', fontWeight: '800', marginBottom: '10px', color: '#111' }}>Check Your Email</h2>
-        
-        <p style={{ color: '#4b5563', lineHeight: '1.6', marginBottom: '30px', fontSize: '1rem' }}>
-          We sent a verification link to:<br/>
-          <strong style={{ color: '#111' }}>{auth.currentUser?.email}</strong>
-        </p>
+        {/* SPAM Warning Box */}
+        <div style={{ background: '#fffbeb', border: '1px solid #fde68a', padding: '16px', borderRadius: '12px', display: 'flex', alignItems: 'flex-start', gap: '12px', textAlign: 'left', marginBottom: '30px' }}>
+          <FaExclamationTriangle color="#d97706" size={20} style={{ flexShrink: 0, marginTop: '2px' }} />
+          <p style={{ margin: 0, fontSize: '0.85rem', color: '#92400e', lineHeight: '1.5' }}>
+            <strong>Can't find the email?</strong><br/> 
+            It might have been accidentally filtered. Please check your <strong>SPAM</strong> or <strong>JUNK</strong> folder. If you find it there, mark it as "Not Spam" to ensure you get our future updates!
+          </p>
+        </div>
 
-        <p style={{ fontSize: '0.9rem', color: '#6b7280', marginBottom: '30px', background: '#f9fafb', padding: '10px', borderRadius: '8px', width: '100%' }}>
-          Click the link in that email to activate your account.<br/>
-          <span style={{ fontSize: '0.8rem' }}>(Don't see it? Check your Spam folder)</span>
-        </p>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', width: '100%' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {/* Primary Action */}
           <button 
-            onClick={handleResend} 
+            onClick={handleResend}
             disabled={isSending}
             style={{ 
-              background: 'black', 
-              color: 'white', 
+              width: '100%', 
+              padding: '16px', 
+              borderRadius: '14px', 
               border: 'none', 
-              padding: '14px', 
-              borderRadius: '8px', 
-              cursor: isSending ? 'wait' : 'pointer',
-              fontWeight: '600',
-              fontSize: '1rem',
-              width: '100%'
+              background: '#111827', 
+              color: '#fff', 
+              fontWeight: '700', 
+              fontSize: '1rem', 
+              cursor: isSending ? 'wait' : 'pointer', 
+              transition: '0.2s', 
+              boxShadow: '0 4px 14px rgba(0,0,0,0.15)', 
+              opacity: isSending ? 0.7 : 1 
             }}
           >
             {isSending ? "Sending..." : "Resend Verification Email"}
           </button>
 
+          {/* Secondary Action */}
           <button 
-            onClick={handleLogout} 
+            onClick={handleLogout}
             style={{ 
-              background: 'transparent', 
+              width: '100%', 
+              padding: '12px', 
+              borderRadius: '14px', 
               border: 'none', 
-              color: '#6b7280',
-              padding: '10px', 
-              cursor: 'pointer',
-              fontWeight: '500',
-              fontSize: '0.9rem'
+              background: 'transparent', 
+              color: '#6b7280', 
+              fontWeight: '600', 
+              fontSize: '0.9rem', 
+              cursor: 'pointer', 
+              transition: '0.2s' 
             }}
+            onMouseOver={(e) => e.currentTarget.style.color = '#111827'}
+            onMouseOut={(e) => e.currentTarget.style.color = '#6b7280'}
           >
             ← Cancel & Return to Login
           </button>
         </div>
+
       </div>
     </div>
   );
