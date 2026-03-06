@@ -67,6 +67,7 @@ export class CloudinaryService {
   /**
    * Upload sensitive ID documents with restricted access (OWASP A02)
    * Uses 'authenticated' access mode so URLs require signed tokens
+   * Applies watermark overlay and strips EXIF metadata (DPA compliance)
    */
   uploadIdDocument(file: Express.Multer.File): Promise<any> {
     this.validateFile(file);
@@ -76,6 +77,21 @@ export class CloudinaryService {
           folder: 'metro-bacolod-ids',
           access_mode: 'authenticated',
           type: 'authenticated',
+          flags: 'strip_profile',
+          transformation: [
+            {
+              overlay: {
+                font_family: 'Arial',
+                font_size: 28,
+                font_weight: 'bold',
+                text: 'FOR VERIFICATION PURPOSES ONLY',
+              },
+              color: '#FF0000',
+              opacity: 40,
+              gravity: 'center',
+              angle: -30,
+            },
+          ],
         },
         (error, result) => {
           if (error) return reject(error);
@@ -104,6 +120,11 @@ export class CloudinaryService {
   // Delete an image by its public ID
   async deleteImage(publicId: string): Promise<any> {
     return cloudinary.uploader.destroy(publicId);
+  }
+
+  // Delete an authenticated-type image by its public ID (for ID documents)
+  async deleteAuthenticatedImage(publicId: string): Promise<any> {
+    return cloudinary.uploader.destroy(publicId, { type: 'authenticated' });
   }
 
   // Extract public ID from a Cloudinary URL

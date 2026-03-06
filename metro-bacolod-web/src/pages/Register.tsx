@@ -7,6 +7,7 @@ import { glassToast } from '../components/GlassToast';
 import logo from "../assets/MBC Logo.png"; 
 import { BACOLOD_LOCATIONS } from "../constants/locations";
 import { FaEye, FaEyeSlash, FaCheckCircle, FaTimesCircle, FaImage, FaSpinner, FaIdCard, FaCertificate, FaUser } from "react-icons/fa"; 
+import IdProcessingPolicyModal from "../components/IdProcessingPolicyModal";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -38,6 +39,8 @@ export default function Register() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false); 
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [spiConsent, setSpiConsent] = useState(false);
+  const [showIdPolicyModal, setShowIdPolicyModal] = useState(false);
 
   // Agent-specific
   const [prcLicenseNo, setPrcLicenseNo] = useState("");
@@ -150,6 +153,7 @@ export default function Register() {
     if (!city) return glassToast.error("Please select a City/Barangay.");
     if (mobile.length !== 10) return glassToast.error("Mobile number must be 10 digits (excluding +63).");
     if (!acceptedTerms) return glassToast.error("You must accept the Terms of Service and Privacy Policy.");
+    if ((selectedRole === "Agent" || selectedRole === "Seller") && !spiConsent) return glassToast.error("You must consent to ID processing before uploading your identification documents.");
 
     // Role-specific validation
     if (selectedRole === "Agent" && !prcLicenseNo.trim()) {
@@ -239,6 +243,7 @@ export default function Register() {
           governmentIdOcrText: govIdOcrText,
         } : {}),
         termsAcceptedAt: new Date().toISOString(),
+        ...((selectedRole === "Agent" || selectedRole === "Seller") ? { spiConsentAt: new Date().toISOString() } : {}),
         createdAt: new Date().toISOString()
       });
 
@@ -539,7 +544,7 @@ export default function Register() {
           )}
 
           {/* Terms and Privacy Acceptance */}
-          <div style={{ marginBottom: '25px' }}>
+          <div style={{ marginBottom: '15px' }}>
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
               <input
                 type="checkbox"
@@ -556,14 +561,33 @@ export default function Register() {
             </label>
           </div>
 
+          {/* SPI Consent for Sellers/Agents — Philippine DPA Compliance */}
+          {(selectedRole === "Seller" || selectedRole === "Agent") && (
+            <div style={{ marginBottom: '25px', background: '#fdf2f8', padding: '16px', borderRadius: '10px', border: '1px solid #fbcfe8' }}>
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={spiConsent}
+                  onChange={(e) => setSpiConsent(e.target.checked)}
+                  style={{ marginTop: '4px', width: '16px', height: '16px', cursor: 'pointer', accentColor: '#db2777' }}
+                />
+                <span style={{ fontSize: '0.85rem', color: '#374151', lineHeight: '1.5' }}>
+                  I explicitly consent to the collection and manual processing of my government-issued ID for identity verification purposes, in accordance with the Philippine Data Privacy Act of 2012. I have read the{' '}
+                  <span style={{ color: '#db2777', cursor: 'pointer', fontWeight: '600' }} onClick={(e) => { e.preventDefault(); setShowIdPolicyModal(true); }}>ID Processing Policy</span>.
+                </span>
+              </label>
+            </div>
+          )}
+
           <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginBottom: '50px' }}>
-             <button type="submit" disabled={isSubmitting || !acceptedTerms} style={{ padding: '15px 60px', borderRadius: '50px', border: 'none', background: 'black', color: 'white', fontWeight: '700', fontSize: '1rem', cursor: 'pointer', opacity: (isSubmitting || !acceptedTerms) ? 0.7 : 1, boxShadow: '0 4px 15px rgba(0,0,0,0.2)', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+             <button type="submit" disabled={isSubmitting || !acceptedTerms || ((selectedRole === "Seller" || selectedRole === "Agent") && !spiConsent)} style={{ padding: '15px 60px', borderRadius: '50px', border: 'none', background: 'black', color: 'white', fontWeight: '700', fontSize: '1rem', cursor: 'pointer', opacity: (isSubmitting || !acceptedTerms || ((selectedRole === "Seller" || selectedRole === "Agent") && !spiConsent)) ? 0.7 : 1, boxShadow: '0 4px 15px rgba(0,0,0,0.2)', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                {isSubmitting ? (<>{isUploadingId ? <><FaSpinner className="spin" /> Uploading ID...</> : <><FaSpinner className="spin" /> Creating Account...</>}</>) : "Complete Registration"}
              </button>
           </div>
         </form>
       </div>
 
+      <IdProcessingPolicyModal isOpen={showIdPolicyModal} onClose={() => setShowIdPolicyModal(false)} />
     </div>
   );
 }

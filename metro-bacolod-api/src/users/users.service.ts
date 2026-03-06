@@ -3,6 +3,7 @@ import * as admin from 'firebase-admin';
 import * as sanitizeHtmlModule from 'sanitize-html';
 import { EmailService } from '../email/email.service';
 import { SecurityLoggerService } from '../logger/security-logger.service';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 
 const sanitizeHtml = (sanitizeHtmlModule as any).default || sanitizeHtmlModule;
 
@@ -13,6 +14,7 @@ export class UsersService {
   constructor(
     private readonly emailService: EmailService,
     private readonly securityLogger: SecurityLoggerService,
+    private readonly cloudinaryService: CloudinaryService,
   ) {}
   private get db() {
     return admin.firestore();
@@ -25,7 +27,7 @@ export class UsersService {
     'customId', 'photoURL', 'displayName', 'description',
     'prcLicenseNo', 'prcIdFrontUrl', 'prcIdBackUrl',
     'governmentIdFrontUrl', 'governmentIdBackUrl',
-    'termsAcceptedAt',
+    'termsAcceptedAt', 'spiConsentAt',
   ];
 
   // Safe fields to expose in public API responses (OWASP A02: strip PII)
@@ -41,7 +43,7 @@ export class UsersService {
     'address', 'fullAddress', 'street', 'prcLicenseNo',
     'prcIdFrontUrl', 'prcIdBackUrl', 'prcOcrText',
     'governmentIdFrontUrl', 'governmentIdBackUrl', 'governmentIdOcrText',
-    'termsAcceptedAt', 'updatedAt', 'verifiedAt', 'rejectionReason', 'deletedAt',
+    'termsAcceptedAt', 'spiConsentAt', 'updatedAt', 'verifiedAt', 'rejectionReason', 'deletedAt',
   ];
 
   /**
@@ -329,6 +331,9 @@ export class UsersService {
       updatedAt: new Date().toISOString(),
     });
 
+    // DPA Compliance: Auto-delete ID images and OCR text after verification
+    await this.purgeIdDocuments(ref, userData);
+
     // Log admin action server-side (OWASP A09)
     if (adminUid && adminEmail) {
       await this.securityLogger.logAdminAction({
@@ -336,7 +341,7 @@ export class UsersService {
         adminEmail,
         action: 'VERIFICATION_APPROVED',
         targetUserId: uid,
-        details: { role: userData?.role },
+        details: { role: userData?.role, idDocumentsPurged: true },
       });
     }
 
@@ -349,7 +354,7 @@ export class UsersService {
       await this.emailService.sendVerificationApprovalEmail(email, name, role);
     }
 
-    return { message: 'User verified and approval email sent' };
+    return { message: 'User verified, ID documents purged, and approval email sent' };
   }
 
   // REJECT VERIFICATION (admin only) — reject and send email, with logging
@@ -365,6 +370,9 @@ export class UsersService {
       updatedAt: new Date().toISOString(),
     });
 
+    // DPA Compliance: Auto-delete ID images and OCR text on rejection too
+    await this.purgeIdDocuments(ref, userData);
+
     // Log admin action server-side (OWASP A09)
     if (adminUid && adminEmail) {
       await this.securityLogger.logAdminAction({
@@ -372,7 +380,7 @@ export class UsersService {
         adminEmail,
         action: 'VERIFICATION_REJECTED',
         targetUserId: uid,
-        details: { role: userData?.role, reason },
+        details: { role: userData?.role, reason, idDocumentsPurged: true },
       });
     }
 
@@ -385,6 +393,51 @@ export class UsersService {
       await this.emailService.sendVerificationRejectionEmail(email, name, role, reason);
     }
 
-    return { message: 'Verification rejected and notification email sent' };
+    return { message: 'Verification rejected, ID documents purged, and notification email sent' };
+  }
+
+  /**
+   * DPA Compliance: Permanently delete ID images from Cloudinary and clear
+   * sensitive fields from Firestore after verification is complete.
+   * Retains only: isVerified, verificationStatus, verifiedAt, prcLicenseNo (number only).
+   */
+  private async purgeIdDocuments(
+    ref: FirebaseFirestore.DocumentReference,
+    userData: FirebaseFirestore.DocumentData | undefined,
+  ): Promise<void> {
+    if (!userData) return;
+
+    const idUrls: string[] = [
+      userData.prcIdFrontUrl,
+      userData.prcIdBackUrl,
+      userData.governmentIdFrontUrl,
+      userData.governmentIdBackUrl,
+    ].filter((url): url is string => !!url);
+
+    // Delete images from Cloudinary (authenticated type)
+    if (idUrls.length > 0) {
+      const deletePromises = idUrls
+        .map((url) => this.cloudinaryService.extractPublicId(url))
+        .filter((id): id is string => id !== null)
+        .map((publicId) =>
+          this.cloudinaryService.deleteAuthenticatedImage(publicId).catch((err) => {
+            this.logger.warn(`Failed to delete ID image ${publicId}: ${err.message}`);
+          }),
+        );
+      await Promise.all(deletePromises);
+    }
+
+    // Clear sensitive fields from Firestore
+    const deleteField = admin.firestore.FieldValue.delete();
+    await ref.update({
+      prcIdFrontUrl: deleteField,
+      prcIdBackUrl: deleteField,
+      governmentIdFrontUrl: deleteField,
+      governmentIdBackUrl: deleteField,
+      prcOcrText: deleteField,
+      governmentIdOcrText: deleteField,
+    });
+
+    this.logger.log(`Purged ${idUrls.length} ID document(s) for user ${ref.id}`);
   }
 }

@@ -7,6 +7,7 @@ import { glassToast } from '../components/GlassToast';
 import logo from "../assets/MBC Logo.png"; 
 import { BACOLOD_LOCATIONS } from "../constants/locations";
 import { FaCheckCircle, FaIdCard, FaCertificate, FaUser, FaImage, FaSpinner } from "react-icons/fa";
+import IdProcessingPolicyModal from "../components/IdProcessingPolicyModal";
 
 export default function CompleteProfile() {
   const navigate = useNavigate();
@@ -26,6 +27,11 @@ export default function CompleteProfile() {
   const [city, setCity] = useState(""); 
   const [prcLicenseNo, setPrcLicenseNo] = useState("");
   const province = "Negros Occidental";
+
+  // Consent states
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [spiConsent, setSpiConsent] = useState(false);
+  const [showIdPolicyModal, setShowIdPolicyModal] = useState(false);
 
   // Privacy toggles for Seller/Agent contact info visibility
   const [showPhone, setShowPhone] = useState(true);
@@ -127,6 +133,8 @@ export default function CompleteProfile() {
     e.preventDefault();
     if (!city) return glassToast.error("Please select a City/Barangay.");
     if (mobile.length !== 10) return glassToast.error("Mobile number must be 10 digits.");
+    if (!acceptedTerms) return glassToast.error("You must accept the Terms of Service and Privacy Policy.");
+    if ((selectedRole === "Agent" || selectedRole === "Seller") && !spiConsent) return glassToast.error("You must consent to ID processing before uploading your identification documents.");
     if (selectedRole === "Agent" && !prcLicenseNo.trim()) return glassToast.error("PRC License Number is required for Agents.");
     if (selectedRole === "Agent" && (!prcFrontFile || !prcBackFile)) return glassToast.error("Both front and back photos of your PRC ID are required.");
     if (selectedRole === "Seller" && (!govIdFrontFile || !govIdBackFile)) return glassToast.error("Both front and back photos of your Government ID are required.");
@@ -198,6 +206,8 @@ export default function CompleteProfile() {
           governmentIdBackUrl: govIdBackUrl, 
           governmentIdOcrText: govIdOcrText,
         } : {}),
+        termsAcceptedAt: new Date().toISOString(),
+        ...((selectedRole === "Agent" || selectedRole === "Seller") ? { spiConsentAt: new Date().toISOString() } : {}),
         createdAt: new Date().toISOString()
       }, { merge: true });
 
@@ -423,11 +433,49 @@ export default function CompleteProfile() {
             </div>
           )}
 
-          <button type="submit" disabled={isSubmitting} style={{ padding: '15px 60px', borderRadius: '50px', border: 'none', background: 'black', color: 'white', fontWeight: '700', fontSize: '1rem', cursor: 'pointer', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+          {/* Terms and Privacy Acceptance */}
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={acceptedTerms}
+                onChange={(e) => setAcceptedTerms(e.target.checked)}
+                style={{ marginTop: '4px', width: '16px', height: '16px', cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: '0.85rem', color: '#374151', lineHeight: '1.4' }}>
+                I agree to the{' '}
+                <span style={{ color: '#2563eb', cursor: 'pointer', fontWeight: '600' }} onClick={(e) => { e.preventDefault(); window.open('/terms', '_blank'); }}>Terms of Service</span>
+                {' '}and{' '}
+                <span style={{ color: '#2563eb', cursor: 'pointer', fontWeight: '600' }} onClick={(e) => { e.preventDefault(); window.open('/privacy', '_blank'); }}>Privacy Policy</span>
+              </span>
+            </label>
+          </div>
+
+          {/* SPI Consent for Sellers/Agents — Philippine DPA Compliance */}
+          {(selectedRole === "Seller" || selectedRole === "Agent") && (
+            <div style={{ marginBottom: '25px', background: '#fdf2f8', padding: '16px', borderRadius: '10px', border: '1px solid #fbcfe8' }}>
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={spiConsent}
+                  onChange={(e) => setSpiConsent(e.target.checked)}
+                  style={{ marginTop: '4px', width: '16px', height: '16px', cursor: 'pointer', accentColor: '#db2777' }}
+                />
+                <span style={{ fontSize: '0.85rem', color: '#374151', lineHeight: '1.5' }}>
+                  I explicitly consent to the collection and manual processing of my government-issued ID for identity verification purposes, in accordance with the Philippine Data Privacy Act of 2012. I have read the{' '}
+                  <span style={{ color: '#db2777', cursor: 'pointer', fontWeight: '600' }} onClick={(e) => { e.preventDefault(); setShowIdPolicyModal(true); }}>ID Processing Policy</span>.
+                </span>
+              </label>
+            </div>
+          )}
+
+          <button type="submit" disabled={isSubmitting || !acceptedTerms || ((selectedRole === "Seller" || selectedRole === "Agent") && !spiConsent)} style={{ padding: '15px 60px', borderRadius: '50px', border: 'none', background: 'black', color: 'white', fontWeight: '700', fontSize: '1rem', cursor: 'pointer', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: (isSubmitting || !acceptedTerms || ((selectedRole === "Seller" || selectedRole === "Agent") && !spiConsent)) ? 0.7 : 1 }}>
             {isSubmitting ? (<>{isUploadingId ? <><FaSpinner className="spin" /> Uploading ID...</> : <><FaSpinner className="spin" /> Saving...</>}</>) : "Finish Setup"}
           </button>
         </form>
       </div>
+
+      <IdProcessingPolicyModal isOpen={showIdPolicyModal} onClose={() => setShowIdPolicyModal(false)} />
     </div>
   );
 }

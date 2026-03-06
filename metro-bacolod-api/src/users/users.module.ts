@@ -2,9 +2,10 @@ import { Module } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { EmailModule } from '../email/email.module';
+import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 
 @Module({
-  imports: [EmailModule],
+  imports: [EmailModule, CloudinaryModule],
   controllers: [UsersController],
   providers: [UsersService],
 })
