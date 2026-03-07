@@ -566,7 +566,9 @@ export default function Profile() {
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) setImageFiles([...imageFiles, ...Array.from(e.target.files)]);
+    if (!e.target.files || e.target.files.length === 0) return;
+    const newFiles = Array.from(e.target.files);
+    setImageFiles(prev => [...prev, ...newFiles]);
   };
 
   const removeImage = (index: number) => {
@@ -615,7 +617,6 @@ export default function Profile() {
       formData.append('userAvatar', user.photoURL || "");
       formData.append('userCustomId', userData?.customId || "USER");
       formData.append('userRole', userData?.role || "Client");
-      formData.append('userPhone', userData?.mobile || "N/A");
 
       const uploadPromises = imageFiles.map(async (file) => {
         const compressed = await compressImage(file);

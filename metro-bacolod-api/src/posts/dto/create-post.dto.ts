@@ -78,6 +78,11 @@ export class CreatePostDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(30)
+  userPhone?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(200)
   pinCoords?: string; // JSON string from FormData
 }

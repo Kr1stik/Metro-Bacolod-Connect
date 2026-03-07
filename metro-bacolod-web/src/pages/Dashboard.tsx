@@ -314,7 +314,8 @@ export default function Dashboard() {
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
-    setImageFiles(prev => [...prev, ...Array.from(e.target.files!)]);
+    const newFiles = Array.from(e.target.files);
+    setImageFiles(prev => [...prev, ...newFiles]);
     e.target.value = '';
   };
   const removeImage = (index: number) => { setImageFiles(prev => prev.filter((_, i) => i !== index)); };
@@ -362,7 +363,6 @@ export default function Dashboard() {
       formData.append('userAvatar', user.photoURL || "");
       formData.append('userCustomId', userData?.customId || "USER");
       formData.append('userRole', userData?.role || "Client");
-      formData.append('userPhone', userData?.mobile || "N/A");
 
       const uploadPromises = imageFiles.map(async (file) => {
         const compressed = await compressImage(file);
