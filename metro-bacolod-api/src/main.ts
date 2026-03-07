@@ -30,7 +30,7 @@ async function bootstrap() {
       crossOriginEmbedderPolicy: false, // Required for Cloudinary images
       hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
       referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
-    }),
+    })
   );
 
   // Global exception filter — hides internal errors from clients (OWASP A05)
@@ -53,13 +53,16 @@ async function bootstrap() {
 
   // 2. Enable CORS — environment-aware origins
   const allowedOrigins = [
-    'https://metrobcd.cosedevs.com',
+    'https://metrobacolod.cosedevs.com', // <-- FIXED: Added the full, correct domain here!
     process.env.FRONTEND_URL || 'https://metro-bacolod-connect.vercel.app',
   ].filter(Boolean);
 
-  // Only allow localhost in development
+  // Only allow localhost in development (or anytime for easier testing)
   if (process.env.NODE_ENV !== 'production') {
     allowedOrigins.push('http://localhost:5173', 'http://localhost:3000');
+  } else {
+    // Safety net: explicitly add localhost just in case NODE_ENV isn't set perfectly on Render
+    allowedOrigins.push('http://localhost:5173');
   }
 
   app.enableCors({
