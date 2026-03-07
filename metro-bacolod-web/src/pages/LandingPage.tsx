@@ -275,7 +275,7 @@ export default function LandingPage() {
       </nav>
 
       {/* HERO */}
-      <section ref={heroRef} className="landing-hero" style={{ minHeight: '110vh', width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', padding: '80px 20px 0', position: 'relative' }}>
+      <section ref={heroRef} className="landing-hero" style={{ minHeight: '110vh', width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', padding: '80px 20px 300', position: 'relative' }}>
         <Antigravity count={300} color="#1d1d1f" particleSize={0.6} />
         <h1 style={{ fontSize: 'clamp(2.5rem, 6vw, 6rem)', fontWeight: '700', color: '#1d1d1f', lineHeight: '1.1', marginBottom: '30px', letterSpacing: '-2px', zIndex: 2 }}>
            <TextType 
@@ -466,7 +466,7 @@ export default function LandingPage() {
             .premium-btn-google {
               width: 100%; padding: 14px; border-radius: 14px; background: white; color: #374151;
               font-size: 0.95rem; font-weight: 600; font-family: 'Google Sans', sans-serif; border: 1.5px solid #e5e7eb;
-              cursor: pointer; transition: all 0.2s ease; display: flex; alignItems: center; justifyContent: center; gap: 10px;
+              cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; gap: 10px;
             }
             .premium-btn-google:hover {
               background: #f9fafb; border-color: #d1d5db; transform: translateY(-1px);
