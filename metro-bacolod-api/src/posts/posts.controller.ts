@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UploadedFiles, UseInterceptors, Put, Param, Delete, Query, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, UploadedFiles, UseInterceptors, Put, Param, Delete, Query, UseGuards, Req, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { PostsService } from './posts.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
@@ -7,6 +7,8 @@ import { CreatePostDto, UpdatePostDto } from './dto/create-post.dto';
 
 @Controller('posts')
 export class PostsController {
+  private readonly logger = new Logger(PostsController.name);
+
   constructor(
     private readonly postsService: PostsService,
     private readonly cloudinaryService: CloudinaryService
@@ -22,21 +24,33 @@ export class PostsController {
   @UseGuards(FirebaseAuthGuard)
   @UseInterceptors(FilesInterceptor('images', 10, { limits: { fileSize: 10 * 1024 * 1024 } })) 
   async create(@UploadedFiles() files: Array<Express.Multer.File>, @Body() body: CreatePostDto, @Req() req: any) {
-    const imageUrls: string[] = [];
+    try {
+      const imageUrls: string[] = [];
 
-    // 1. Upload all files to Cloudinary in parallel
-    if (files && files.length > 0) {
-      const uploadPromises = files.map(file => this.cloudinaryService.uploadImage(file));
-      const results = await Promise.all(uploadPromises);
-      results.forEach(result => imageUrls.push(result.secure_url));
+      // 1. Upload all files to Cloudinary in parallel
+      if (files && files.length > 0) {
+        this.logger.log(`Uploading ${files.length} files to Cloudinary...`);
+        const uploadPromises = files.map(file => this.cloudinaryService.uploadImage(file));
+        const results = await Promise.all(uploadPromises);
+        results.forEach(result => imageUrls.push(result.secure_url));
+        this.logger.log(`Cloudinary upload complete: ${imageUrls.length} images`);
+      }
+
+      // 2. Save to DB with authenticated user's UID
+      const result = await this.postsService.create({
+        ...body,
+        userId: req.user.uid,
+        images: imageUrls,
+      });
+      this.logger.log(`Post created: ${result.id}`);
+      return result;
+    } catch (error: any) {
+      this.logger.error(`Post creation failed: ${error.message}`, error.stack);
+      throw new HttpException(
+        { message: error.message || 'Post creation failed', detail: error.stack?.split('\n')[0] },
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
-
-    // 2. Save to DB with authenticated user's UID
-    return this.postsService.create({
-      ...body,
-      userId: req.user.uid,
-      images: imageUrls,
-    });
   }
 
   @Put(':id/like')
