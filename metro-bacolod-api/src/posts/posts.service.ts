@@ -33,6 +33,10 @@ export class PostsService {
       isArchived: false,
       createdAt: new Date().toISOString(),
     };
+    // Strip undefined values — Firestore rejects them
+    Object.keys(sanitizedDto).forEach(key => {
+      if (sanitizedDto[key] === undefined) delete sanitizedDto[key];
+    });
     const newDoc = await collection.add(sanitizedDto);
     return { id: newDoc.id, ...sanitizedDto };
   }

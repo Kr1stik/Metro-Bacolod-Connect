@@ -48,8 +48,10 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       } else if (status === HttpStatus.TOO_MANY_REQUESTS) {
         message = 'Too many requests. Please try again later.';
       } else {
-        // Temporarily show real error messages for debugging
-        message = typeof exceptionResponse === 'string' ? exceptionResponse : (exceptionResponse as any).message || message;
+        // For other HTTP exceptions, use a generic message in production
+        message = process.env.NODE_ENV === 'production'
+          ? 'An error occurred while processing your request.'
+          : (typeof exceptionResponse === 'string' ? exceptionResponse : (exceptionResponse as any).message || message);
       }
     }
 
