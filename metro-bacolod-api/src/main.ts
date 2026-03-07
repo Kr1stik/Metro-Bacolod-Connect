@@ -53,7 +53,8 @@ async function bootstrap() {
 
   // 2. Enable CORS — environment-aware origins
   const allowedOrigins = [
-    'https://metrobacolod.cosedevs.com', // <-- FIXED: Added the full, correct domain here!
+    'https://metrobacolod.cosedevs.com',
+    'https://metrobcd.cosedevs.com',
     process.env.FRONTEND_URL || 'https://metro-bacolod-connect.vercel.app',
   ].filter(Boolean);
 
