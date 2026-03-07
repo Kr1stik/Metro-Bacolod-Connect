@@ -5139,14 +5139,17 @@ ul { list-style: none; }
    (Extracted from inline <style> tags)
    ========================================= */
 @media (max-width: 768px) {
-  .admin-sidebar { width: 60px !important; padding: 16px 0 !important; }
-  .admin-sidebar h2,
-  .admin-sidebar span,
-  .admin-sidebar button span,
-  .admin-sidebar nav button { font-size: 0 !important; }
-  .admin-sidebar nav button { justify-content: center !important; padding: 12px !important; }
-  .admin-sidebar nav button svg { font-size: 1.2rem !important; }
-  .admin-main { margin-left: 60px !important; padding: 20px 16px !important; }
+  .admin-hamburger { display: block !important; }
+  .admin-sidebar-overlay { display: block !important; }
+  .admin-sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    width: 260px !important;
+  }
+  .admin-sidebar.admin-sidebar-open {
+    transform: translateX(0);
+  }
+  .admin-main { margin-left: 0 !important; padding: 20px 16px !important; padding-top: 60px !important; }
   .admin-main table { font-size: 0.75rem !important; }
 }
 

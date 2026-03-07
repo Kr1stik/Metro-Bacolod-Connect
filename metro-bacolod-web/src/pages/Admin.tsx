@@ -10,7 +10,8 @@ import {
   FaShieldAlt, FaIdCard, FaCertificate, FaTimesCircle,
   FaDownload, FaEnvelope, FaCog, FaStar, FaHistory,
   FaSort, FaSortUp, FaSortDown, FaFilter, FaChevronRight,
-  FaUserSlash, FaSpinner, FaChevronUp
+  FaUserSlash, FaSpinner, FaChevronUp,
+  FaBars, FaUndo, FaTachometerAlt, FaArrowUp, FaArrowDown, FaUserShield
 } from "react-icons/fa";
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
@@ -62,6 +63,23 @@ export default function Admin() {
 
   // Sidebar collapse for mobile
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Post Detail Drawer
+  const [drawerPost, setDrawerPost] = useState<any>(null);
+
+  // Verification filter
+  const [verificationFilter, setVerificationFilter] = useState<string>("pending");
+
+  // Reports search
+  const [reportSearchQuery, setReportSearchQuery] = useState("");
+
+  // Activity log pagination & search
+  const [activityPage, setActivityPage] = useState(1);
+  const [activitySearch, setActivitySearch] = useState("");
+  const ACTIVITY_PER_PAGE = 20;
+
+  // Broadcast preview
+  const [showBroadcastPreview, setShowBroadcastPreview] = useState(false);
 
   // --- ACTIVITY LOG HELPER ---
   const logActivity = useCallback(async (action: string, details: string, targetId?: string) => {
@@ -205,6 +223,8 @@ export default function Admin() {
       confirmButtonText: "Change",
     });
     if (newRole) {
+      const VALID_ROLES = ["Client", "Seller", "Agent"];
+      if (!VALID_ROLES.includes(newRole)) return glassToast.error("Invalid role selected.");
       try {
         await updateDoc(doc(db, "users", userId), { role: newRole });
         await logActivity("role_change", `Changed role of user to ${newRole}`, userId);
@@ -299,6 +319,196 @@ export default function Admin() {
     } catch { glassToast.error("Failed to update featured status."); }
   };
 
+  // --- POST RESTORE (UNARCHIVE) ---
+  const handleRestorePost = async (postId: string) => {
+    const result = await Swal.fire({
+      title: "Restore this listing?",
+      text: "This will make the listing active again.",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonColor: "#10b981",
+      confirmButtonText: "Restore",
+    });
+    if (result.isConfirmed) {
+      try {
+        await updateDoc(doc(db, "posts", postId), { isArchived: false, deletedAt: null });
+        await logActivity("post_restore", `Restored post from archive`, postId);
+        glassToast.success("Listing restored.");
+      } catch { glassToast.error("Failed to restore listing."); }
+    }
+  };
+
+  // --- HARD DELETE POST ---
+  const handleHardDeletePost = async (postId: string) => {
+    const result = await Swal.fire({
+      title: "Permanently delete this listing?",
+      text: "This action cannot be undone. The listing will be permanently removed.",
+      icon: "error",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      confirmButtonText: "Delete Permanently",
+      input: "text",
+      inputPlaceholder: 'Type "DELETE" to confirm',
+      inputValidator: (value) => value !== "DELETE" ? 'Type "DELETE" to confirm' : null,
+    });
+    if (result.isConfirmed) {
+      try {
+        await deleteDoc(doc(db, "posts", postId));
+        await logActivity("post_hard_delete", `Permanently deleted post`, postId);
+        glassToast.success("Listing permanently deleted.");
+      } catch { glassToast.error("Failed to delete listing."); }
+    }
+  };
+
+  // --- HARD DELETE USER ---
+  const handleHardDeleteUser = async (userId: string) => {
+    const result = await Swal.fire({
+      title: "Permanently delete this user?",
+      text: "This action cannot be undone. All user data will be permanently removed.",
+      icon: "error",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      confirmButtonText: "Delete Permanently",
+      input: "text",
+      inputPlaceholder: 'Type "DELETE" to confirm',
+      inputValidator: (value) => value !== "DELETE" ? 'Type "DELETE" to confirm' : null,
+    });
+    if (result.isConfirmed) {
+      try {
+        await deleteDoc(doc(db, "users", userId));
+        await logActivity("user_hard_delete", `Permanently deleted user`, userId);
+        if (drawerUser?.id === userId) setDrawerUser(null);
+        glassToast.success("User permanently deleted.");
+      } catch { glassToast.error("Failed to delete user."); }
+    }
+  };
+
+  // --- BULK REACTIVATE USERS ---
+  const handleBulkReactivateUsers = async () => {
+    if (selectedUsers.size === 0) return glassToast.error("No users selected.");
+    const result = await Swal.fire({
+      title: `Reactivate ${selectedUsers.size} users?`,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonColor: "#10b981",
+      confirmButtonText: "Reactivate All",
+    });
+    if (result.isConfirmed) {
+      try {
+        const promises = Array.from(selectedUsers).map(id => updateDoc(doc(db, "users", id), { isDeactivated: false }));
+        await Promise.all(promises);
+        await logActivity("bulk_reactivate", `Bulk reactivated ${selectedUsers.size} users`);
+        setSelectedUsers(new Set());
+        glassToast.success(`${selectedUsers.size} users reactivated.`);
+      } catch { glassToast.error("Bulk reactivation failed."); }
+    }
+  };
+
+  // --- BULK UNARCHIVE POSTS ---
+  const handleBulkUnarchivePosts = async () => {
+    if (selectedPosts.size === 0) return glassToast.error("No posts selected.");
+    const result = await Swal.fire({
+      title: `Restore ${selectedPosts.size} posts?`,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonColor: "#10b981",
+      confirmButtonText: "Restore All",
+    });
+    if (result.isConfirmed) {
+      try {
+        const promises = Array.from(selectedPosts).map(id => updateDoc(doc(db, "posts", id), { isArchived: false, deletedAt: null }));
+        await Promise.all(promises);
+        await logActivity("bulk_unarchive", `Bulk restored ${selectedPosts.size} posts`);
+        setSelectedPosts(new Set());
+        glassToast.success(`${selectedPosts.size} posts restored.`);
+      } catch { glassToast.error("Bulk restore failed."); }
+    }
+  };
+
+  // --- PROMOTE / DEMOTE ADMIN ---
+  const handlePromoteToAdmin = async (userId: string) => {
+    const targetUser = users.find(u => u.id === userId);
+    const result = await Swal.fire({
+      title: "Promote to Admin?",
+      text: `This will give ${targetUser?.firstName || ''} ${targetUser?.lastName || ''} full admin access.`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#111827",
+      confirmButtonText: "Promote",
+      input: "text",
+      inputPlaceholder: 'Type "PROMOTE" to confirm',
+      inputValidator: (value) => value !== "PROMOTE" ? 'Type "PROMOTE" to confirm' : null,
+    });
+    if (result.isConfirmed) {
+      try {
+        await updateDoc(doc(db, "users", userId), { role: "Admin" });
+        await logActivity("admin_promote", `Promoted ${targetUser?.firstName} ${targetUser?.lastName} to Admin`, userId);
+        glassToast.success("User promoted to Admin.");
+      } catch { glassToast.error("Failed to promote user."); }
+    }
+  };
+
+  const handleDemoteFromAdmin = async (userId: string) => {
+    if (userId === user?.uid) return glassToast.error("You cannot demote yourself.");
+    const targetUser = users.find(u => u.id === userId);
+    const result = await Swal.fire({
+      title: "Demote from Admin?",
+      text: `This will remove admin access from ${targetUser?.firstName || ''} ${targetUser?.lastName || ''} and set their role to Client.`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      confirmButtonText: "Demote",
+      input: "text",
+      inputPlaceholder: 'Type "DEMOTE" to confirm',
+      inputValidator: (value) => value !== "DEMOTE" ? 'Type "DEMOTE" to confirm' : null,
+    });
+    if (result.isConfirmed) {
+      try {
+        await updateDoc(doc(db, "users", userId), { role: "Client" });
+        await logActivity("admin_demote", `Demoted ${targetUser?.firstName} ${targetUser?.lastName} from Admin`, userId);
+        glassToast.success("Admin access removed.");
+      } catch { glassToast.error("Failed to demote user."); }
+    }
+  };
+
+  // --- REVOKE VERIFICATION ---
+  const handleRevokeVerification = async (userId: string) => {
+    const result = await Swal.fire({
+      title: "Revoke verification?",
+      text: "This user will lose their verified status.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      confirmButtonText: "Revoke",
+    });
+    if (result.isConfirmed) {
+      try {
+        await updateDoc(doc(db, "users", userId), { isVerified: false, verificationStatus: "revoked" });
+        const targetUser = users.find(u => u.id === userId);
+        await logActivity("verify_revoke", `Revoked verification for ${targetUser?.firstName} ${targetUser?.lastName}`, userId);
+        glassToast.success("Verification revoked.");
+      } catch { glassToast.error("Failed to revoke verification."); }
+    }
+  };
+
+  // --- FEATURED ORDERING ---
+  const handleChangeFeaturedOrder = async (postId: string, direction: "up" | "down") => {
+    const sorted = [...featuredPosts].sort((a, b) => (a.featuredOrder || 0) - (b.featuredOrder || 0));
+    const idx = sorted.findIndex(p => p.id === postId);
+    if (idx < 0) return;
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= sorted.length) return;
+    try {
+      const currentOrder = sorted[idx].featuredOrder || idx;
+      const swapOrder = sorted[swapIdx].featuredOrder || swapIdx;
+      await Promise.all([
+        updateDoc(doc(db, "posts", sorted[idx].id), { featuredOrder: swapOrder }),
+        updateDoc(doc(db, "posts", sorted[swapIdx].id), { featuredOrder: currentOrder }),
+      ]);
+      glassToast.success("Featured order updated.");
+    } catch { glassToast.error("Failed to reorder."); }
+  };
+
   // --- REPORT MANAGEMENT ---
   const handleDismissReport = async (reportId: string) => {
     try {
@@ -330,6 +540,8 @@ export default function Admin() {
   // --- EMAIL BROADCAST ---
   const handleSendBroadcast = async () => {
     if (!broadcastSubject.trim() || !broadcastBody.trim()) return glassToast.error("Subject and body are required.");
+    if (broadcastSubject.trim().length > 200) return glassToast.error("Subject must be under 200 characters.");
+    if (broadcastBody.trim().length > 5000) return glassToast.error("Body must be under 5000 characters.");
     setIsSendingBroadcast(true);
     try {
       let targetEmails: string[] = [];
@@ -531,7 +743,9 @@ export default function Admin() {
 
   const filteredReports = reports.filter(r => {
     const matchesStatus = reportStatusFilter === "all" || r.status === reportStatusFilter;
-    return matchesStatus;
+    const sq = reportSearchQuery.toLowerCase();
+    const matchesSearch = !sq || (r.postTitle || "").toLowerCase().includes(sq) || (r.reporterName || "").toLowerCase().includes(sq) || (r.reason || "").toLowerCase().includes(sq);
+    return matchesStatus && matchesSearch;
   });
 
   const sortedUsers = sortData(filteredUsers, userSort);
@@ -545,6 +759,51 @@ export default function Admin() {
 
   // Reset page when search/filter changes
   useEffect(() => { setUsersPage(1); setPostsPage(1); }, [searchQuery, roleFilter, postStatusFilter]);
+  useEffect(() => { setActivityPage(1); }, [activitySearch]);
+
+  // --- FILTERED ACTIVITY LOGS ---
+  const filteredActivityLogs = activityLogs.filter(log => {
+    if (!activitySearch) return true;
+    const sq = activitySearch.toLowerCase();
+    return (log.action || "").toLowerCase().includes(sq) ||
+      (log.details || "").toLowerCase().includes(sq) ||
+      (log.adminEmail || "").toLowerCase().includes(sq);
+  });
+  const totalActivityPages = Math.ceil(filteredActivityLogs.length / ACTIVITY_PER_PAGE);
+  const paginatedActivityLogs = filteredActivityLogs.slice((activityPage - 1) * ACTIVITY_PER_PAGE, activityPage * ACTIVITY_PER_PAGE);
+
+  // --- EXPORT ACTIVITY LOG CSV ---
+  const exportActivityCSV = () => {
+    const headers = ["Action", "Details", "Admin", "Target ID", "Timestamp"];
+    const rows = filteredActivityLogs.map(log => [
+      log.action || "",
+      log.details || "",
+      log.adminEmail || "",
+      log.targetId || "",
+      log.timestamp || "",
+    ]);
+    downloadCSV(headers, rows, "mbc-activity-log-export.csv");
+    logActivity("export", "Exported activity log CSV");
+  };
+
+  // --- VERIFICATION FILTERED LIST ---
+  const filteredVerifications = users.filter(u => {
+    if (verificationFilter === "pending") return u.verificationStatus === "pending";
+    if (verificationFilter === "approved") return u.verificationStatus === "approved";
+    if (verificationFilter === "rejected") return u.verificationStatus === "rejected";
+    if (verificationFilter === "revoked") return u.verificationStatus === "revoked";
+    return u.verificationStatus === "pending" || u.verificationStatus === "approved" || u.verificationStatus === "rejected" || u.verificationStatus === "revoked";
+  });
+
+  // --- RECENT SIGNUPS (last 24h) ---
+  const recentSignups = users.filter(u => {
+    if (!u.createdAt) return false;
+    const diff = Date.now() - new Date(u.createdAt).getTime();
+    return diff < 24 * 60 * 60 * 1000;
+  });
+
+  // --- USER POST COUNT HELPER ---
+  const getUserPostCount = (userId: string) => posts.filter(p => p.userId === userId).length;
 
   if (loading) {
     return (
@@ -556,8 +815,30 @@ export default function Admin() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', fontFamily: "'Inter', sans-serif", background: '#f9fafb' }}>
+      {/* ========== MOBILE HAMBURGER ========== */}
+      <button
+        className="admin-hamburger"
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        style={{
+          display: 'none', position: 'fixed', top: '16px', left: '16px', zIndex: 60,
+          background: '#111827', color: 'white', border: 'none', borderRadius: '10px',
+          padding: '10px 12px', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+        }}
+      >
+        <FaBars size={18} />
+      </button>
+
+      {/* ========== MOBILE OVERLAY ========== */}
+      {sidebarOpen && (
+        <div
+          className="admin-sidebar-overlay"
+          onClick={() => setSidebarOpen(false)}
+          style={{ display: 'none', position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 49 }}
+        />
+      )}
+
       {/* ========== SIDEBAR ========== */}
-      <aside className="admin-sidebar" style={{
+      <aside className={`admin-sidebar ${sidebarOpen ? 'admin-sidebar-open' : ''}`} style={{
         width: '260px', background: '#111827', color: 'white', padding: '24px 0',
         display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, left: 0,
         height: '100vh', zIndex: 50, boxShadow: '4px 0 20px rgba(0,0,0,0.1)',
@@ -573,7 +854,7 @@ export default function Admin() {
 
         <nav style={{ flex: 1, padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
           {([
-            { key: "dashboard", icon: <FaChartBar size={16} />, label: "Dashboard" },
+            { key: "dashboard", icon: <FaTachometerAlt size={16} />, label: "Dashboard" },
             { key: "analytics", icon: <FaChartBar size={16} />, label: "Analytics" },
             { key: "verifications", icon: <FaShieldAlt size={16} />, label: "Verifications" },
             { key: "users", icon: <FaUsers size={16} />, label: "Users" },
@@ -586,7 +867,7 @@ export default function Admin() {
           ] as { key: AdminTab; icon: any; label: string }[]).map(item => (
             <button
               key={item.key}
-              onClick={() => { setActiveTab(item.key); setSearchQuery(""); }}
+              onClick={() => { setActiveTab(item.key); setSearchQuery(""); setReportSearchQuery(""); setActivitySearch(""); setSidebarOpen(false); }}
               style={{
                 display: 'flex', alignItems: 'center', gap: '12px', padding: '11px 16px',
                 borderRadius: '10px', border: 'none', cursor: 'pointer', fontSize: '0.85rem',
@@ -684,13 +965,39 @@ export default function Admin() {
               </select>
             )}
             {activeTab === 'reports' && (
-              <select value={reportStatusFilter} onChange={e => setReportStatusFilter(e.target.value)}
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'white', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '0 14px' }}>
+                  <FaSearch style={{ color: '#9ca3af' }} />
+                  <input type="text" placeholder="Search reports..." value={reportSearchQuery}
+                    onChange={(e) => setReportSearchQuery(e.target.value)}
+                    style={{ border: 'none', outline: 'none', padding: '10px 0', fontSize: '0.85rem', width: '180px', background: 'transparent' }} />
+                </div>
+                <select value={reportStatusFilter} onChange={e => setReportStatusFilter(e.target.value)}
+                  style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '0.85rem', background: 'white', cursor: 'pointer' }}>
+                  <option value="all">All Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="resolved">Resolved</option>
+                  <option value="dismissed">Dismissed</option>
+                </select>
+              </>
+            )}
+            {activeTab === 'verifications' && (
+              <select value={verificationFilter} onChange={e => setVerificationFilter(e.target.value)}
                 style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #e5e7eb', fontSize: '0.85rem', background: 'white', cursor: 'pointer' }}>
-                <option value="all">All Status</option>
                 <option value="pending">Pending</option>
-                <option value="resolved">Resolved</option>
-                <option value="dismissed">Dismissed</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+                <option value="revoked">Revoked</option>
+                <option value="all">All</option>
               </select>
+            )}
+            {activeTab === 'activity' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'white', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '0 14px' }}>
+                <FaSearch style={{ color: '#9ca3af' }} />
+                <input type="text" placeholder="Search activity..." value={activitySearch}
+                  onChange={(e) => setActivitySearch(e.target.value)}
+                  style={{ border: 'none', outline: 'none', padding: '10px 0', fontSize: '0.85rem', width: '180px', background: 'transparent' }} />
+              </div>
             )}
             {/* Export buttons */}
             {activeTab === 'users' && (
@@ -705,6 +1012,11 @@ export default function Admin() {
             )}
             {activeTab === 'reports' && (
               <button onClick={exportReportsCSV} style={{ ...actionBtnStyle, padding: '10px 16px' }} title="Export CSV">
+                <FaDownload size={12} /> Export
+              </button>
+            )}
+            {activeTab === 'activity' && (
+              <button onClick={exportActivityCSV} style={{ ...actionBtnStyle, padding: '10px 16px' }} title="Export CSV">
                 <FaDownload size={12} /> Export
               </button>
             )}
@@ -773,27 +1085,74 @@ export default function Admin() {
             </div>
 
             {/* Recent activity */}
-            <div style={{ background: 'white', borderRadius: '16px', border: '1px solid #e5e7eb', padding: '24px' }}>
-              <h3 style={{ margin: '0 0 16px', fontSize: '1rem', fontWeight: '700', color: '#111827' }}>Recent Reports</h3>
-              {reports.filter(r => r.status === 'pending').length === 0 ? (
-                <p style={{ color: '#9ca3af', fontSize: '0.85rem' }}>No pending reports. All clear!</p>
-              ) : (
-                reports.filter(r => r.status === 'pending').slice(0, 5).map(r => (
-                  <div key={r.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #f3f4f6' }}>
-                    <div>
-                      <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: '600', color: '#111' }}>
-                        <FaExclamationTriangle size={11} color="#f59e0b" /> {r.postTitle || 'Untitled'}
-                      </p>
-                      <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: '#6b7280' }}>
-                        Reason: {r.reason} • By: {r.reporterName || 'Anonymous'}
-                      </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '20px' }}>
+              {/* Recent Reports */}
+              <div style={{ background: 'white', borderRadius: '16px', border: '1px solid #e5e7eb', padding: '24px' }}>
+                <h3 style={{ margin: '0 0 16px', fontSize: '1rem', fontWeight: '700', color: '#111827' }}>Recent Reports</h3>
+                {reports.filter(r => r.status === 'pending').length === 0 ? (
+                  <p style={{ color: '#9ca3af', fontSize: '0.85rem' }}>No pending reports. All clear!</p>
+                ) : (
+                  reports.filter(r => r.status === 'pending').slice(0, 5).map(r => (
+                    <div key={r.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #f3f4f6' }}>
+                      <div>
+                        <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: '600', color: '#111' }}>
+                          <FaExclamationTriangle size={11} color="#f59e0b" /> {r.postTitle || 'Untitled'}
+                        </p>
+                        <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: '#6b7280' }}>
+                          Reason: {r.reason} • By: {r.reporterName || 'Anonymous'}
+                        </p>
+                      </div>
+                      <button onClick={() => setActiveTab('reports')} style={{ background: '#111827', color: 'white', border: 'none', padding: '6px 14px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer' }}>
+                        Review
+                      </button>
                     </div>
-                    <button onClick={() => setActiveTab('reports')} style={{ background: '#111827', color: 'white', border: 'none', padding: '6px 14px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer' }}>
-                      Review
-                    </button>
-                  </div>
-                ))
-              )}
+                  ))
+                )}
+              </div>
+
+              {/* Pending Verifications Quick-Action */}
+              <div style={{ background: 'white', borderRadius: '16px', border: '1px solid #e5e7eb', padding: '24px' }}>
+                <h3 style={{ margin: '0 0 16px', fontSize: '1rem', fontWeight: '700', color: '#111827' }}>Pending Verifications</h3>
+                {pendingVerifications.length === 0 ? (
+                  <p style={{ color: '#9ca3af', fontSize: '0.85rem' }}>No pending verifications.</p>
+                ) : (
+                  pendingVerifications.slice(0, 5).map(u => (
+                    <div key={u.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #f3f4f6' }}>
+                      <div>
+                        <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: '600', color: '#111' }}>
+                          <FaShieldAlt size={11} color="#f59e0b" /> {u.firstName} {u.lastName}
+                        </p>
+                        <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: '#6b7280' }}>
+                          {u.role} • {u.email}
+                        </p>
+                      </div>
+                      <button onClick={() => setActiveTab('verifications')} style={{ background: '#111827', color: 'white', border: 'none', padding: '6px 14px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer' }}>
+                        Review
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Recent Signups (last 24h) */}
+              <div style={{ background: 'white', borderRadius: '16px', border: '1px solid #e5e7eb', padding: '24px' }}>
+                <h3 style={{ margin: '0 0 16px', fontSize: '1rem', fontWeight: '700', color: '#111827' }}>Recent Signups (24h)</h3>
+                {recentSignups.length === 0 ? (
+                  <p style={{ color: '#9ca3af', fontSize: '0.85rem' }}>No new signups in the last 24 hours.</p>
+                ) : (
+                  recentSignups.slice(0, 5).map(u => (
+                    <div key={u.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #f3f4f6' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <img src={u.photoURL || `https://ui-avatars.com/api/?name=${u.firstName || 'U'}+${u.lastName || ''}&rounded=true&size=32`} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} alt="" />
+                        <div>
+                          <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: '600', color: '#111' }}>{u.firstName} {u.lastName}</p>
+                          <p style={{ margin: '2px 0 0', fontSize: '0.75rem', color: '#6b7280' }}>{u.role || 'Client'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -895,6 +1254,9 @@ export default function Admin() {
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button onClick={handleBulkDeactivateUsers} style={{ background: '#ef4444', color: 'white', border: 'none', padding: '8px 14px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: '600', cursor: 'pointer' }}>
                     <FaBan size={11} /> Deactivate All
+                  </button>
+                  <button onClick={handleBulkReactivateUsers} style={{ background: '#10b981', color: 'white', border: 'none', padding: '8px 14px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: '600', cursor: 'pointer' }}>
+                    <FaCheckCircle size={11} /> Reactivate All
                   </button>
                   <button onClick={() => setSelectedUsers(new Set())} style={{ background: 'rgba(255,255,255,0.2)', color: 'white', border: 'none', padding: '8px 14px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: '600', cursor: 'pointer' }}>
                     Clear
@@ -1013,6 +1375,9 @@ export default function Admin() {
                   <button onClick={handleBulkArchivePosts} style={{ background: '#ef4444', color: 'white', border: 'none', padding: '8px 14px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: '600', cursor: 'pointer' }}>
                     <FaTrash size={11} /> Archive All
                   </button>
+                  <button onClick={handleBulkUnarchivePosts} style={{ background: '#10b981', color: 'white', border: 'none', padding: '8px 14px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: '600', cursor: 'pointer' }}>
+                    <FaUndo size={11} /> Restore All
+                  </button>
                   <button onClick={() => setSelectedPosts(new Set())} style={{ background: 'rgba(255,255,255,0.2)', color: 'white', border: 'none', padding: '8px 14px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: '600', cursor: 'pointer' }}>
                     Clear
                   </button>
@@ -1047,7 +1412,8 @@ export default function Admin() {
                 </thead>
                 <tbody>
                   {paginatedPosts.map(p => (
-                    <tr key={p.id} style={{ borderBottom: '1px solid #f3f4f6', opacity: p.isArchived ? 0.5 : 1 }}>
+                    <tr key={p.id} style={{ borderBottom: '1px solid #f3f4f6', opacity: p.isArchived ? 0.6 : 1, cursor: 'pointer' }}
+                      onClick={(e) => { if ((e.target as HTMLElement).tagName !== 'INPUT' && (e.target as HTMLElement).tagName !== 'BUTTON') setDrawerPost(p); }}>
                       <td style={tdStyle}>
                         <input type="checkbox" checked={selectedPosts.has(p.id)}
                           onChange={() => {
@@ -1075,15 +1441,28 @@ export default function Admin() {
                           {p.isArchived ? 'Archived' : p.isFeatured ? 'Featured' : (p.status || 'Active')}
                         </span>
                       </td>
-                      <td style={tdStyle}>
+                      <td style={tdStyle} onClick={e => e.stopPropagation()}>
                         <div style={{ display: 'flex', gap: '6px' }}>
+                          <button onClick={() => setDrawerPost(p)} style={actionBtnStyle} title="View Details">
+                            <FaEye size={12} />
+                          </button>
                           {!p.isArchived && (
                             <>
                               <button onClick={() => handleToggleFeatured(p.id, !!p.isFeatured)} style={{ ...actionBtnStyle, color: p.isFeatured ? '#d97706' : '#9ca3af' }} title={p.isFeatured ? "Unfeature" : "Feature"}>
                                 <FaStar size={12} />
                               </button>
-                              <button onClick={() => handleRemovePost(p.id)} style={{ ...actionBtnStyle, color: '#ef4444' }} title="Remove">
+                              <button onClick={() => handleRemovePost(p.id)} style={{ ...actionBtnStyle, color: '#ef4444' }} title="Archive">
                                 <FaTrash size={12} />
+                              </button>
+                            </>
+                          )}
+                          {p.isArchived && (
+                            <>
+                              <button onClick={() => handleRestorePost(p.id)} style={{ ...actionBtnStyle, color: '#10b981' }} title="Restore">
+                                <FaUndo size={12} />
+                              </button>
+                              <button onClick={() => handleHardDeletePost(p.id)} style={{ ...actionBtnStyle, color: '#ef4444' }} title="Delete Permanently">
+                                <FaTimesCircle size={12} />
                               </button>
                             </>
                           )}
@@ -1117,15 +1496,23 @@ export default function Admin() {
                 <p style={{ margin: '12px 0 0', color: '#6b7280', fontSize: '0.9rem' }}>No featured listings yet. Feature posts from the Posts tab.</p>
               </div>
             ) : (
-              featuredPosts.map(p => (
+              [...featuredPosts].sort((a, b) => (a.featuredOrder || 0) - (b.featuredOrder || 0)).map((p, idx) => (
                 <div key={p.id} style={{ ...cardStyle }}>
                   {p.images?.[0] && <img src={p.images[0]} style={{ width: '100%', height: '160px', borderRadius: '10px', objectFit: 'cover', marginBottom: '12px' }} alt="" />}
                   <h4 style={{ margin: '0 0 6px', fontSize: '1rem', fontWeight: '700', color: '#111' }}>{p.title || 'Untitled'}</h4>
                   <p style={{ margin: 0, fontSize: '0.82rem', color: '#6b7280' }}>{p.location || '—'} • {p.price || '—'}</p>
-                  <p style={{ margin: '4px 0 0', fontSize: '0.78rem', color: '#9ca3af' }}>By: {p.userName || '—'}</p>
-                  <button onClick={() => handleToggleFeatured(p.id, true)} style={{ ...actionBtnStyle, marginTop: '12px', color: '#ef4444', padding: '8px 14px' }}>
-                    <FaStar size={12} /> Unfeature
-                  </button>
+                  <p style={{ margin: '4px 0 0', fontSize: '0.78rem', color: '#9ca3af' }}>By: {p.userName || '—'} • Order: #{idx + 1}</p>
+                  <div style={{ display: 'flex', gap: '6px', marginTop: '12px' }}>
+                    <button onClick={() => handleChangeFeaturedOrder(p.id, "up")} disabled={idx === 0} style={{ ...actionBtnStyle, padding: '8px 10px', opacity: idx === 0 ? 0.4 : 1 }} title="Move Up">
+                      <FaArrowUp size={12} />
+                    </button>
+                    <button onClick={() => handleChangeFeaturedOrder(p.id, "down")} disabled={idx === featuredPosts.length - 1} style={{ ...actionBtnStyle, padding: '8px 10px', opacity: idx === featuredPosts.length - 1 ? 0.4 : 1 }} title="Move Down">
+                      <FaArrowDown size={12} />
+                    </button>
+                    <button onClick={() => handleToggleFeatured(p.id, true)} style={{ ...actionBtnStyle, color: '#ef4444', padding: '8px 14px' }}>
+                      <FaStar size={12} /> Unfeature
+                    </button>
+                  </div>
                 </div>
               ))
             )}
@@ -1135,13 +1522,13 @@ export default function Admin() {
         {/* ====== VERIFICATIONS TAB ====== */}
         {activeTab === 'verifications' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {pendingVerifications.length === 0 ? (
+            {filteredVerifications.length === 0 ? (
               <div style={{ background: 'white', borderRadius: '16px', border: '1px solid #e5e7eb', padding: '40px', textAlign: 'center' }}>
                 <FaCheckCircle size={32} color="#10b981" />
-                <p style={{ margin: '12px 0 0', color: '#6b7280', fontSize: '0.9rem' }}>No pending verifications.</p>
+                <p style={{ margin: '12px 0 0', color: '#6b7280', fontSize: '0.9rem' }}>No {verificationFilter === 'all' ? '' : verificationFilter} verifications found.</p>
               </div>
             ) : (
-              pendingVerifications.map(u => (
+              filteredVerifications.map(u => (
                 <div key={u.id} style={{ background: 'white', borderRadius: '16px', border: '1px solid #e5e7eb', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
                   {/* User Info Header */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '16px' }}>
@@ -1161,6 +1548,13 @@ export default function Admin() {
                           color: u.role === 'Seller' ? '#10b981' : '#2563eb'
                         }}>
                           {u.role}
+                        </span>
+                        {' '}&middot;{' '}
+                        <span style={{ padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: '600',
+                          background: u.verificationStatus === 'approved' ? '#ecfdf5' : u.verificationStatus === 'rejected' ? '#fef2f2' : u.verificationStatus === 'revoked' ? '#fef2f2' : '#fef3c7',
+                          color: u.verificationStatus === 'approved' ? '#10b981' : u.verificationStatus === 'rejected' ? '#ef4444' : u.verificationStatus === 'revoked' ? '#ef4444' : '#d97706',
+                        }}>
+                          {u.verificationStatus}
                         </span>
                         {' '}&middot; ID: <span style={{ fontFamily: 'monospace', fontSize: '0.78rem' }}>{u.customId}</span>
                         {' '}&middot; Registered: {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—'}
@@ -1258,12 +1652,26 @@ export default function Admin() {
                     <button onClick={() => setDrawerUser(u)} style={{ ...actionBtnStyle, padding: '10px 18px', fontSize: '0.82rem' }}>
                       <FaEye size={12} /> View Details
                     </button>
-                    <button onClick={() => handleRejectVerification(u.id)} style={{ ...actionBtnStyle, padding: '10px 18px', fontSize: '0.82rem', color: '#ef4444', background: '#fef2f2' }}>
-                      <FaTimesCircle size={12} /> Reject
-                    </button>
-                    <button onClick={() => handleApproveVerification(u.id)} style={{ background: '#10b981', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <FaCheckCircle size={12} /> Approve
-                    </button>
+                    {u.verificationStatus === 'pending' && (
+                      <>
+                        <button onClick={() => handleRejectVerification(u.id)} style={{ ...actionBtnStyle, padding: '10px 18px', fontSize: '0.82rem', color: '#ef4444', background: '#fef2f2' }}>
+                          <FaTimesCircle size={12} /> Reject
+                        </button>
+                        <button onClick={() => handleApproveVerification(u.id)} style={{ background: '#10b981', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <FaCheckCircle size={12} /> Approve
+                        </button>
+                      </>
+                    )}
+                    {u.verificationStatus === 'approved' && (
+                      <button onClick={() => handleRevokeVerification(u.id)} style={{ ...actionBtnStyle, padding: '10px 18px', fontSize: '0.82rem', color: '#ef4444', background: '#fef2f2' }}>
+                        <FaTimesCircle size={12} /> Revoke
+                      </button>
+                    )}
+                    {(u.verificationStatus === 'rejected' || u.verificationStatus === 'revoked') && (
+                      <button onClick={() => handleApproveVerification(u.id)} style={{ background: '#10b981', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <FaCheckCircle size={12} /> Re-Approve
+                      </button>
+                    )}
                   </div>
                 </div>
               ))
@@ -1308,16 +1716,23 @@ export default function Admin() {
                       </div>
                     )}
                   </div>
-                  {r.status === 'pending' && (
-                    <div style={{ display: 'flex', gap: '8px', marginLeft: '16px' }}>
-                      <button onClick={() => handleDismissReport(r.id)} style={{ ...actionBtnStyle, padding: '8px 14px', fontSize: '0.78rem' }} title="Dismiss">
-                        <FaTimes size={11} /> Dismiss
+                  <div style={{ display: 'flex', gap: '8px', marginLeft: '16px', flexDirection: 'column', alignItems: 'flex-end' }}>
+                    {r.postOwnerId && (
+                      <button onClick={() => { const u = users.find(u => u.id === r.postOwnerId); if (u) setDrawerUser(u); }} style={{ ...actionBtnStyle, padding: '6px 12px', fontSize: '0.72rem' }} title="View Post Owner">
+                        <FaEye size={10} /> Owner
                       </button>
-                      <button onClick={() => handleResolveReport(r.id, r.postId)} style={{ background: '#111827', color: 'white', border: 'none', padding: '8px 14px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <FaCheckCircle size={11} /> Resolve
-                      </button>
-                    </div>
-                  )}
+                    )}
+                    {r.status === 'pending' && (
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button onClick={() => handleDismissReport(r.id)} style={{ ...actionBtnStyle, padding: '8px 14px', fontSize: '0.78rem' }} title="Dismiss">
+                          <FaTimes size={11} /> Dismiss
+                        </button>
+                        <button onClick={() => handleResolveReport(r.id, r.postId)} style={{ background: '#111827', color: 'white', border: 'none', padding: '8px 14px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <FaCheckCircle size={11} /> Resolve
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))
             )}
@@ -1372,27 +1787,40 @@ export default function Admin() {
         {/* ====== ACTIVITY LOG TAB ====== */}
         {activeTab === 'activity' && (
           <div style={{ ...cardStyle }}>
-            {activityLogs.length === 0 ? (
-              <p style={{ color: '#9ca3af', fontSize: '0.85rem', textAlign: 'center', padding: '20px' }}>No activity logs yet.</p>
+            {filteredActivityLogs.length === 0 ? (
+              <p style={{ color: '#9ca3af', fontSize: '0.85rem', textAlign: 'center', padding: '20px' }}>No activity logs found.</p>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                {activityLogs.slice(0, 100).map((log, i) => (
-                  <div key={log.id || i} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px 0', borderBottom: '1px solid #f3f4f6' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <FaHistory size={12} color="#6b7280" />
+              <>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                  {paginatedActivityLogs.map((log, i) => (
+                    <div key={log.id || i} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px 0', borderBottom: '1px solid #f3f4f6' }}>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <FaHistory size={12} color="#6b7280" />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: '600', color: '#111' }}>
+                          {log.action?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                        </p>
+                        <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: '#6b7280' }}>{log.details}</p>
+                        <p style={{ margin: '2px 0 0', fontSize: '0.72rem', color: '#9ca3af' }}>
+                          by {log.adminEmail} • {log.timestamp ? new Date(log.timestamp).toLocaleString() : ''}
+                        </p>
+                      </div>
                     </div>
-                    <div style={{ flex: 1 }}>
-                      <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: '600', color: '#111' }}>
-                        {log.action?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
-                      </p>
-                      <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: '#6b7280' }}>{log.details}</p>
-                      <p style={{ margin: '2px 0 0', fontSize: '0.72rem', color: '#9ca3af' }}>
-                        by {log.adminEmail} • {log.timestamp ? new Date(log.timestamp).toLocaleString() : ''}
-                      </p>
+                  ))}
+                </div>
+                {totalActivityPages > 1 && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0 0', borderTop: '1px solid #e5e7eb', marginTop: '8px' }}>
+                    <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+                      Showing {(activityPage - 1) * ACTIVITY_PER_PAGE + 1}–{Math.min(activityPage * ACTIVITY_PER_PAGE, filteredActivityLogs.length)} of {filteredActivityLogs.length}
+                    </span>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button disabled={activityPage <= 1} onClick={() => setActivityPage(p => p - 1)} style={{ ...actionBtnStyle, opacity: activityPage <= 1 ? 0.4 : 1 }}>Prev</button>
+                      <button disabled={activityPage >= totalActivityPages} onClick={() => setActivityPage(p => p + 1)} style={{ ...actionBtnStyle, opacity: activityPage >= totalActivityPages ? 0.4 : 1 }}>Next</button>
                     </div>
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -1428,10 +1856,29 @@ export default function Admin() {
                   placeholder="Write your message here..."
                 />
               </div>
-              <button onClick={handleSendBroadcast} disabled={isSendingBroadcast}
-                style={{ background: '#111827', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '10px', fontSize: '0.9rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', opacity: isSendingBroadcast ? 0.7 : 1 }}>
-                {isSendingBroadcast ? <><FaSpinner className="spin" /> Sending...</> : <><FaEnvelope size={14} /> Send Broadcast</>}
-              </button>
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                <button onClick={handleSendBroadcast} disabled={isSendingBroadcast}
+                  style={{ background: '#111827', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '10px', fontSize: '0.9rem', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', opacity: isSendingBroadcast ? 0.7 : 1 }}>
+                  {isSendingBroadcast ? <><FaSpinner className="spin" /> Sending...</> : <><FaEnvelope size={14} /> Send Broadcast</>}
+                </button>
+                <button onClick={() => setShowBroadcastPreview(!showBroadcastPreview)}
+                  style={{ ...actionBtnStyle, padding: '12px 20px', fontSize: '0.9rem' }}>
+                  <FaEye size={14} /> {showBroadcastPreview ? 'Hide Preview' : 'Preview'}
+                </button>
+              </div>
+              {showBroadcastPreview && (broadcastSubject || broadcastBody) && (
+                <div style={{ marginTop: '16px', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '20px', background: '#f9fafb' }}>
+                  <p style={{ margin: '0 0 4px', fontSize: '0.75rem', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email Preview</p>
+                  <p style={{ margin: '0 0 8px', fontSize: '1rem', fontWeight: '700', color: '#111' }}>{broadcastSubject || '(No subject)'}</p>
+                  <div style={{ fontSize: '0.9rem', color: '#374151', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{broadcastBody || '(No body)'}</div>
+                  <p style={{ margin: '12px 0 0', fontSize: '0.75rem', color: '#9ca3af' }}>Target: {broadcastTarget} • Recipients: {
+                    broadcastTarget === 'all' ? users.filter(u => u.email && !u.isDeactivated).length :
+                    broadcastTarget === 'sellers' ? users.filter(u => u.role === 'Seller' && u.email && !u.isDeactivated).length :
+                    broadcastTarget === 'agents' ? users.filter(u => u.role === 'Agent' && u.email && !u.isDeactivated).length :
+                    users.filter(u => u.role === 'Client' && u.email && !u.isDeactivated).length
+                  }</p>
+                </div>
+              )}
             </div>
 
             {/* Platform Info */}
@@ -1443,7 +1890,6 @@ export default function Admin() {
                   { label: "Admin Email", value: user?.email || "—" },
                   { label: "Total Database Records", value: `${totalUsers + posts.length + reports.length}` },
                   { label: "Frontend URL", value: window.location.origin },
-                  { label: "API URL", value: import.meta.env.VITE_API_URL || "http://localhost:3000" },
                 ].map((item, i) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f3f4f6' }}>
                     <span style={{ fontSize: '0.85rem', color: '#6b7280' }}>{item.label}</span>
@@ -1513,6 +1959,7 @@ export default function Admin() {
                 { label: "Address", value: drawerUser.fullAddress ? `${drawerUser.fullAddress.street}, ${drawerUser.fullAddress.city}` : drawerUser.address },
                 { label: "PRC License No", value: drawerUser.prcLicenseNo },
                 { label: "Verification Status", value: drawerUser.verificationStatus },
+                { label: "Total Posts", value: String(getUserPostCount(drawerUser.id)) },
                 { label: "Joined", value: drawerUser.createdAt ? new Date(drawerUser.createdAt).toLocaleString() : '—' },
               ].filter(item => item.value).map((item, i) => (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f3f4f6' }}>
@@ -1564,9 +2011,107 @@ export default function Admin() {
               <button onClick={() => { handleDeactivateUser(drawerUser.id, !drawerUser.isDeactivated); }} style={{ ...actionBtnStyle, width: '100%', justifyContent: 'center', padding: '10px', color: drawerUser.isDeactivated ? '#10b981' : '#ef4444' }}>
                 <FaBan size={12} /> {drawerUser.isDeactivated ? 'Reactivate' : 'Deactivate'}
               </button>
+              {drawerUser.role !== 'Admin' && (
+                <button onClick={() => handlePromoteToAdmin(drawerUser.id)} style={{ ...actionBtnStyle, width: '100%', justifyContent: 'center', padding: '10px', color: '#d97706' }}>
+                  <FaUserShield size={12} /> Promote to Admin
+                </button>
+              )}
+              {drawerUser.role === 'Admin' && drawerUser.id !== user?.uid && (
+                <button onClick={() => handleDemoteFromAdmin(drawerUser.id)} style={{ ...actionBtnStyle, width: '100%', justifyContent: 'center', padding: '10px', color: '#ef4444' }}>
+                  <FaUserShield size={12} /> Demote from Admin
+                </button>
+              )}
               <button onClick={() => { navigate(`/profile/${drawerUser.id}`); }} style={{ ...actionBtnStyle, width: '100%', justifyContent: 'center', padding: '10px' }}>
                 <FaEye size={12} /> View Public Profile
               </button>
+              <div style={{ borderTop: '1px solid #fef2f2', paddingTop: '8px', marginTop: '4px' }}>
+                <button onClick={() => handleHardDeleteUser(drawerUser.id)} style={{ ...actionBtnStyle, width: '100%', justifyContent: 'center', padding: '10px', color: '#ef4444', background: '#fef2f2' }}>
+                  <FaTimesCircle size={12} /> Permanently Delete User
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Post Detail Drawer */}
+      {drawerPost && (
+        <>
+          <div onClick={() => setDrawerPost(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 60 }} />
+          <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: '420px', maxWidth: '90vw', background: 'white', zIndex: 70, boxShadow: '-8px 0 30px rgba(0,0,0,0.12)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            {/* Header */}
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700' }}>Post Details</h3>
+              <button onClick={() => setDrawerPost(null)} style={{ background: '#f3f4f6', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer' }}>
+                <FaTimes />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
+              {/* Images */}
+              {drawerPost.images && drawerPost.images.length > 0 && (
+                <div style={{ display: 'grid', gridTemplateColumns: drawerPost.images.length === 1 ? '1fr' : '1fr 1fr', gap: '8px', marginBottom: '20px' }}>
+                  {drawerPost.images.map((img: string, i: number) => (
+                    <img key={i} src={img} alt={`Post image ${i + 1}`} style={{ width: '100%', height: '140px', objectFit: 'cover', borderRadius: '12px', border: '1px solid #e5e7eb' }} />
+                  ))}
+                </div>
+              )}
+
+              {/* Title */}
+              <h4 style={{ margin: '0 0 12px', fontSize: '1.05rem', fontWeight: '700', color: '#111827' }}>{drawerPost.title || 'Untitled Post'}</h4>
+
+              {/* Details */}
+              {[
+                { label: 'Owner', value: drawerPost.ownerName || drawerPost.ownerId || 'Unknown' },
+                { label: 'Price', value: drawerPost.price ? `₱${Number(drawerPost.price).toLocaleString()}` : 'N/A' },
+                { label: 'Category', value: drawerPost.category || 'N/A' },
+                { label: 'Location', value: drawerPost.location || drawerPost.address || 'N/A' },
+                { label: 'Status', value: drawerPost.isArchived ? 'Archived' : 'Active' },
+                { label: 'Featured', value: drawerPost.isFeatured ? 'Yes' : 'No' },
+                { label: 'Created', value: drawerPost.createdAt?.toDate ? new Date(drawerPost.createdAt.toDate()).toLocaleDateString() : 'N/A' },
+              ].map((d, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #f3f4f6' }}>
+                  <span style={{ color: '#6b7280', fontSize: '0.85rem' }}>{d.label}</span>
+                  <span style={{ fontWeight: '600', fontSize: '0.85rem', color: '#111827', textAlign: 'right', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.value}</span>
+                </div>
+              ))}
+
+              {/* Description */}
+              {drawerPost.description && (
+                <div style={{ marginTop: '16px' }}>
+                  <span style={{ color: '#6b7280', fontSize: '0.85rem', fontWeight: '600' }}>Description</span>
+                  <p style={{ margin: '6px 0 0', fontSize: '0.88rem', color: '#374151', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>{drawerPost.description}</p>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '20px' }}>
+                <button onClick={() => { handleToggleFeatured(drawerPost.id, drawerPost.isFeatured); setDrawerPost({ ...drawerPost, isFeatured: !drawerPost.isFeatured }); }} style={{ ...actionBtnStyle, width: '100%', justifyContent: 'center', padding: '10px', color: drawerPost.isFeatured ? '#ef4444' : '#d97706' }}>
+                  <FaStar size={12} /> {drawerPost.isFeatured ? 'Remove from Featured' : 'Add to Featured'}
+                </button>
+                {!drawerPost.isArchived ? (
+                  <button onClick={() => { handleRemovePost(drawerPost.id); setDrawerPost(null); }} style={{ ...actionBtnStyle, width: '100%', justifyContent: 'center', padding: '10px', color: '#ef4444' }}>
+                    <FaArchive size={12} /> Archive Post
+                  </button>
+                ) : (
+                  <>
+                    <button onClick={() => { handleRestorePost(drawerPost.id); setDrawerPost(null); }} style={{ ...actionBtnStyle, width: '100%', justifyContent: 'center', padding: '10px', color: '#10b981' }}>
+                      <FaUndo size={12} /> Restore Post
+                    </button>
+                    <div style={{ borderTop: '1px solid #fef2f2', paddingTop: '8px', marginTop: '4px' }}>
+                      <button onClick={() => { handleHardDeletePost(drawerPost.id); setDrawerPost(null); }} style={{ ...actionBtnStyle, width: '100%', justifyContent: 'center', padding: '10px', color: '#ef4444', background: '#fef2f2' }}>
+                        <FaTimesCircle size={12} /> Permanently Delete
+                      </button>
+                    </div>
+                  </>
+                )}
+                {drawerPost.ownerId && (
+                  <button onClick={() => { const owner = users.find((u: any) => u.id === drawerPost.ownerId); if (owner) { setDrawerPost(null); setDrawerUser(owner); } }} style={{ ...actionBtnStyle, width: '100%', justifyContent: 'center', padding: '10px' }}>
+                    <FaEye size={12} /> View Post Owner
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </>
